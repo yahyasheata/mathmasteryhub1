@@ -19,8 +19,9 @@
 
 .public-landing .landing-hero {
   isolation: isolate;
-  min-height: 38rem;
-  padding-block: clamp(4.5rem, 8vw, 7.5rem);
+  min-height: 36rem;
+  padding-block: clamp(4.25rem, 7vw, 6.75rem);
+  border-bottom: 1px solid color-mix(in srgb, var(--border) 86%, transparent);
   background:
     linear-gradient(135deg, color-mix(in srgb, var(--secondary) 8%, var(--surface)) 0%, transparent 53%),
     linear-gradient(315deg, color-mix(in srgb, var(--primary) 9%, var(--surface)) 0%, transparent 45%),
@@ -79,7 +80,8 @@
   font-size: clamp(2.65rem, 5.5vw, 5.35rem);
   font-weight: 800;
   letter-spacing: -.055em;
-  line-height: .98;
+  line-height: 1.02;
+  text-wrap: balance;
 }
 
 .public-landing .landing-hero-highlight,
@@ -101,6 +103,8 @@
   max-width: 38rem;
   margin-bottom: var(--space-8);
   font-size: clamp(1rem, 1.5vw, 1.2rem);
+  line-height: 1.7;
+  text-wrap: pretty;
 }
 
 .public-landing .landing-hero-actions { justify-content: flex-start; }
@@ -112,7 +116,8 @@
   justify-content: center;
   gap: var(--space-2);
   border: 1px solid transparent;
-  border-radius: var(--radius-md);
+  padding-inline: calc(var(--space-6) + var(--space-1));
+  border-radius: var(--radius-pill);
   box-shadow: var(--shadow-sm);
   transition: transform var(--transition), box-shadow var(--transition), background-color var(--transition), border-color var(--transition);
 }
@@ -152,6 +157,7 @@
   background: color-mix(in srgb, var(--surface-elevated) 92%, transparent);
   box-shadow: var(--shadow-sm);
   backdrop-filter: blur(12px);
+  transition: transform var(--transition), border-color var(--transition), box-shadow var(--transition), background-color var(--transition);
 }
 
 .public-landing .landing-highlight-card:hover {
@@ -186,6 +192,7 @@
 .public-landing .landing-section {
   position: relative;
   padding-block: clamp(4.5rem, 8vw, 7rem);
+  scroll-margin-top: 5rem;
 }
 
 .public-landing .landing-categories { background: var(--bg-primary); }
@@ -203,7 +210,7 @@
   border-top: 2px solid var(--primary);
   border-radius: 50%;
   content: "";
-  opacity: .84;
+  opacity: .68;
   transform: rotate(-2deg);
 }
 
@@ -230,6 +237,7 @@
 
 .public-landing .courses-swiper { padding: 0 var(--space-2) 3.5rem; }
 .public-landing .courses-swiper .swiper-slide { height: auto; padding-top: var(--space-2); }
+.public-landing .courses-swiper .swiper-wrapper { align-items: stretch; }
 
 .public-landing .landing-course-card {
   display: flex;
@@ -239,7 +247,7 @@
   border: 1px solid var(--border);
   border-radius: var(--radius-xl);
   background: transparent;
-  box-shadow: var(--shadow-sm);
+  box-shadow: 0 10px 28px color-mix(in srgb, var(--text-muted) 10%, transparent);
   overflow: visible;
   transition: transform var(--transition), border-color var(--transition), box-shadow var(--transition);
 }
@@ -247,7 +255,13 @@
 .public-landing .landing-course-card:hover {
   border-color: color-mix(in srgb, var(--secondary) 48%, var(--border));
   box-shadow: var(--shadow-md);
-  transform: translateY(-5px);
+  transform: translateY(-4px);
+}
+
+.public-landing .landing-course-card:focus-within,
+.public-landing .landing-category-card:focus-within {
+  border-color: color-mix(in srgb, var(--secondary) 55%, var(--border));
+  box-shadow: var(--shadow-focus), var(--shadow-sm);
 }
 
 .public-landing .landing-course-media {
@@ -282,7 +296,7 @@
   border: 1px solid var(--border);
   border-radius: var(--radius-lg);
   background: var(--surface-elevated);
-  box-shadow: var(--shadow-sm);
+  box-shadow: 0 8px 22px color-mix(in srgb, var(--text-muted) 9%, transparent);
 }
 
 .public-landing .landing-course-title,
@@ -391,7 +405,7 @@
   border: 1px solid var(--border);
   border-radius: var(--radius-lg);
   background: var(--surface);
-  box-shadow: var(--shadow-xs);
+  box-shadow: var(--shadow-sm);
   overflow: hidden;
   transition: transform var(--transition), border-color var(--transition), box-shadow var(--transition);
 }
@@ -419,12 +433,15 @@
 }
 
 .public-landing .landing-feature-card {
+  position: relative;
+  display: flex;
+  flex-direction: column;
   height: 100%;
   padding: var(--space-6);
   border: 1px solid var(--border);
   border-radius: var(--radius-lg);
   background: var(--surface);
-  box-shadow: var(--shadow-xs);
+  box-shadow: var(--shadow-sm);
   transition: transform var(--transition), border-color var(--transition), box-shadow var(--transition);
 }
 
@@ -434,11 +451,25 @@
   transform: translateY(-4px);
 }
 
-.public-landing .landing-feature-icon { color: var(--secondary); }
+.public-landing .landing-feature-icon {
+  display: inline-flex;
+  width: 3rem;
+  height: 3rem;
+  align-items: center;
+  justify-content: center;
+  margin-bottom: var(--space-5);
+  border: 1px solid color-mix(in srgb, var(--secondary) 18%, var(--border));
+  border-radius: var(--radius-md);
+  background: var(--secondary-soft);
+  color: var(--secondary);
+}
 .public-landing .landing-feature-card:nth-child(2) .landing-feature-icon,
-.public-landing .landing-feature-card:nth-child(5) .landing-feature-icon { color: var(--primary); }
+.public-landing .landing-feature-card:nth-child(5) .landing-feature-icon { color: var(--primary); background: var(--primary-soft); border-color: color-mix(in srgb, var(--primary) 18%, var(--border)); }
 .public-landing .landing-feature-card:nth-child(3) .landing-feature-icon,
-.public-landing .landing-feature-card:nth-child(6) .landing-feature-icon { color: var(--accent); }
+.public-landing .landing-feature-card:nth-child(6) .landing-feature-icon { color: var(--accent); background: var(--accent-soft); border-color: color-mix(in srgb, var(--accent) 22%, var(--border)); }
+
+.public-landing .landing-feature-card h3 { letter-spacing: -.02em; }
+.public-landing .landing-feature-card p { margin: 0; line-height: 1.65; }
 
 .public-landing footer { margin-top: 0; background: var(--surface); }
 .public-landing footer a:hover { color: var(--primary); }
@@ -467,7 +498,7 @@ html.dark .public-landing footer { background: var(--surface-elevated); }
 }
 
 @media (max-width: 767px) {
-  .public-landing .landing-hero { min-height: auto; }
+  .public-landing .landing-hero { min-height: auto; padding-block: clamp(3.75rem, 14vw, 5rem); }
   .public-landing .landing-hero-title { max-width: 14ch; margin-inline: auto; }
   .public-landing .landing-hero-highlights { grid-template-columns: 1fr; }
   .public-landing .landing-highlight-card { padding: var(--space-4); }
@@ -482,6 +513,8 @@ html.dark .public-landing footer { background: var(--surface-elevated); }
     border-radius: 0 0 calc(var(--radius-xl) - 1px) calc(var(--radius-xl) - 1px);
     box-shadow: none;
   }
+  .public-landing .landing-course-card { box-shadow: var(--shadow-sm); }
+  .public-landing .landing-feature-card { padding: var(--space-5); }
   .public-landing .courses-swiper .swiper-button-next,
   .public-landing .courses-swiper .swiper-button-prev { display: none; }
   .public-landing .landing-category-media { height: clamp(11rem, 54vw, 14rem); }
