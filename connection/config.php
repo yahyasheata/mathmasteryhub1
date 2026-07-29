@@ -43,10 +43,10 @@ mmh_load_local_env(__DIR__ . '/../.env');
 
 date_default_timezone_set('Africa/Cairo');
 
-$host = '127.0.0.1';
-$user = 'root';
-$pass = '';
-$db = 'mathmsgv_lms';
+$host = getenv('DB_HOST') ?: '127.0.0.1';
+$user = getenv('DB_USER') ?: 'root';
+$pass = getenv('DB_PASS') ?: '';
+$db = getenv('DB_NAME') ?: 'mathmsgv_lms';
 
 mysqli_report(MYSQLI_REPORT_OFF);
 $conn = mysqli_connect($host, $user, $pass, $db);
