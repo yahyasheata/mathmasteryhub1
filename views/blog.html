@@ -1,0 +1,732 @@
+<html lang="ar" dir="rtl"><head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="csrf-token" content="8imjeNfqeUBgH3a6IsmtdETFfJXHzq4U01KEqJQ7">  
+    <title>المدونة | <?=$site_name;?></title>
+<meta name="title" content="المدونة | <?=$site_name;?>">
+<!---
+وَما نَيلُ المَطالِبِ بِالتَمَنّي وَلَكِن تُؤخَذُ الدُنيا غِلاباوَ
+ما اِستَعصى عَلى قَومٍ مَن الٌإِذا الإِقدامُ كانَ لَهُم رِكابا
+أحمد شوقي
+---> 
+<link rel="icon" type="image/png" href="images/default/favicon.png"> 
+<link rel="icon" type="image/png" sizes="512x512" href="data:image/png;base64,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">
+<link rel="manifest" href="manifest.json">
+<meta name="theme-color" content="#36876f">
+<meta name="mobile-web-app-capable" content="no">
+<meta name="application-name" content="<?=$site_name;?>">
+
+
+<meta name="facebook-domain-verification" content="vymdke86bl9vdcyleijy0r173c6k7c">
+<meta name="apple-mobile-web-app-capable" content="no">
+<meta name="apple-mobile-web-app-status-bar-style" content="black">
+<meta name="apple-mobile-web-app-title" content="<?=$site_name;?>">
+<link rel="apple-touch-icon" href="images/default/favicon.png?v=2">
+
+<link href="images/default/favicon.png" media="(device-width: 320px) and (device-height: 568px) and (-webkit-device-pixel-ratio: 2)" rel="apple-touch-startup-image">
+<link href="images/default/favicon.png" media="(device-width: 375px) and (device-height: 667px) and (-webkit-device-pixel-ratio: 2)" rel="apple-touch-startup-image">
+<link href="images/default/favicon.png" media="(device-width: 621px) and (device-height: 1104px) and (-webkit-device-pixel-ratio: 3)" rel="apple-touch-startup-image">
+<link href="images/default/favicon.png" media="(device-width: 375px) and (device-height: 812px) and (-webkit-device-pixel-ratio: 3)" rel="apple-touch-startup-image">
+<link href="images/default/favicon.png" media="(device-width: 414px) and (device-height: 896px) and (-webkit-device-pixel-ratio: 2)" rel="apple-touch-startup-image">
+<link href="images/default/favicon.png" media="(device-width: 414px) and (device-height: 896px) and (-webkit-device-pixel-ratio: 3)" rel="apple-touch-startup-image">
+<link href="images/default/favicon.png" media="(device-width: 768px) and (device-height: 1024px) and (-webkit-device-pixel-ratio: 2)" rel="apple-touch-startup-image">
+<link href="images/default/favicon.png" media="(device-width: 834px) and (device-height: 1112px) and (-webkit-device-pixel-ratio: 2)" rel="apple-touch-startup-image">
+<link href="images/default/favicon.png" media="(device-width: 834px) and (device-height: 1194px) and (-webkit-device-pixel-ratio: 2)" rel="apple-touch-startup-image">
+<link href="images/default/favicon.png" media="(device-width: 1024px) and (device-height: 1366px) and (-webkit-device-pixel-ratio: 2)" rel="apple-touch-startup-image"> 
+
+<link rel="alternate" href="blog" hreflang="x-default">
+
+<meta name="author" content="<?=$site_name;?>">
+<meta name="description" content="<?=$site_name;?>">
+<link rel="canonical" href="blog">
+
+
+<meta name="msapplication-TileColor" content="#36876f">
+<meta name="msapplication-TileImage" content="images/default/favicon.png">
+<meta name="msapplication-square70x70logo" content="images/default/cover.png">
+<meta name="msapplication-square150x150logo" content="images/default/cover.png">
+<meta name="msapplication-wide310x150logo" content="images/default/cover.png">
+<meta name="msapplication-square310x310logo" content="images/default/cover.png">
+<link rel="apple-touch-icon-precomposed" href="images/default/cover.png">
+
+<meta property="og:type" content="website">
+<meta property="og:site_name" content="<?=$site_name;?>">
+<meta property="og:locale" content="ar_AR">
+<meta property="og:locale:alternate" content="ar_AR">
+<meta property="og:url" content="blog">
+<meta property="og:title" content="المدونة | <?=$site_name;?>">
+<meta property="og:description" content="<?=$site_name;?>">
+<meta property="og:image" content="images/default/cover.png">
+
+<meta itemprop="name" content="المدونة | <?=$site_name;?>">
+<meta itemprop="url" content="http://127.0.0.1:8000">
+<meta itemprop="author" content="<?=$site_name;?>">
+<meta itemprop="image" content="images/default/cover.png">
+<meta itemprop="description" content="<?=$site_name;?>">
+
+<meta name="twitter:image" content="images/default/cover.png">
+<meta name="twitter:card" content="summary">
+<meta name="twitter:site" content="@Nafezly">
+<meta name="twitter:creator" content="@Nafezly">
+<meta name="twitter:title" content="المدونة | <?=$site_name;?>">
+<meta name="twitter:image:src" content="images/default/cover.png">
+<meta name="twitter:description" content="<?=$site_name;?>">
+
+
+<link rel="help" title="FAQ" href="faq">
+<link rel="alternate" type="application/rss+xml" title="آخر الأخبار" href="feed">
+<script type="application/ld+json">
+{
+    "@context": "http://schema.org",
+    "@type": "Organization",
+    "name": "<?=$site_name;?>",
+    "url": "http://127.0.0.1:8000",
+    "logo": "images/default/favicon.png",
+            "sameAs": [
+       
+                                    "admin/settings" 
+                ,                                                "admin/settings" 
+                ,                                                "admin/settings" 
+                ,                                                "admin/settings" 
+                                        ],
+        "contactPoint": [
+                {
+            "@type": "ContactPoint",
+            "telephone": "1556456456456",
+            "contactType": "customer support"
+        },
+        {
+            "@type": "ContactPoint",
+            "telephone": "1556456456456",
+            "contactType": "technical support"
+        }, {
+            "@type": "ContactPoint",
+            "telephone": "1556456456456",
+            "contactType": "billing support"
+        }
+            ]
+}
+{
+    "@context": "http://schema.org",
+    "@type": "WebSite",
+    "url": "http://127.0.0.1:8000",
+    "potentialAction": {
+        "@type": "SearchAction",
+        "target": "q?key={search_term_string}",
+        "query-input": "required name=search_term_string"
+    }
+}
+{
+    "@context": "https://schema.org",
+    "@type": "WebPage",
+    "name": "المدونة | <?=$site_name;?>",
+    "description": "<?=$site_name;?>",
+    "publisher": {
+        "@type": "Organization",
+        "name": "<?=$site_name;?>"
+    }
+}
+</script>
+<script type="text/javascript">
+    if ('serviceWorker' in navigator) {
+        navigator.serviceWorker.register('/serviceworker.js', {
+            scope: '.'
+        }).then(function (registration) { 
+            console.log('Laravel PWA: ServiceWorker registration successful with scope: ', registration.scope);
+        }, function (err) { 
+            console.log('Laravel PWA: ServiceWorker registration failed: ', err);
+        });
+    }
+</script>    
+    
+
+
+    
+    <!-- Livewire Styles --><style>[wire\:loading], [wire\:loading\.delay], [wire\:loading\.inline-block], [wire\:loading\.inline], [wire\:loading\.block], [wire\:loading\.flex], [wire\:loading\.table], [wire\:loading\.grid], [wire\:loading\.inline-flex] {display: none;}[wire\:loading\.delay\.shortest], [wire\:loading\.delay\.shorter], [wire\:loading\.delay\.short], [wire\:loading\.delay\.long], [wire\:loading\.delay\.longer], [wire\:loading\.delay\.longest] {display:none;}[wire\:offline] {display: none;}[wire\:dirty]:not(textarea):not(input):not(select) {display: none;}</style>
+                    <link rel="preload" as="style" href="build/assets/app-38448552.css"><link rel="stylesheet" href="build/assets/app-38448552.css" data-navigate-track="reload">    
+    <style type="text/css">
+        body {
+            --bg-main: #fff;
+            --bg-second: #f4f4f4;
+            --font-1: #333333;
+            --font-2: #555555;
+            --border-color: #dddddd;
+            --main-color: #0194fe;
+            --main-color-rgb: 1,148,254;
+            --main-color-flexable: #0194fe;
+            --scroll-bar-color: #d1d1d1;
+        }
+        body.night {
+            --bg-main: #1c222b;
+            --bg-second: #131923;
+            --font-1: #fff;
+            --font-2: #e3e3e3;
+            --border-color: #33343b;
+            --main-color: #0194fe;
+            --main-color-rgb: 1,148,254;
+            --main-color-flexable: #15202b;
+            --scroll-bar-color: #505050;
+        }
+        
+    </style>
+    
+<script type="text/javascript" class="flasher-js">(function() {    var rootScript = '/vendor/flasher/flasher.min.js';    var FLASHER_FLASH_BAG_PLACE_HOLDER = {};    var options = mergeOptions([], FLASHER_FLASH_BAG_PLACE_HOLDER);    function mergeOptions(first, second) {        return {            context: merge(first.context || {}, second.context || {}),            envelopes: merge(first.envelopes || [], second.envelopes || []),            options: merge(first.options || {}, second.options || {}),            scripts: merge(first.scripts || [], second.scripts || []),            styles: merge(first.styles || [], second.styles || []),        };    }    function merge(first, second) {        if (Array.isArray(first) && Array.isArray(second)) {            return first.concat(second).filter(function(item, index, array) {                return array.indexOf(item) === index;            });        }        return Object.assign({}, first, second);    }    function renderOptions(options) {        if(!window.hasOwnProperty('flasher')) {            console.error('Flasher is not loaded');            return;        }        requestAnimationFrame(function () {            window.flasher.render(options);        });    }    function render(options) {        if ('loading' !== document.readyState) {            renderOptions(options);            return;        }        document.addEventListener('DOMContentLoaded', function() {            renderOptions(options);        });    }    if (1 === document.querySelectorAll('script.flasher-js').length) {        document.addEventListener('flasher:render', function (event) {            render(event.detail);        });    }    if (window.hasOwnProperty('flasher') || !rootScript || document.querySelector('script[src="' + rootScript + '"]')) {        render(options);    } else {        var tag = document.createElement('script');        tag.setAttribute('src', rootScript);        tag.setAttribute('type', 'text/javascript');        tag.onload = function () {            render(options);        };        document.head.appendChild(tag);    }})();</script><script src="vendor/flasher/flasher.min.js" type="text/javascript"></script>
+<style>/* Make clicks pass-through */
+    #nprogress {
+      pointer-events: none;
+    }
+
+    #nprogress .bar {
+    //   background: #FC70A9;
+      background: #29d;
+
+      position: fixed;
+      z-index: 1031;
+      top: 0;
+      left: 0;
+
+      width: 100%;
+      height: 2px;
+    }
+
+    /* Fancy blur effect */
+    #nprogress .peg {
+      display: block;
+      position: absolute;
+      right: 0px;
+      width: 100px;
+      height: 100%;
+      box-shadow: 0 0 10px #29d, 0 0 5px #29d;
+      opacity: 1.0;
+
+      -webkit-transform: rotate(3deg) translate(0px, -4px);
+          -ms-transform: rotate(3deg) translate(0px, -4px);
+              transform: rotate(3deg) translate(0px, -4px);
+    }
+
+    /* Remove these to get rid of the spinner */
+    #nprogress .spinner {
+      display: block;
+      position: fixed;
+      z-index: 1031;
+      top: 15px;
+      right: 15px;
+    }
+
+    #nprogress .spinner-icon {
+      width: 18px;
+      height: 18px;
+      box-sizing: border-box;
+
+      border: solid 2px transparent;
+      border-top-color: #29d;
+      border-left-color: #29d;
+      border-radius: 50%;
+
+      -webkit-animation: nprogress-spinner 400ms linear infinite;
+              animation: nprogress-spinner 400ms linear infinite;
+    }
+
+    .nprogress-custom-parent {
+      overflow: hidden;
+      position: relative;
+    }
+
+    .nprogress-custom-parent #nprogress .spinner,
+    .nprogress-custom-parent #nprogress .bar {
+      position: absolute;
+    }
+
+    @-webkit-keyframes nprogress-spinner {
+      0%   { -webkit-transform: rotate(0deg); }
+      100% { -webkit-transform: rotate(360deg); }
+    }
+    @keyframes nprogress-spinner {
+      0%   { transform: rotate(0deg); }
+      100% { transform: rotate(360deg); }
+    }
+    </style><style type="text/css">.fl-main-container{position:fixed;transition:all 1s ease-in-out;width:24em;z-index:99999}@media only screen and (max-width:480px){.fl-main-container{left:.5em;right:.5em;width:auto}}.fl-main-container[data-position^=top-]{top:.5em}.fl-main-container[data-position^=bottom-]{bottom:.5em}.fl-main-container[data-position$=-right]{right:.5em}.fl-main-container[data-position$=-right] .fl-container{transform:translateX(110%)}.fl-main-container[data-position$=-left]{left:.5em}.fl-main-container[data-position$=-left] .fl-container{transform:translateX(-110%)}.fl-main-container[data-position$=-center]{left:50%;transform:translateX(-50%)}.fl-main-container[data-position=top-center] .fl-container{transform:translateY(-100vh)}.fl-main-container[data-position=bottom-center] .fl-container{transform:translateY(100vh)}.fl-main-container .fl-container{transition:transform .3s ease-in-out}.fl-main-container .fl-container.fl-show{transform:translate(0)}.fl-main-container .fl-container .fl-progress-bar{display:flex;height:.125em;margin-left:-1px}.fl-main-container .fl-container.fl-rtl{direction:rtl}.fl-main-container .fl-container.fl-rtl .fl-progress-bar{margin-left:auto;margin-right:-1px}.fl-main-container .fl-container.fl-success .fl-icon{background-color:#059669}.fl-main-container .fl-container.fl-success .fl-progress-bar{background-color:#6dface}.fl-main-container .fl-container.fl-success .fl-progress-bar .fl-progress{background-color:#059669}.fl-main-container .fl-container.fl-flasher.fl-success{border-left:.8em solid #059669}.fl-main-container .fl-container.fl-flasher.fl-success.fl-rtl{border-left:none;border-right:.8em solid #059669}.fl-main-container .fl-container.fl-flasher.fl-success:not(.fl-rtl){border-left:.8em solid #059669;border-right:none}.fl-main-container .fl-container.fl-flasher.fl-success .fl-title{color:#059669}.fl-main-container .fl-container.fl-info .fl-icon{background-color:#2563eb}.fl-main-container .fl-container.fl-info .fl-progress-bar{background-color:#e0e9fc}.fl-main-container .fl-container.fl-info .fl-progress-bar .fl-progress{background-color:#2563eb}.fl-main-container .fl-container.fl-flasher.fl-info{border-left:.8em solid #2563eb}.fl-main-container .fl-container.fl-flasher.fl-info.fl-rtl{border-left:none;border-right:.8em solid #2563eb}.fl-main-container .fl-container.fl-flasher.fl-info:not(.fl-rtl){border-left:.8em solid #2563eb;border-right:none}.fl-main-container .fl-container.fl-flasher.fl-info .fl-title{color:#2563eb}.fl-main-container .fl-container.fl-warning .fl-icon{background-color:#d97706}.fl-main-container .fl-container.fl-warning .fl-progress-bar{background-color:#fdd8ae}.fl-main-container .fl-container.fl-warning .fl-progress-bar .fl-progress{background-color:#d97706}.fl-main-container .fl-container.fl-flasher.fl-warning{border-left:.8em solid #d97706}.fl-main-container .fl-container.fl-flasher.fl-warning.fl-rtl{border-left:none;border-right:.8em solid #d97706}.fl-main-container .fl-container.fl-flasher.fl-warning:not(.fl-rtl){border-left:.8em solid #d97706;border-right:none}.fl-main-container .fl-container.fl-flasher.fl-warning .fl-title{color:#d97706}.fl-main-container .fl-container.fl-error .fl-icon{background-color:#dc2626}.fl-main-container .fl-container.fl-error .fl-progress-bar{background-color:#f8d6d6}.fl-main-container .fl-container.fl-error .fl-progress-bar .fl-progress{background-color:#dc2626}.fl-main-container .fl-container.fl-flasher.fl-error{border-left:.8em solid #dc2626}.fl-main-container .fl-container.fl-flasher.fl-error.fl-rtl{border-left:none;border-right:.8em solid #dc2626}.fl-main-container .fl-container.fl-flasher.fl-error:not(.fl-rtl){border-left:.8em solid #dc2626;border-right:none}.fl-main-container .fl-container.fl-flasher.fl-error .fl-title{color:#dc2626}.fl-main-container .fl-container .fl-icon{border-radius:50%;box-sizing:border-box;color:#fff;display:inline-block;height:1em;margin:0;min-height:1em;min-width:1em;position:relative;transition:all 1s;width:1em}.fl-main-container .fl-container .fl-icon:after,.fl-main-container .fl-container .fl-icon:before{border-width:0;box-sizing:border-box;content:"";position:absolute;transition:all 1s}.fl-main-container .fl-container.fl-success .fl-icon:after,.fl-main-container .fl-container.fl-success .fl-icon:before{background-color:currentColor;border-radius:.1em;height:.6em;left:.35em;top:.6em;transform:rotate(-135deg);transform-origin:.08em .08em;width:.16em}.fl-main-container .fl-container.fl-success .fl-icon:after{height:.16em;width:.4em}.fl-main-container .fl-container.fl-info .fl-icon:after,.fl-main-container .fl-container.fl-info .fl-icon:before{background-color:currentColor;border-radius:.03em;left:50%;transform:translateX(-50%);width:.15em}.fl-main-container .fl-container.fl-info .fl-icon:before{height:.38em;top:.4em}.fl-main-container .fl-container.fl-info .fl-icon:after{box-shadow:-.06em .19em,-.06em .44em,.06em .44em;height:.13em;top:.21em}.fl-main-container .fl-container.fl-warning .fl-icon:after,.fl-main-container .fl-container.fl-warning .fl-icon:before{background-color:currentColor;border-radius:.03em;left:50%;transform:translateX(-50%);width:.15em}.fl-main-container .fl-container.fl-warning .fl-icon:before{height:.38em;top:.21em}.fl-main-container .fl-container.fl-warning .fl-icon:after{height:.13em;top:.65em}.fl-main-container .fl-container.fl-error .fl-icon:after,.fl-main-container .fl-container.fl-error .fl-icon:before{background-color:currentColor;border-radius:.1em;height:.7em;left:50%;top:50%;transform:translate(-50%,-50%) rotate(-135deg);width:.16em}.fl-main-container .fl-container.fl-error .fl-icon:after{transform:translate(-50%,-50%) rotate(-45deg)}.fl-main-container .fl-container.fl-flasher{background-color:#fff;box-shadow:0 10px 15px -3px rgba(0,0,0,.1),0 4px 6px -2px rgba(0,0,0,.05);color:#4b5563;cursor:pointer;line-height:1.5;margin-top:.5em;word-break:break-word}.fl-main-container .fl-container.fl-flasher.fl-rtl{border-radius:0 .375em .375em 0}.fl-main-container .fl-container.fl-flasher:not(.fl-rtl){border-radius:.375em 0 0 .375em}.fl-main-container .fl-container.fl-flasher .fl-content{align-items:center;display:flex;padding:.75em}.fl-main-container .fl-container.fl-flasher .fl-icon{font-size:2.5em}.fl-main-container .fl-container.fl-flasher .fl-message,.fl-main-container .fl-container.fl-flasher .fl-title{display:block;line-height:1.25em;margin-left:1em;margin-right:1em}.fl-main-container .fl-container.fl-flasher .fl-message:first-letter,.fl-main-container .fl-container.fl-flasher .fl-title:first-letter{text-transform:uppercase}.fl-main-container .fl-container.fl-flasher .fl-title{font-size:1em;font-weight:700}.fl-main-container .fl-container.fl-flasher .fl-message{font-size:.875em;margin-top:.25em}</style></head>
+<body style="background:#eef4f5;margin-top: 65px;" class="body">
+    <style type="text/css">
+        #toast-container>div {
+            opacity: 1;
+        }
+    </style>
+        <div id="app">
+        
+        <div id="body-overlay" onclick="document.getElementById('aside-menu').classList.toggle('active');document.getElementById('body-overlay').classList.toggle('active');"></div>
+        <form id="logout-form" action="logout" method="POST" class="d-none">
+    <input type="hidden" name="_token" value="8imjeNfqeUBgH3a6IsmtdETFfJXHzq4U01KEqJQ7"></form>
+
+<div class="col-12 fixed-top  main-nav shadow" style="background: #fff;padding: 3px 0px;min-height: 65px;">
+    <div class="container px-1 my-auto">
+        <div class="col-12 row p-0">
+            <div class="col-auto p-3 d-flex align-items-center hover-main-color-flexable" onclick="document.getElementById('aside-menu').classList.toggle('active');document.getElementById('body-overlay').classList.toggle('active');" style="cursor: pointer;">
+                <span class="far fa-bars font-3 px-0"></span>
+            </div>
+            <div class="col-auto d-flex align-items-center px-1 py-2">
+                <a href="/">
+                    <img src="images/default/wide-logo.png" style="width: 105px;" alt="<?=$site_name;?>">
+                </a>
+            </div>
+            <div class="col me-auto p-0 row justify-content-between d-flex">
+                <div class="col row m-0 px-2">
+
+                                                                                <div class="col-auto  d-none d-lg-flex align-items-center p-0 mx-1 ">
+                        <a href="http://127.0.0.1:8000" class="d-flex align-items-center py-2 px-3 top-navbar-link rounded" style="color: inherit;">
+                            <span class="fal fa-home mx-1"></span> الرئيسية
+                        </a>
+                    </div>
+                                        <div class="col-auto  d-none d-lg-flex align-items-center p-0 mx-1 ">
+                        <a href="blog" class="d-flex align-items-center py-2 px-3 top-navbar-link rounded" style="color: inherit;">
+                            <span class="fal fa-pen-alt mx-1"></span> المدونة
+                        </a>
+                    </div>
+                                        <div class="col-auto  d-none d-lg-flex align-items-center p-0 mx-1 ">
+                        <a href="page/terms" class="d-flex align-items-center py-2 px-3 top-navbar-link rounded" style="color: inherit;">
+                            <span class="fal fa-lock mx-1"></span> شروط الاستخدام
+                        </a>
+                    </div>
+                                        <div class="col-auto  d-none d-lg-flex align-items-center p-0 mx-1 ">
+                        <a href="contact" class="d-flex align-items-center py-2 px-3 top-navbar-link rounded" style="color: inherit;">
+                            <span class="fal fa-phone mx-1"></span> تواصل معنا
+                        </a>
+                    </div>
+                                                        </div>
+                <div class="col-auto  d-flex align-items-center px-1 ">
+                    
+
+                                                                                    <div class="btn-group" id="notificationDropdown">
+
+                        <div class="col-12 px-0 d-flex justify-content-center align-items-center " style="width: 55px;height: 55px;cursor: pointer" data-bs-toggle="dropdown" aria-expanded="false" id="dropdown-notifications">
+                            <span class="fal fa-bell font-3 d-inline-block" style="color: var(--color-2);transform: rotate(15deg);"></span>
+                            <span style="position: absolute;min-width: 25px;min-height: 25px;
+                                                        display: none;
+                                                        right: 0px;top: 0px;border-radius: 20px;background: #c00;color:#fff;font-size: 14px;" class="text-center" id="dropdown-notifications-icon">0</span>
+
+                        </div>
+                        <div class="dropdown-menu dropdown-menu-end py-0 rounded-0 border-0 shadow " style="cursor: auto!important;z-index: 20000;width: 350px;height: 450px;">
+                            <div class="col-12 notifications-container" style="height:406px;overflow: auto;"><div class="col-12 justify-content-center text-ceter d-flex my-auto align-items-center" style="color: var(--bg-color-0);height: 100%;">
+    <div class="col-12 px-0 text-center"> 
+        <span class="fal fa-bell font-4" style="color:var(--bg-color-4);"></span>
+        <div class="col-12 px-0 text-center mt-2">
+            لا توجد إشعارات حتى الآن
+        </div>
+    </div>
+</div>
+</div>
+                            <div class="col-12 d-flex border-top" style="border-color: rgb(46 46 46 / 9%)!important;"> 
+                                <a href="dashboard/notifications" class="d-block py-2 px-3 ">
+                                    <div class="col-12 align-items-center">
+                                      <span class="fal fa-bells"></span>  عرض كل الإشعارات
+                                    </div>
+                                </a>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-12 px-0 d-flex justify-content-center align-items-center  dropdown" style="width: 55px;height: 55px;">
+                        <div style="width: 55px;height: 55px;cursor: pointer;" data-bs-toggle="dropdown" aria-expanded="false" class="d-flex justify-content-center align-items-center cursor-pointer">
+                            <img src="images/default/avatar.png" style="padding: 10px;border-radius: 50%;width: 55px;height: 55px;" alt="مسؤول">
+                        </div>
+                        <ul class="dropdown-menu dropdown-menu-end shadow border-0 py-2" aria-labelledby="dropdownMenuButton1" style="top: -3px;">
+                                <li><a class="dropdown-item font-1" href="dashboard"><span class="fal fa-sliders-h font-1" style="width: 20px;"></span> لوحة التحكم</a></li>
+                                <li><a class="dropdown-item font-1" href="dashboard/support"><span class="fal fa-comments-alt font-1" style="width: 20px;"></span> الدعم الفني</a></li>
+
+                        
+
+                                <li><a class="dropdown-item font-1" href="dashboard/profile/settings"><span class="fal fa-wrench font-1" style="width: 20px;"></span> الاعدادات</a></li>
+
+                                <li><a class="dropdown-item font-1" href="dashboard/notifications"><span class="fal fa-bells font-1" style="width: 20px;"></span> الاشعارات</a></li> 
+                           
+                                <li><hr style="height: 1px;margin: 10px 0px 5px;"></li>
+                                <li><a class="dropdown-item font-1" onclick="document.getElementById('logout-form').submit();" style="cursor:pointer;"><span class="fal fa-sign-out-alt font-1" style="width: 20px;"></span> تسجيل خروج</a></li>
+                        </ul>
+
+                    </div>
+                                    </div>
+            </div>
+        </div>
+    </div>
+</div>
+<div id="aside-menu" class=" shadow">
+    <div class="col-12 d-flex justify-content-between  align-items-center p-0 shadow" style="height:65px">
+        <span class="px-3 font-1 kufi">
+
+            <img src="images/default/wide-logo.png" style="width: 105px;" alt="<?=$site_name;?>">
+
+        </span>
+        <span class="d-flex">
+            <span class="font-1"><span class="far fa-times font-3 px-4 py-3" style="cursor: pointer;" onclick="document.getElementById('aside-menu').classList.toggle('active');document.getElementById('body-overlay').classList.toggle('active');"></span></span>
+        </span>
+    </div>
+    <div class="col-12 p-0">
+        <div class="col-12 p-0 aside-scroll pt-2" style="height: calc(100vh - 186px);overflow: auto;position: relative;">
+
+                                                <div class="nav-item ">
+                <a href="http://127.0.0.1:8000" style="color: inherit;" class="d-block">
+                <div class="nav-link" style="cursor: pointer;">
+                    <div class="col-12 px-0 row">
+                        <div class="col-12 px-0 kufi">
+                            <span class="fal fa-home mx-1"></span> الرئيسية
+                        </div>
+                    </div>
+                </div>
+                </a>
+            </div>
+                        <div class="nav-item ">
+                <a href="blog" style="color: inherit;" class="d-block">
+                <div class="nav-link" style="cursor: pointer;">
+                    <div class="col-12 px-0 row">
+                        <div class="col-12 px-0 kufi">
+                            <span class="fal fa-pen-alt mx-1"></span> المدونة
+                        </div>
+                    </div>
+                </div>
+                </a>
+            </div>
+                        <div class="nav-item ">
+                <a href="page/about" style="color: inherit;" class="d-block">
+                <div class="nav-link" style="cursor: pointer;">
+                    <div class="col-12 px-0 row">
+                        <div class="col-12 px-0 kufi">
+                            <span class="fal fa-info mx-1"></span> معلومات عنا
+                        </div>
+                    </div>
+                </div>
+                </a>
+            </div>
+                        <div class="nav-item ">
+                <a href="page/terms" style="color: inherit;" class="d-block">
+                <div class="nav-link" style="cursor: pointer;">
+                    <div class="col-12 px-0 row">
+                        <div class="col-12 px-0 kufi">
+                            <span class="fal fa-lock mx-1"></span> شروط الاستخدام
+                        </div>
+                    </div>
+                </div>
+                </a>
+            </div>
+                        <div class="nav-item ">
+                <a href="page/privacy" style="color: inherit;" class="d-block">
+                <div class="nav-link" style="cursor: pointer;">
+                    <div class="col-12 px-0 row">
+                        <div class="col-12 px-0 kufi">
+                            <span class="fal fa-info mx-1"></span> سياسة الخصوصية
+                        </div>
+                    </div>
+                </div>
+                </a>
+            </div>
+                        <div class="nav-item ">
+                <a href="contact" style="color: inherit;" class="d-block">
+                <div class="nav-link" style="cursor: pointer;">
+                    <div class="col-12 px-0 row">
+                        <div class="col-12 px-0 kufi">
+                            <span class="fal fa-phone mx-1"></span> تواصل معنا
+                        </div>
+                    </div>
+                </div>
+                </a>
+            </div>
+                         
+        
+        </div>
+        <div class="col-12 px-0 py-2" style="position:absolute;width: 100%;">
+            <div class="col-12  p-0">
+                <div class="col-12 p-0">
+                    <ul style=";padding: 0px;list-style: none;min-height: 48px;" class="d-flex align-items-center justify-content-center row my-2">
+                                                <a href="admin/settings" class="d-inline-block p-1" style="width:48px">
+                            <span class="fab fa-facebook-f d-inline-block border rounded-circle" style="width: 40px;@height: 40px;padding: 11px 14px ;color: #3b5998;cursor: pointer;"></span>
+                        </a>
+                                                                        <a href="admin/settings" class="d-inline-block p-1" style="width:48px">
+                            <span class="fab fa-twitter d-inline-block border rounded-circle" style="width: 40px;height: 40px;padding: 11px 11px ;color: #00aced;cursor: pointer;"></span>
+                        </a>
+                                                                        <a href="admin/settings" class="d-inline-block p-1" style="width:48px">
+                            <span class="fab fa-youtube d-inline-block border rounded-circle" style="width: 40px;height: 40px;padding: 11px 10px ;color: #FF0000;cursor: pointer;"></span>
+                        </a>
+                                                                                                <a href="admin/settings" class="d-inline-block p-1" style="width:48px">
+                            <span class="fab fa-telegram-plane d-inline-block border rounded-circle" style="width: 40px;height: 40px;padding: 11px 12px ;color: #1e96c8;cursor: pointer;"></span>
+                        </a>
+                                            </ul>
+                </div>
+                <div class="col-12 p-0 text-center" style="font-size: 12px;color: var(--font-1);">
+                    جميع الحقوق محفوظة © <?=$site_name;?> 2023 </div>
+            </div>
+        </div>
+    </div>
+</div>        <main class="p-0 font-2">
+            <div class="col-12 p-0  bg-light pt-6">
+
+	<section class="section-frame overflow-hidden">
+	      <div class="wrapper bg-soft-primary">
+	        <div class="container py-12 py-md-10 text-center">
+	          <div class="row">
+	            <div class="col-md-7 col-lg-6 col-xl-5 mx-auto">
+	              <h1 class="display-1 mb-3 text-center">المدونة</h1>
+	              <p class="lead px-lg-5 px-xxl-8 mb-1 text-center">إليك أحدث مقالاتنا.</p>
+	            </div>
+	            <!-- /column -->
+	          </div>
+	          <!-- /.row -->
+	        </div>
+	        <!-- /.container -->
+	      </div>
+	      <!-- /.wrapper -->
+	    </section>
+
+
+	<div class=" p-0 container py-10 " style="min-height:70vh">
+		<div class="col-12 p-2 p-lg-3 row">
+
+			<div class="col-12 p-2 row">
+				
+
+				<div class="col-12 col-lg-4 mb-4">
+		            <article>
+		              <div class="card shadow-lg">
+		                <figure class="card-img-top overlay overlay-1"><a href="article/new1"> <img src="images/default/image.jpg" alt="" style="height:280px;object-fit: cover;vertical-align: middle;"></a>
+		                  <figcaption>
+		                    <h5 class="from-top mb-0 text-center">عرض المزيد</h5>
+		                  </figcaption>
+		                </figure>
+		                <div class="card-body p-6">
+		                  <div class="post-header">
+		                    <div class="post-category">
+		                    				                    				                    		<a href="category/news" class="hover" rel="category">news</a>
+			                    			                    			                      
+		                    </div>
+		                    <h2 class="post-title h3 mt-1 mb-3"><a class="link-dark" href="article/new1">new1</a></h2>
+		                  </div>
+		                  <div class="post-footer">
+		                    <ul class="post-meta d-flex mb-0">
+		                      <li class="post-date"> 
+		                      	<span> 
+		                      		<i class="fal fa-clock"></i>  منذ ساعة
+		                      	</span> 
+		                      </li>
+		                      		                      <li class="post-comments"><a href="#">  0 <i class="fal fa-comment"></i> </a></li>
+		                      		                    </ul>
+		                  </div>
+		                </div>
+		              </div>
+		            </article>
+		          </div> 
+				
+				<div class="col-12 p-2">
+					
+				</div>
+			</div>
+		</div>
+	</div>
+</div>
+        </main>
+        <footer class=" pt-5" style="background:#fff;border-top:1px solid #f1f1f1;">
+ 
+  <div class="container pb-12 text-center pt-12">
+    <div class="row mt-n10 mt-lg-0">
+      <div class="col-xl-10 mx-auto">
+        <div class="row mb-3 d-flex">
+          <div class="col-md-6 mb-3">
+            <div class="widget">
+                <img src="images/default/wide-logo.png" style="width:160px;max-width:100%" class="mb-3">
+              <div style="text-align:justify;">هذا النص هو مثال لنص يمكن أن يستبدل في نفس المساحة، لقد تم توليد هذا النص من مولد النص العربى، حيث يمكنك أن تولد مثل هذا النص أو العديد من النصوص الأخرى إضافة إلى زيادة عدد الحروف التى يولدها التطبيق</div>
+            </div>
+            <!-- /.widget -->
+          </div>
+   
+          <div class="col-md-3 mb-3">
+            <div class="widget">
+              <div class="widget-title display-6 mb-5">روابط</div>
+
+              
+                                              <div><a href="http://127.0.0.1:8000" class="link-body"><span class="fal fa-home font-1 d-none" style="color: #0194fe;width: 15px"></span> الرئيسية</a></div>
+                                <div><a href="blog" class="link-body"><span class="fal fa-pen-alt font-1 d-none" style="color: #0194fe;width: 15px"></span> المدونة</a></div>
+                                <div><a href="page/terms" class="link-body"><span class="fal fa-lock font-1 d-none" style="color: #0194fe;width: 15px"></span> شروط الاستخدام</a></div>
+                                <div><a href="contact" class="link-body"><span class="fal fa-phone font-1 d-none" style="color: #0194fe;width: 15px"></span> تواصل معنا</a></div>
+                                        
+ 
+            </div>
+            <!-- /.widget -->
+          </div>
+
+          <div class="col-md-3 mb-3">
+            <div class="widget">
+              <div class="widget-title display-6 mb-5">تابعنا</div>
+
+              <nav class="nav social">
+                            <a href="admin/settings"><i class="fab fa-twitter"></i></a>
+                                          <a href="admin/settings"><i class="fab fa-facebook-f"></i></a>
+                                          <a href="admin/settings"><i class="fab fa-instagram"></i></a>
+                                          <a href="admin/settings"><i class="fab fa-youtube"></i></a>
+                          </nav>
+          
+ 
+            </div>
+            <!-- /.widget -->
+          </div>
+
+          <!--/column -->
+        </div>
+        <!--/.row -->
+        
+        
+        <!-- /.social -->
+      </div>
+      <!-- /column -->
+    </div>
+    <!-- /.row -->
+  </div>
+  <!-- /.container -->
+</footer>
+
+<div class="col-12" style="background-image: linear-gradient(to right, rgba(0,0,0,0.01) , rgba(0,0,0,0.01) );border-top:1px solid rgb(145 145 145 / 3%);display: flex; align-items: center;justify-content: center;direction: rtl;"> <div class="container "> <div class="col-12 row d-flex justify-content-between p-0"> <div class="col-12 text-center mt-1 mb-2 pt-3 pb-2 "> <p style="font-size: 14px;line-height: 1.8;margin:0px" class="my-0  kufi text-center"><span class="d-inline-block kufi"> جميع الحقوق محفوظة © <?=$site_name;?> 2023 </span> <span class="d-inline-block kufi"> All rights reserved</span></p> 
+
+    <div class="developer" style="text-align:center;direction:ltr;font-size:16px;font-weight:bold;cursor:pointer;">
+      <span>
+        <span> <</span>
+        <span>Developed With ❤ By </span>
+        <span>></span>
+      </span>
+      <span class="text-primary">ENG/ Abdulrahman Mohamed Eid</span>
+    </div>
+    
+        <script>
+              $(document).ready(function() {
+        $('.developer').click(function() {
+    Swal.fire({
+      title: `<h5 class='modal-title' style='font-size:35px;text-align:center;margin-bottom:16px;'><span class='fal fa-phone mx-1'></span> تواصل مع المُبرمج</h5>`,
+      html: `<div class='col-lg-4 d-flex' style='width:100%;flex-direction:column;justify-content:center;align-items: center;'>
+              <div class='d-flex flex-row' style='justify-content:space-between;width:100%;flex-direction:row;'>
+                <div class='col-lg-6 col-md-6 col-sm-12 col-xs-12'>
+                  <div>
+                    <div class='icon text-primary fs-28 me-4 mt-n1'> <i class='fal fa-phone'></i> </div>
+                  </div>
+                  <div>
+                    <h5 class='mb-1' style='margin-right:10px;'>الهاتف</h5>
+                    <p style='fon-size:17px;'>01080842899 <br>01011626776</p>
+                  </div>
+                </div>
+    
+                <div class='col-lg-6 col-md-6 col-sm-12 col-xs-12'>
+                  <div class='icon text-info fs-28 me-4 mt-n1'> <i class='fa fa-globe'></i> </div>
+                  <div>
+                    <h5 class='mb-1' style='margin-right:10px;'>مواقع التواصل</h5>
+                    <p class='mb-0'><a href='https://wa.me/+201080842899' target='_blank' class='btn btn-outline-success btn-sm'>واتساب<i class='fab fa-whatsapp' style='margin-right:5px;font-size:22px;'></i> </a></p>
+                    <p class='mb-0'><a href='https://www.facebook.com/abdo0m/' target='_blank' class='btn btn-outline-primary btn-sm'>فيسبوك<i class='fab fa-facebook' style='margin-right:5px;font-size:22px;'></i> </a></p>
+                  </div>
+                </div>
+              </div>
+            </div>`,
+      // icon: "info",
+      showCancelButton: true,
+      confirmButtonColor: "#3085d6",
+      cancelButtonColor: "#d33",
+      confirmButtonText: "!",
+      cancelButtonText: "الغاء",
+      showConfirmButton: false,
+    });
+    
+        });
+      });
+    
+    </script>
+    </div> </div> </div> </div>    </div>
+
+
+    <link rel="modulepreload" href="build/assets/app-e4352ad6.js"><link rel="modulepreload" href="build/assets/main-07febffb.js"><script type="module" src="build/assets/app-e4352ad6.js" data-navigate-track="reload"></script>    <!-- Livewire Scripts -->
+<script src="livewirelivewire.js?id=3605227a" data-csrf="8imjeNfqeUBgH3a6IsmtdETFfJXHzq4U01KEqJQ7" data-uri="livewire/update" data-navigate-once="true"></script>
+    <script type="text/javascript" src="js/tinymce/tinymce.min.js"></script>
+<script type="text/javascript" src="js/tinymce/ar.js"></script>
+<script>
+    var temp_file_selector = document.getElementById('temp_file_selector') !== null?document.getElementById('temp_file_selector').value:null;
+
+    tinymce.init({
+        selector: '.editor,#editor',
+        plugins: ' advlist image media autolink code codesample directionality table wordcount quickbars link lists',
+        images_upload_url:"admin/upload/image?_token=8imjeNfqeUBgH3a6IsmtdETFfJXHzq4U01KEqJQ7&temp_file_selector="+temp_file_selector,
+        file_picker_types: 'file image media',
+        image_caption: true,
+        image_dimensions:true,
+        directionality : 'rtl',
+        language:'ar',
+        quickbars_selection_toolbar: 'bold italic |h1 h2 h3 h4 h5 h6| formatselect | quicklink blockquote | numlist bullist',
+        entity_encoding : "raw",
+        verify_html : false ,
+        object_resizing : 'img',
+    });
+
+</script>
+<script type="module">
+toastr.options={"positionClass": "toast-top-left"};
+</script>        <script type="module">
+        var favicon = new Favico({bgColor: '#dc0000',textColor: '#fff',animation: 'slide',fontStyle: 'bold',fontFamily: 'sans',type: 'circle'});
+        function get_website_title(){
+            return $('meta[name="title"]').attr('content');
+        }
+        var notificationDropdown = document.getElementById('notificationDropdown')
+        notificationDropdown.addEventListener('show.bs.dropdown', function() {
+            $.ajax({
+                method: "POST",
+                url: "admin/notifications/see",
+                data: { _token: "8imjeNfqeUBgH3a6IsmtdETFfJXHzq4U01KEqJQ7" }
+            }).done(function(res) {
+                $('#dropdown-notifications-icon').fadeOut();
+                favicon.badge(0);
+            });
+        });
+        function append_notification_notifications(msg) {
+            if (msg.count_unseen_notifications > 0) {
+                $('#dropdown-notifications-icon').fadeIn(0);
+                $('#dropdown-notifications-icon').text(msg.count_unseen_notifications);
+            } else {
+                $('#dropdown-notifications-icon').fadeOut(0);
+                favicon.badge(0);
+            }
+            $('.notifications-container').empty();
+            $('.notifications-container').append(msg.response);
+            $('.notifications-container a').on('click', function() { window.location.href = $(this).attr('href'); });
+        } 
+        function get_notifications() {
+            $.ajax({
+                method: "GET",
+                url: "admin/notifications/ajax", 
+                success: function(data, textStatus, xhr) {
+
+                    favicon.badge(data.notifications.response.count_unseen_notifications);
+
+                    if (data.alert) {
+                        var audio = new Audio('sounds/notification.wav');
+                        audio.play();
+                    }  
+                    append_notification_notifications(data.notifications.response); 
+                    if (data.notifications.response.count_unseen_notifications > 0) {
+                        $('title').text('(' + parseInt(data.notifications.response.count_unseen_notifications) + ')' + " " +  
+                        get_website_title());
+
+                    } else {
+                        $('title').text(get_website_title());
+                    }
+                }
+            });
+        } 
+        window.focused = 25000;
+        window.onfocus = function() {
+            get_notifications(); 
+            window.focused = 25000;
+        };
+        window.onblur = function() {
+            window.focused = 60000;
+        }; 
+        function get_nots() {
+            setTimeout(function() { 
+                get_notifications();
+                get_nots();
+            }, window.focused);
+        }
+        get_nots();
+
+            </script>
+            
+
+
+</body></html>

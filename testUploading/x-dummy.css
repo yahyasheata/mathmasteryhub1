@@ -1,0 +1,33 @@
+/* NOT IMPORTANT */
+* {
+  font-family: Arial, Helvetica, sans-serif;
+  box-sizing: border-box;
+}
+form {
+  width: 450px;
+  padding: 20px;
+  border: 1px solid #eee;
+  background: #f5f5f5;
+}
+input {
+  display: block;
+  width: 100%;
+}
+input[type=file], #list {
+  padding: 10px;
+  border: 1px solid #d5d5d5;
+  background: #fff;
+}
+#list div { padding: 3px 0; }
+input[type=button], input[type=submit] {
+  margin-top: 20px;
+  padding: 10px;
+  color: #fff;
+  border: 0;
+  background: #b11717;
+  cursor: pointer;
+}
+#upBrowse, #upToggle {
+  display: inline-block;
+  width: 49%;
+}

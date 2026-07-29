@@ -1,0 +1,10 @@
+{
+    "require": {
+        "bramus/router": "~1.6",
+        "geoip2/geoip2": "^2.13",
+        "arcanedev/seo-helper": "^5.0",
+        "melbahja/seo": "^2.1",
+        "google/apiclient": "^2.0",
+        "mpdf/mpdf": "^8.2"
+    }
+}

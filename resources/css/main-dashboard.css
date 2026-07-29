@@ -1,0 +1,989 @@
+.dash {
+    font-family: var(--bs-font-sans-serif, Arial, sans-serif);
+    direction: ltr;
+    text-align: start;
+}
+
+.dash input,
+.dash select,
+.dash textarea,
+.dash table,
+.dash .modal,
+.dash .dropdown-menu {
+    direction: ltr;
+    text-align: start;
+}
+
+.dash *:not(.fileuploader):not([class^="fileuploader-icon-"]):not([class^="fa"]):not(.fa):not(.fas):not(.far):not(.fal):not(.fab):not(.cairo):not([class^="vj"]):not([class^="tie-"]){
+    font-family: inherit;
+}
+td,
+th {
+    padding-top: 10px !important;
+    padding-bottom: 10px !important;
+    border-bottom: 1px solid var(--border);
+    font-size: 14px;
+}
+.fixed {
+    z-index: 11;
+}
+.ml-4.flex-1 {
+    margin-inline-start: 30px !important;
+    margin-inline-end: 0;
+}
+thead th {
+    border-bottom: 1px solid var(--border) !important;
+}
+.aside,
+.main-content,
+.top-nav {
+    transition: .2s ease-in-out;
+}
+.aside .item-container{
+    padding: var(--space-2) 0;
+    border-radius: var(--radius-md);
+}
+.aside .item-container.active {
+    background: var(--surface);
+    /*box-shadow: 0px 12px 17px var(--secondary-soft);
+    border-bottom: 1px solid var(--secondary-soft);*/
+}
+.aside .item-container.active * {
+    color: var(--secondary);
+}
+.sub-item.active{
+    display: block;
+}
+.sub-item.active a.active * ,.sub-item.active a.active ,.sub-item a:hover *,.sub-item a:hover{
+    color: var(--secondary);
+}
+.main-content {
+    width: calc(100% - 260px);
+    margin-left: 260px;
+}
+.top-nav {
+    width: calc(100% - 260px);
+    left: 260px;
+    right: auto;
+}
+.aside * {
+    color: var(--text-secondary);
+}
+.aside .item-container div {
+    font-size: 17px;
+}
+.aside.active {
+    left: 0px;
+}
+.aside.in-active {
+    left: -260px;
+}
+/*.item {
+    padding: 5px 0px 10px 0px;
+    margin: 2px 0px;
+    border-radius: var(--radius-md);
+}*/
+.main-box-wedit{
+    box-shadow: 0 8px 16px 0 color-mix(in srgb, var(--text-primary) 2%, transparent), 0 8px 64px 0 color-mix(in srgb, var(--text-muted) 8%, transparent);
+    border-radius: var(--radius-lg);
+    background: var(--surface);
+}
+.item-container .item-container-title.has-sub-menu:after{
+    content:'\f107';
+    font-family: "Font Awesome 5 Free";
+    width: 20px;
+    height: 20px;
+    display: flex;
+    right: 12px;
+    left: auto;
+    top: 4px;
+    position: absolute;
+    align-items: center;
+    justify-content: center;
+    justify-items: center;
+    font-size: 12px;
+}
+.item-container .item-container-title{
+    position: relative;
+}
+.main-content.active .top-nav {
+    width: 100% !important;
+    left: 0;
+}
+#loading-image-container{
+            width: calc(100% - 260px);
+        }
+@media (max-width: 700px) {
+    .main-content {
+        width: 100% !important;
+        margin-left: 0px !important;
+    }
+    .top-nav {
+        width: 100% !important;
+        left: 0;
+    }
+    .aside {
+        left: -260px;
+    }
+    .aside.active {
+        left: -260px;
+    }
+    .aside.in-active {
+        left: 0px;
+    }
+    #loading-image-container{
+        width: 100%;
+    }
+}
+@media (min-width: 700px) {
+    .main-content.active {
+        width: 100% !important;
+        margin-left: 0px !important
+    }
+}
+.ck[dir=ltr],
+.ck,
+.ck * {
+    text-align: left;
+}
+.main-box{
+    background: var(--surface);
+    border-radius: var(--radius-lg);
+    box-shadow: 0 0 transparent,0 0 transparent,0px 13px 19px color-mix(in srgb, var(--primary) 6%, transparent);
+}
+tr{
+    height: 52px;
+    align-items: center;
+}
+
+.divider {
+    background-image: linear-gradient(90deg ,transparent,var(--border-strong));
+    right: auto;
+    left: 10px;
+    opacity: .1;
+    margin: 0px 0px ;
+    min-height: 2px;
+}
+.divider-right {
+    background-image: linear-gradient(270deg ,transparent,var(--border-strong));
+    right: auto;
+    left: 10px;
+    opacity: .1;
+    margin: 0px 0px ;
+    min-height: 2px;
+}
+.form-control.error{
+    border: 1px solid var(--danger)!important;
+}
+label.error{
+    font-size: 13px;
+    color: var(--danger);
+}
+.fa, .fas {
+    font-family: "Font Awesome 5 Free"!important;
+    font-weight: 900;
+}
+.ck-editor{
+    z-index: 0;
+}
+.image-file.active{
+    border: 3px solid var(--primary);
+}
+
+.ck-content{
+    min-height: 150px;
+}
+[class^="fileuploader-icon-"], [class*=" fileuploader-icon-"] {
+    display: inline-block;
+    font-family: 'font-fileuploader' !important;
+}
+.selectize-input { 
+    border: 1px solid var(--border-strong); 
+}
+.fileuploader-theme-dragdrop .fileuploader-input{
+        border-radius: var(--radius-md)!important;
+        border: 1px solid var(--border-strong)!important;
+}
+.fileuploader{
+    margin:0px!important;
+}
+.fileuploader-input{
+    text-align: center;
+}
+.fileuploader-input *{
+    text-align: center;
+}
+.fileuploader-theme-dragdrop .fileuploader-input{
+    background: var(--bg-second-bg);
+    border: 1px dashed var(--bg-main-bg);
+}
+.fileuploader{
+    background: var(--bg-second-bg);
+
+    padding: 0px;
+}
+/*  .dropzone{
+    padding: 0px!important;
+}
+*/
+.fileuploader,
+.fileuploader-popup {
+    direction: ltr;
+}
+.fileuploader-items .fileuploader-item{
+    padding: 7px!important;
+}
+.fileuploader-items-list{
+    width: 100%!important;
+    margin: 0px!important;
+    padding-left: 0px!important;
+    padding-right: 0px!important;
+    /*padding-top: 5px!important; 
+    padding-bottom: 5px!important; */
+}
+.fileuploader-popup{
+    z-index: 66666666666666666;
+
+}
+.fileuploader-popup *{
+    text-align: center!important;
+
+}
+ 
+.fileuploader-popup-button[data-action="cancel"]{
+    font-size: 0px!important
+}
+.fileuploader-popup .fileuploader-popup-header .fileuploader-popup-button{
+        padding: 5px 15px!important;
+        text-shadow: none;
+}
+.fileuploader-popup-button[data-action="cancel"]:after{
+    content:'Close';
+    font-size: 13px!important
+}
+.fileuploader-popup-footer{
+    display: flex;
+    justify-content: center;
+}
+.fileuploader-popup .fileuploader-popup-tools button[data-action="remove"]{
+        font-size: 0px!important
+}
+.fileuploader-popup .fileuploader-popup-tools button[data-action="remove"]:after{
+       content:'Delete';
+    font-size: 13px!important
+} 
+*[class^="fileuploader-icon-"]{
+    text-align: center!important;
+}
+
+.fileuploader-items .fileuploader-item{
+    border-color: none!important;
+}
+.fileuploader-items .fileuploader-item .fileuploader-action+.fileuploader-action{
+    margin-left:16px!important;
+    margin-right:0!important;
+}
+.fileuploader-input{
+    padding-top: 30px!important;
+    padding-bottom: 30px!important;
+}
+.fileuploader-icon-main{
+    margin: 0px!important;
+    padding: 10px!important;
+    font-size: 30px!important;
+}
+.fileuploader-input-caption{
+    font-size: 14px!important;
+}
+.fileuploader-input-inner p,.fileuploader-input-button{
+    display: none!important
+}
+.fileuploader-input-inner:hover{
+    opacity: .5!important;
+}
+.fileuploader-icon-remove:before {
+    content: "\e923";
+    position: relative;
+    top: -5px;
+}
+.fileuploader-item {
+    z-index: 0;
+}
+
+/* width */
+.aside-menu::-webkit-scrollbar {
+  width: 8px;
+}
+
+/* Track */
+.aside-menu::-webkit-scrollbar-track {
+  background: var(--surface-muted);
+}
+
+/* Handle */
+.aside-menu::-webkit-scrollbar-thumb {
+  background: var(--surface-hover);
+}
+
+/* Handle on hover */
+.aside-menu::-webkit-scrollbar-thumb:hover {
+  background: var(--primary);
+}
+
+.front-content *{
+    max-width: 100%!important;
+}
+.front-content iframe{
+    width: 100%!important;
+}
+.circle-chart {
+    position: absolute!important;
+}
+.circle-chart__circle {
+    animation: circle-chart-fill 1s reverse;
+    transform: rotate(-90deg);
+    transform-origin: center;
+}
+@keyframes circle-chart-fill {
+  to { stroke-dasharray: 0 100; }
+}
+
+@keyframes circle-chart-appear {
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+.form-switch .form-check-input{
+    width: 40px;height: 18px;cursor: pointer;
+}
+.dash .fa, .dash .fas {
+    font-family: "Font Awesome 5 Free" !important;
+    font-weight: 900;
+}
+ol,ul{
+    padding: 5px 20px;
+}
+ol{
+    list-style: auto;
+}
+ul{
+    list-style: disc;
+}
+.select2-selection__arrow{
+    margin-top: 2px;
+}
+.select2-selection{
+    width: 100%!important;
+    height: var(--control-height)!important;
+    border-radius: var(--radius-md)!important;
+}
+.select2{
+    width: 100%!important;
+}
+pre{
+    direction: ltr;
+}
+
+.dash *:not(.fileuploader):not([class^="fileuploader-icon-"]):not([class^="fa"]):not(.cairo):not([class^="vj"]):not([class^="tie-"]) {
+    font-family: 'DinNext',sans-serif!important;
+    direction: ltr;
+}
+.sub-item{
+    display: none;
+}
+.sub-item li a{
+    padding: 2px 0px;
+    display: block;
+}
+.item.active .sub-item.active{
+    display: block;
+}
+
+.sub-item{
+    background: var(--background-0);
+    padding: 15px 19px 18px 19px!important;
+    margin-bottom: 5px;
+    margin-top: 5px;
+    border-radius: var(--radius-md);
+}
+
+/* Admin LTR layout stability: sidebar stays fixed on the left; content fills the remaining space. */
+:root {
+    --admin-sidebar-width: 232px;
+}
+
+body.dash > .col-12.d-flex {
+    width: 100%;
+    max-width: 100%;
+    align-items: stretch;
+}
+
+.aside {
+    width: var(--admin-sidebar-width) !important;
+    left: 0;
+    right: auto;
+    flex: 0 0 var(--admin-sidebar-width);
+}
+
+.main-content,
+.main-content.in-active {
+    flex: 1 1 auto;
+    width: auto !important;
+    max-width: calc(100% - var(--admin-sidebar-width));
+    margin-left: var(--admin-sidebar-width) !important;
+    margin-right: 0 !important;
+    min-width: 0;
+    overflow: visible !important;
+}
+
+.main-content.active {
+    width: 100% !important;
+    max-width: 100%;
+    margin-left: 0 !important;
+    margin-right: 0 !important;
+}
+
+.top-nav,
+.main-content.in-active .top-nav {
+    position: fixed !important;
+    top: 0;
+    height: 55px;
+    width: calc(100% - var(--admin-sidebar-width)) !important;
+    left: var(--admin-sidebar-width) !important;
+    right: auto !important;
+}
+
+.main-content.active .top-nav {
+    width: 100% !important;
+    left: 0 !important;
+    right: auto !important;
+}
+
+/* The shared Admin top bar scrolls with its document instead of the
+   viewport. Existing pages already reserve its 55px layout slot, so preserve
+   their current spacing and horizontal alignment. */
+body.dash .main-content > .admin-top-nav {
+    position: absolute !important;
+}
+
+/* Shared Admin navigation: submenu state is controlled by admin-shell.js.
+   A route can be active without preventing a manual collapse or expand. */
+body.dash .admin-nav-submenu-toggle {
+    appearance: none;
+    background: transparent;
+    border: 0;
+    color: inherit;
+    cursor: pointer;
+    text-align: start;
+}
+body.dash .admin-nav-submenu-toggle:focus-visible {
+    box-shadow: var(--shadow-focus);
+    outline: 0;
+}
+body.dash .sub-item[hidden] { display: none !important; }
+body.dash .sub-item.is-open { display: block; }
+body.dash .admin-nav-submenu-toggle[aria-expanded="true"] .has-sub-menu:after { transform: rotate(180deg); }
+
+#loading-image-container {
+    left: var(--admin-sidebar-width);
+    right: auto;
+}
+
+.main-content.active #loading-image-container {
+    left: 0;
+}
+
+.main-content .main-box,
+.main-content .dataTables_wrapper,
+.main-content .dataTables_scroll,
+.main-content .dataTables_scrollHead,
+.main-content .dataTables_scrollBody {
+    width: 100% !important;
+    max-width: 100%;
+}
+
+.main-content table.dataTable,
+.main-content table.table {
+    width: 100% !important;
+}
+
+@media (max-width: 700px) {
+    .main-content,
+    .main-content.in-active,
+    .main-content.active {
+        width: 100% !important;
+        max-width: 100% !important;
+        margin-left: 0 !important;
+        margin-right: 0 !important;
+    }
+
+    .top-nav,
+    .main-content.in-active .top-nav,
+    .main-content.active .top-nav {
+        width: 100% !important;
+        left: 0 !important;
+        right: auto !important;
+    }
+
+    #loading-image-container,
+    .main-content.active #loading-image-container {
+        width: 100% !important;
+        left: 0;
+        right: auto;
+    }
+}
+
+
+
+/*
+ * Admin form-control recovery
+ *
+ * The legacy compiled dashboard bundle is loaded before this file and applies
+ * Bootstrap light backgrounds plus an orange #fff5d8 focus state after the
+ * shared Design System. Keep the correction inside body.dash so public,
+ * student, and auth surfaces keep their own presentation layers.
+ */
+body.dash {
+    color-scheme: light;
+}
+
+html[data-bs-theme="dark"] body.dash,
+html.dark body.dash {
+    color-scheme: dark;
+}
+
+body.dash :is(
+    input:not([type="hidden"]):not([type="checkbox"]):not([type="radio"]):not([type="range"]):not([type="color"]):not([type="file"]),
+    select,
+    textarea,
+    .form-control,
+    .form-select
+) {
+    color: var(--text-primary) !important;
+    background-color: var(--surface-elevated) !important;
+    border-color: var(--border) !important;
+    caret-color: var(--text-primary);
+}
+
+body.dash :is(input, textarea, select).form-control,
+body.dash .form-select,
+body.dash textarea.form-control {
+    min-height: var(--control-height);
+    border-radius: var(--radius-md) !important;
+}
+
+body.dash :is(
+    input:not([type="hidden"]):not([type="checkbox"]):not([type="radio"]):not([type="range"]):not([type="color"]):not([type="file"]),
+    select,
+    textarea,
+    .form-control,
+    .form-select
+):hover:not(:disabled):not([readonly]) {
+    border-color: var(--border-strong) !important;
+}
+
+body.dash :is(input, textarea, select).form-control::placeholder,
+body.dash input::placeholder,
+body.dash textarea::placeholder {
+    color: var(--text-muted) !important;
+    opacity: 1;
+}
+
+/* This deliberately overrides the legacy bundle's !important cream focus
+   background. It is limited to actual dashboard controls. */
+body.dash :is(
+    input:not([type="hidden"]):not([type="checkbox"]):not([type="radio"]):not([type="range"]):not([type="color"]):not([type="file"]),
+    select,
+    textarea,
+    .form-control,
+    .form-select
+):focus {
+    color: var(--text-primary) !important;
+    background-color: var(--surface-elevated) !important;
+    border-color: var(--primary) !important;
+    box-shadow: var(--shadow-focus) !important;
+    outline: 0;
+}
+
+body.dash :is(.form-control, .form-select).is-invalid,
+body.dash .was-validated :is(.form-control, .form-select):invalid {
+    border-color: var(--danger) !important;
+}
+
+body.dash :is(.form-control, .form-select).is-valid,
+body.dash .was-validated :is(.form-control, .form-select):valid {
+    border-color: var(--success) !important;
+}
+
+body.dash select[multiple] option:checked {
+    color: #fff;
+    background: var(--primary);
+}
+
+body.dash :is(.form-control, .form-select):disabled,
+body.dash :is(.form-control, .form-select)[readonly],
+body.dash :is(input, textarea, select):disabled,
+body.dash :is(input, textarea, select)[readonly] {
+    color: var(--text-muted) !important;
+    background-color: var(--surface-muted) !important;
+    border-color: var(--border) !important;
+    cursor: not-allowed;
+    opacity: 1;
+}
+
+body.dash :is(input, textarea, select):-webkit-autofill,
+body.dash :is(input, textarea, select):-webkit-autofill:hover,
+body.dash :is(input, textarea, select):-webkit-autofill:focus {
+    -webkit-text-fill-color: var(--text-primary) !important;
+    caret-color: var(--text-primary);
+    -webkit-box-shadow: 0 0 0 1000px var(--surface-elevated) inset !important;
+    box-shadow: 0 0 0 1000px var(--surface-elevated) inset !important;
+}
+
+body.dash input[type="file"].form-control,
+body.dash .form-control[type="file"] {
+    color: var(--text-secondary) !important;
+}
+
+body.dash input[type="file"]::file-selector-button {
+    color: var(--text-primary);
+    background: var(--surface-muted);
+    border: 0;
+    border-inline-end: 1px solid var(--border);
+    font: inherit;
+    font-weight: 700;
+}
+
+body.dash .form-check-input {
+    background-color: var(--surface-elevated);
+    border-color: var(--border-strong);
+}
+
+body.dash .form-check-input:checked {
+    background-color: var(--primary);
+    border-color: var(--primary);
+}
+
+body.dash .form-check-input:focus {
+    border-color: var(--primary);
+    box-shadow: var(--shadow-focus);
+}
+
+body.dash option,
+body.dash optgroup {
+    color: var(--text-primary);
+    background: var(--surface-elevated);
+}
+
+body.dash .select2-container--default .select2-selection--single,
+body.dash .select2-container--default .select2-selection--multiple,
+body.dash .select2-container--bootstrap-5 .select2-selection,
+body.dash .selectize-input {
+    min-height: var(--control-height) !important;
+    color: var(--text-primary) !important;
+    background: var(--surface-elevated) !important;
+    border-color: var(--border) !important;
+    border-radius: var(--radius-md) !important;
+}
+
+body.dash .select2-container--default .select2-selection__rendered,
+body.dash .select2-container--default .select2-selection__placeholder,
+body.dash .select2-container--bootstrap-5 .select2-selection__rendered,
+body.dash .select2-container--bootstrap-5 .select2-selection__placeholder,
+body.dash .selectize-input input {
+    color: var(--text-primary) !important;
+}
+
+body.dash .select2-container--default .select2-selection__placeholder,
+body.dash .select2-container--bootstrap-5 .select2-selection__placeholder {
+    color: var(--text-muted) !important;
+}
+
+body.dash .select2-dropdown,
+body.dash .select2-container--bootstrap-5 .select2-dropdown,
+body.dash .selectize-dropdown,
+body.dash .selectize-dropdown-content {
+    color: var(--text-primary) !important;
+    background: var(--surface-elevated) !important;
+    border-color: var(--border) !important;
+}
+
+body.dash .select2-search__field,
+body.dash .selectize-control input {
+    color: var(--text-primary) !important;
+    background: var(--surface) !important;
+    border-color: var(--border) !important;
+    caret-color: var(--text-primary);
+}
+
+body.dash .select2-results__option,
+body.dash .selectize-dropdown .option {
+    color: var(--text-primary) !important;
+    background: transparent;
+}
+
+body.dash .select2-container--default .select2-selection__arrow b {
+    border-top-color: var(--text-secondary) !important;
+}
+
+body.dash .select2-container--default.select2-container--open .select2-selection__arrow b {
+    border-bottom-color: var(--text-secondary) !important;
+}
+
+body.dash .select2-results__option--highlighted,
+body.dash .select2-container--default .select2-results__option--highlighted[aria-selected],
+body.dash .select2-container--bootstrap-5 .select2-results__option--highlighted,
+body.dash .selectize-dropdown .active,
+body.dash .selectize-dropdown .option:hover {
+    color: var(--text-primary) !important;
+    background: var(--surface-hover) !important;
+}
+
+body.dash .select2-results__option--selected,
+body.dash .select2-container--default .select2-results__option[aria-selected="true"],
+body.dash .selectize-control.multi .item {
+    color: var(--primary) !important;
+    background: var(--primary-soft) !important;
+    border-color: color-mix(in srgb, var(--primary) 35%, var(--border)) !important;
+}
+
+body.dash .select2-results__option[aria-disabled="true"],
+body.dash .select2-container--disabled .select2-selection {
+    color: var(--text-muted) !important;
+    background: var(--surface-muted) !important;
+}
+
+body.dash .fileuploader,
+body.dash .fileuploader-input,
+body.dash .fileuploader-input-caption,
+body.dash .fileuploader-items .fileuploader-item,
+body.dash .dropzone,
+body.dash .upload-area,
+body.dash .input-group-text {
+    color: var(--text-secondary) !important;
+    background: var(--surface-elevated) !important;
+    border-color: var(--border) !important;
+}
+
+body.dash .form-control.error,
+body.dash .is-invalid {
+    border-color: var(--danger) !important;
+}
+
+body.dash label.error,
+body.dash .invalid-feedback,
+body.dash .text-danger {
+    color: var(--danger) !important;
+}
+
+body.dash .valid-feedback,
+body.dash .text-success {
+    color: var(--success) !important;
+}
+
+body.dash .table-responsive {
+    max-width: 100%;
+    overflow-x: auto;
+    overscroll-behavior-inline: contain;
+    -webkit-overflow-scrolling: touch;
+}
+
+body.dash :is(.table, table.dataTable) :is(th, td) {
+    overflow-wrap: anywhere;
+}
+
+/* The local project ships Font Awesome 5 Free, not the Pro family declared by
+   the legacy dashboard bundle. Keep icons and pseudo-element chevrons visible. */
+body.dash .fa,
+body.dash .fas,
+body.dash .fal {
+    font-family: "Font Awesome 5 Free" !important;
+    font-style: normal;
+    font-weight: 900 !important;
+}
+
+body.dash .far {
+    font-family: "Font Awesome 5 Free" !important;
+    font-style: normal;
+    font-weight: 400 !important;
+}
+
+body.dash :is(button, a, input, select, textarea):focus-visible {
+    outline: 3px solid color-mix(in srgb, var(--primary) 42%, transparent);
+    outline-offset: 2px;
+}
+
+@media (max-width: 767.98px) {
+    body.dash .table-responsive > :is(table, .dataTables_wrapper) {
+        min-width: max-content;
+    }
+
+    body.dash .select2-container,
+    body.dash .selectize-control {
+        max-width: 100%;
+    }
+}
+
+/* Stabilization: keep the assessment grouping legible without adding another sidebar level. */
+body.dash .aside .admin-nav-subheading {
+  display: flex;
+  align-items: center;
+  gap: .5rem;
+  margin: .85rem .45rem .2rem;
+  padding-top: .7rem;
+  border-top: 1px solid var(--border);
+  color: var(--text-muted);
+  font-size: .72rem;
+  font-weight: 800;
+  letter-spacing: .07em;
+  text-transform: uppercase;
+}
+
+
+/* Final production polish: shared Admin components only. The rules below
+   refine existing Bootstrap/legacy controls without changing page structure. */
+body.dash .main-content :is(.main-box, .main-box-wedit, .card, .modal-content) {
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-sm);
+}
+
+body.dash .main-content .card-header,
+body.dash .main-content .modal-header {
+  padding-block: .85rem;
+  border-bottom-color: var(--border);
+  background: var(--surface-muted);
+}
+
+body.dash .main-content .card-footer,
+body.dash .main-content .modal-footer {
+  padding-block: .8rem;
+  border-top-color: var(--border);
+  background: var(--surface-muted);
+}
+
+body.dash .btn {
+  min-height: 2.4rem;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: .45rem;
+  font-weight: 700;
+  line-height: 1.2;
+}
+
+body.dash .btn-sm { min-height: 2rem; gap: .35rem; }
+body.dash .btn :is(.fa, .fas, .far, .fab) { line-height: 1; }
+
+body.dash :is(.form-label, label:not(.form-check-label):not(.btn)) {
+  color: var(--text-primary);
+  font-size: .88rem;
+  font-weight: 700;
+}
+
+body.dash .form-text,
+body.dash small.text-muted {
+  color: var(--text-muted) !important;
+  font-size: .78rem;
+}
+
+body.dash :is(.table, table.dataTable) {
+  margin-bottom: 0;
+  border-color: var(--border);
+}
+
+body.dash :is(.table, table.dataTable) > :not(caption) > * > * {
+  padding: .72rem .8rem;
+  vertical-align: middle;
+  border-bottom-color: var(--border);
+}
+
+body.dash :is(.table, table.dataTable) thead :is(th, td) {
+  color: var(--text-muted);
+  background: var(--surface-muted);
+  font-size: .72rem;
+  font-weight: 800;
+  letter-spacing: .05em;
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+
+body.dash :is(.table, table.dataTable) tbody tr { transition: background-color var(--transition-fast); }
+body.dash :is(.table, table.dataTable) tbody tr:hover > * { background: var(--surface-hover); }
+
+body.dash .dataTables_wrapper .dataTables_filter,
+body.dash .dataTables_wrapper .dataTables_length,
+body.dash .dataTables_wrapper .dataTables_info,
+body.dash .dataTables_wrapper .dataTables_paginate { margin-block: .75rem; }
+
+body.dash .dropdown-menu {
+  padding: .4rem;
+  border-color: var(--border);
+  box-shadow: var(--shadow-md);
+}
+
+body.dash .dropdown-item {
+  min-height: 2.2rem;
+  display: flex;
+  align-items: center;
+  gap: .5rem;
+  border-radius: var(--radius-sm);
+}
+
+body.dash .dropdown-item:focus-visible,
+body.dash .dropdown-item:hover {
+  color: var(--text-primary);
+  background: var(--surface-hover);
+}
+
+body.dash .empty-state,
+body.dash .dataTables_empty { color: var(--text-muted); text-align: center; }
+
+@media (max-width: 767.98px) {
+  body.dash .main-content :is(.main-box, .main-box-wedit, .card) { border-radius: var(--radius-md); }
+
+  body.dash .dataTables_wrapper .dataTables_filter,
+  body.dash .dataTables_wrapper .dataTables_length { width: 100%; text-align: start; }
+
+  body.dash .dataTables_wrapper .dataTables_filter input,
+  body.dash .dataTables_wrapper .dataTables_length select { max-width: 100%; }
+}
+
+/* Centralized admin shell state. These selectors only target the dashboard chrome
+   and intentionally override the legacy inline geometry while the sidebar moves. */
+.admin-page-loader {
+    position: fixed;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    height: 100vh;
+    z-index: 10;
+    margin-top: -15px;
+    transition: opacity 160ms ease, visibility 160ms ease;
+}
+.admin-page-loader--ready {
+    opacity: 0;
+    visibility: hidden;
+    pointer-events: none;
+}
+body.dash.admin-sidebar-collapsed .aside {
+    left: calc(var(--admin-sidebar-width) * -1);
+}
+body.dash.admin-sidebar-collapsed .main-content {
+    width: 100% !important;
+    max-width: 100%;
+    margin-left: 0 !important;
+}
+body.dash.admin-sidebar-collapsed .top-nav {
+    width: 100% !important;
+    left: 0 !important;
+}
+body.dash.admin-sidebar-collapsed #loading-image-container {
+    left: 0;
+}
+@media (max-width: 700px) {
+    body.dash.admin-sidebar-mobile-open .aside {
+        left: 0 !important;
+    }
+}

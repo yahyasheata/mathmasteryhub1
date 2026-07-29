@@ -1,0 +1,6 @@
+CHANGE THESE IN YOUR PHP.INI IF YOU WANT TO PERMANENTLY RAISE UPLOAD LIMITS
+
+upload_max_filesize=150M;
+post_max_size=150M
+max_input_time=300
+max_execution_time=300

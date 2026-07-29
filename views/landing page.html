@@ -1,0 +1,705 @@
+<!DOCTYPE html>
+<html lang="en" dir="ltr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    
+    <!-- إعدادات SEO الأساسية -->
+    <title>API Club - منصتك البرمجية العربية للتوثيق وخدمات API</title>
+    <meta name="description" content="منصة API Club العربية توفر توثيقًا شاملًا للغات البرمجة وأطر العمل وخدمات API متكاملة للمطورين العرب">
+    <meta name="keywords" content="API, توثيق برمجي, مطورين عرب, برمجة, خدمات API, منصة عربية, مجتمع مبرمجين">
+    <meta name="author" content="API Club">
+    <meta name="robots" content="index, follow">
+    
+    <!-- Canonical URL -->
+    <link rel="canonical" href="https://apiclub.site/">
+    
+    <!-- Open Graph / Facebook -->
+    <meta property="og:type" content="website">
+    <meta property="og:url" content="https://apiclub.site/">
+    <meta property="og:title" content="API Club - منصتك البرمجية العربية">
+    <meta property="og:description" content="منصة API Club العربية توفر توثيقًا شاملًا للغات البرمجة وأطر العمل وخدمات API متكاملة للمطورين العرب">
+    <meta property="og:image" content="https://apiclub.site/assets/images/api-club-og.jpg">
+    
+    <!-- Twitter -->
+    <meta property="twitter:card" content="summary_large_image">
+    <meta property="twitter:url" content="https://apiclub.site/">
+    <meta property="twitter:title" content="API Club - منصتك البرمجية العربية">
+    <meta property="twitter:description" content="منصة API Club العربية توفر توثيقًا شاملًا للغات البرمجة وأطر العمل وخدمات API متكاملة للمطورين العرب">
+    <meta property="twitter:image" content="https://apiclub.site/assets/images/api-club-twitter.jpg">
+    
+    <!-- Favicon -->
+    <link rel="apple-touch-icon" sizes="180x180" href="/assets/favicon/apple-touch-icon.png">
+    <link rel="icon" type="image/png" sizes="32x32" href="/assets/favicon/favicon-32x32.png">
+    <link rel="icon" type="image/png" sizes="16x16" href="/assets/favicon/favicon-16x16.png">
+    <link rel="manifest" href="/assets/favicon/site.webmanifest">
+    
+    <!-- TailwindCSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Google Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Tajawal:wght@300;400;500;700;900&display=swap" rel="stylesheet">
+    <!-- Font Awesome -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    
+    <script>
+        tailwind.config = {
+            darkMode: 'class',
+            theme: {
+                extend: {
+                    colors: {
+                        primary: '#2563eb',
+                        secondary: '#10b981',
+                        dark: '#111827',
+                        light: '#f9fafb'
+                    },
+                    fontFamily: {
+                        tajawal: ['Tajawal', 'sans-serif']
+                    }
+                }
+            }
+        }
+    </script>
+    <style>
+        body {
+            font-family: 'Tajawal', sans-serif;
+        }
+        .dark .dark-invert {
+            filter: invert(1);
+        }
+        /* تحسين الانتقالات للوضع الداكن */
+        .dark-transition {
+            transition: background-color 0.3s ease, color 0.3s ease, border-color 0.3s ease, box-shadow 0.3s ease;
+        }
+    </style>
+</head>
+<body class="font-tajawal bg-gray-50 text-gray-900 transition-colors duration-300 dark:bg-gray-900 dark:text-gray-100">
+     
+    <!-- Navigation -->
+    <header class="sticky top-0 z-50 bg-white shadow-sm transition-colors duration-300 dark:bg-gray-800 dark:border-gray-700">
+        <div class="container mx-auto px-4">
+            <div class="flex justify-between items-center py-4">
+                <a href="https://apiclub.site/" class="flex items-center gap-2">
+                    <span class="text-primary text-2xl font-bold">API</span>
+                    <span class="text-secondary text-2xl font-bold dark:text-secondary">Club</span>
+                </a>
+                
+                <nav class="hidden md:flex items-center gap-6">
+                                        <a href="#home" class="text-gray-600 hover:text-primary font-medium transition duration-200 dark:text-gray-300 dark:hover:text-white">
+                        الرئيسية                    </a>
+                                        <a href="#docs" class="text-gray-600 hover:text-primary font-medium transition duration-200 dark:text-gray-300 dark:hover:text-white">
+                        التوثيق                    </a>
+                                        <a href="#apis" class="text-gray-600 hover:text-primary font-medium transition duration-200 dark:text-gray-300 dark:hover:text-white">
+                        خدمات API                    </a>
+                                        <a href="#community" class="text-gray-600 hover:text-primary font-medium transition duration-200 dark:text-gray-300 dark:hover:text-white">
+                        المجتمع                    </a>
+                                        
+                    <!-- Dark Mode Toggle -->
+                    <button id="theme-toggle" class="p-2 rounded-lg text-gray-600 hover:text-primary transition duration-200 dark:text-gray-300 dark:hover:text-white">
+                        <i class="fas fa-moon dark:hidden"></i>
+                        <i class="fas fa-sun hidden dark:block"></i>
+                    </button>
+                    
+                    <a href="#" class="bg-primary text-white px-5 py-2 rounded-lg hover:bg-primary/90 transition duration-200">
+                        تسجيل الدخول
+                    </a>
+                </nav>
+                
+                <div class="flex items-center gap-4 md:hidden">
+                    <!-- Dark Mode Toggle (Mobile) -->
+                    <button id="theme-toggle-mobile" class="p-2 rounded-lg text-gray-600 hover:text-primary transition duration-200 dark:text-gray-300 dark:hover:text-white">
+                        <i class="fas fa-moon dark:hidden"></i>
+                        <i class="fas fa-sun hidden dark:block"></i>
+                    </button>
+                    
+                    <button id="menu-toggle" class="flex items-center text-gray-700 hover:text-primary focus:outline-none dark:text-gray-300 dark:hover:text-white">
+                        <i class="fas fa-bars text-xl"></i>
+                    </button>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Mobile Menu -->
+        <div id="mobile-menu" class="md:hidden hidden">
+            <div class="container mx-auto px-4 py-4 bg-white border-t dark:bg-gray-800 dark:border-gray-700 transition-colors duration-300">
+                                <a href="#home" class="block py-2 text-gray-600 hover:text-primary dark:text-gray-300 dark:hover:text-white">
+                    الرئيسية                </a>
+                                <a href="#docs" class="block py-2 text-gray-600 hover:text-primary dark:text-gray-300 dark:hover:text-white">
+                    التوثيق                </a>
+                                <a href="#apis" class="block py-2 text-gray-600 hover:text-primary dark:text-gray-300 dark:hover:text-white">
+                    خدمات API                </a>
+                                <a href="#community" class="block py-2 text-gray-600 hover:text-primary dark:text-gray-300 dark:hover:text-white">
+                    المجتمع                </a>
+                                <a href="#" class="block py-2 mt-2 bg-primary text-white text-center rounded-lg hover:bg-primary/90">
+                    تسجيل الدخول
+                </a>
+            </div>
+        </div>
+    </header>
+
+    <!-- Hero Section -->
+    <section id="home" class="relative bg-white py-20 lg:py-32 overflow-hidden dark:bg-gray-900 transition-colors duration-300">
+        <div class="absolute inset-0 overflow-hidden">
+            <div class="absolute left-0 bottom-0 w-full h-1/2 bg-gradient-to-t from-white to-transparent dark:from-gray-900 dark:to-transparent"></div>
+            <div class="absolute -left-64 -bottom-32 w-96 h-96 bg-secondary/20 blur-3xl rounded-full dark:bg-secondary/10"></div>
+            <div class="absolute -right-64 -top-32 w-96 h-96 bg-primary/20 blur-3xl rounded-full dark:bg-primary/10"></div>
+        </div>
+        
+        <div class="container mx-auto px-4 relative">
+            <div class="max-w-3xl mx-auto text-center mb-12">
+                <h1 class="text-4xl md:text-5xl lg:text-6xl font-extrabold mb-6 text-gray-900 dark:text-white">
+                    Welcome to <span class="text-primary dark:text-primary">Our Arabic Educational Platform</span>
+                </h1>
+                <p class="text-xl text-gray-600 mb-8 leading-relaxed dark:text-gray-300">
+                    Discover the best educational courses, accredited certificates, and interactive learning resources designed especially for Arab students and teachers.
+                </p>
+                <div class="flex flex-col sm:flex-row justify-center gap-4">
+                    <a href="#courses" class="bg-primary text-white px-8 py-3 rounded-lg hover:bg-primary/90 transition duration-200 font-bold dark:bg-primary/90 dark:hover:bg-primary">
+                        <i class="fas fa-graduation-cap ml-2"></i>
+                        Browse Courses
+                    </a>
+                    <a href="#community" class="bg-gray-100 text-gray-800 px-8 py-3 rounded-lg hover:bg-gray-200 transition duration-200 font-bold dark:bg-gray-700 dark:text-white dark:hover:bg-gray-600">
+                        <i class="fas fa-users ml-2"></i>
+                        Join the Community
+                    </a>
+                </div>
+            </div>
+            
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-6 mt-16">
+                <div class="bg-white border border-gray-100 rounded-xl p-6 shadow-lg shadow-primary/5 hover:shadow-primary/10 transition duration-300 dark:bg-gray-800 dark:border-gray-700 dark:shadow-primary/5">
+                    <div class="flex items-center mb-4">
+                        <div class="w-12 h-12 bg-blue-100 text-primary flex items-center justify-center rounded-full dark:bg-blue-900/30 dark:text-blue-400">
+                            <i class="fas fa-chalkboard-teacher text-xl"></i>
+                        </div>
+                        <div class="mr-4">
+                            <h3 class="font-bold text-xl dark:text-white">Interactive Courses</h3>
+                            <p class="text-gray-500 dark:text-gray-400">Hands-on Learning</p>
+                        </div>
+                    </div>
+                    <p class="text-gray-600 dark:text-gray-300">
+                        Interactive educational content covering various disciplines and fields, with quizzes and practical exercises.
+                    </p>
+                </div>
+                
+                <div class="bg-white border border-gray-100 rounded-xl p-6 shadow-lg shadow-secondary/5 hover:shadow-secondary/10 transition duration-300 dark:bg-gray-800 dark:border-gray-700 dark:shadow-secondary/5">
+                    <div class="flex items-center mb-4">
+                        <div class="w-12 h-12 bg-green-100 text-secondary flex items-center justify-center rounded-full dark:bg-green-900/30 dark:text-green-400">
+                            <i class="fas fa-certificate text-xl"></i>
+                        </div>
+                        <div class="mr-4">
+                            <h3 class="font-bold text-xl dark:text-white">Accredited Certificates</h3>
+                            <p class="text-gray-500 dark:text-gray-400">For All Courses</p>
+                        </div>
+                    </div>
+                    <p class="text-gray-600 dark:text-gray-300">
+                        Obtain accredited certificates after successfully completing courses to enhance your CV and career opportunities.
+                    </p>
+                </div>
+                
+                <div class="bg-white border border-gray-100 rounded-xl p-6 shadow-lg shadow-purple-500/5 hover:shadow-purple-500/10 transition duration-300 dark:bg-gray-800 dark:border-gray-700 dark:shadow-purple-500/5">
+                    <div class="flex items-center mb-4">
+                        <div class="w-12 h-12 bg-purple-100 text-purple-500 flex items-center justify-center rounded-full dark:bg-purple-900/30 dark:text-purple-400">
+                            <i class="fas fa-users text-xl"></i>
+                        </div>
+                        <div class="mr-4">
+                            <h3 class="font-bold text-xl dark:text-white">Active Educational Community</h3>
+                            <p class="text-gray-500 dark:text-gray-400">Connect & Support</p>
+                        </div>
+                    </div>
+                    <p class="text-gray-600 dark:text-gray-300">
+                        Join our active community to exchange knowledge, ask questions, and participate in educational discussions.
+                    </p>
+                </div>
+            </div>
+        </div>
+    </section>
+
+<!-- Categories Section -->
+<section id="categories" class="py-20 bg-white dark:bg-gray-900 transition-colors duration-300" dir="ltr">
+  <div class="container mx-auto px-4">
+    <div class="max-w-3xl mx-auto text-center mb-16">
+      <span class="inline-block text-secondary font-semibold mb-2 dark:text-green-400">Course Categories</span>
+      <h2 class="text-3xl md:text-4xl font-bold text-gray-900 mb-4 dark:text-white">Start Your Learning Journey</h2>
+      <p class="text-gray-600 dark:text-gray-300">
+        Explore our available categories and choose what matches your interests, from programming to AI and design.
+      </p>
+    </div>
+
+    <div class="grid grid-cols-1 md:grid-cols-3 gap-8">
+      
+      <!-- Card 1: Programming -->
+      <div class="bg-gray-50 rounded-xl overflow-hidden transition duration-300 hover:shadow-xl dark:bg-gray-800 dark:border dark:border-gray-700">
+        <div class="h-48 bg-secondary/10 flex items-center justify-center dark:bg-secondary/5">
+          <i class="fas fa-code text-6xl text-secondary/70 dark:text-secondary/60"></i>
+        </div>
+        <div class="p-6">
+          <h3 class="text-xl font-bold mb-4 text-gray-900 dark:text-white">Programming & Development</h3>
+          <ul class="space-y-3 mb-6">
+            <li class="flex items-center text-gray-600 dark:text-gray-300">
+              <i class="fas fa-check text-secondary mr-2 dark:text-green-400"></i>
+              <span>Learn HTML, CSS, JavaScript</span>
+            </li>
+            <li class="flex items-center text-gray-600 dark:text-gray-300">
+              <i class="fas fa-check text-secondary mr-2 dark:text-green-400"></i>
+              <span>Build real-world web projects</span>
+            </li>
+            <li class="flex items-center text-gray-600 dark:text-gray-300">
+              <i class="fas fa-check text-secondary mr-2 dark:text-green-400"></i>
+              <span>Suitable for all levels</span>
+            </li>
+          </ul>
+          <div class="flex items-center justify-between">
+            <a href="category/programming" class="text-secondary hover:text-secondary/80 font-medium flex items-center dark:text-secondary/70 dark:hover:text-secondary/90">
+              Explore
+              <i class="fas fa-arrow-right ml-2"></i>
+            </a>
+            <span class="bg-secondary/10 text-secondary text-xs px-3 py-1 rounded-full dark:bg-secondary/20 dark:text-secondary/80">
+              New
+            </span>
+          </div>
+        </div>
+      </div>
+
+      <!-- Card 2: Design -->
+      <div class="bg-gray-50 rounded-xl overflow-hidden transition duration-300 hover:shadow-xl dark:bg-gray-800 dark:border dark:border-gray-700">
+        <div class="h-48 bg-blue-100 flex items-center justify-center dark:bg-blue-900/10">
+          <i class="fas fa-pencil-ruler text-6xl text-blue-600 dark:text-blue-400"></i>
+        </div>
+        <div class="p-6">
+          <h3 class="text-xl font-bold mb-4 text-gray-900 dark:text-white">UI/UX Design</h3>
+          <ul class="space-y-3 mb-6">
+            <li class="flex items-center text-gray-600 dark:text-gray-300">
+              <i class="fas fa-check text-blue-500 mr-2 dark:text-blue-300"></i>
+              <span>UX / UI Principles</span>
+            </li>
+            <li class="flex items-center text-gray-600 dark:text-gray-300">
+              <i class="fas fa-check text-blue-500 mr-2 dark:text-blue-300"></i>
+              <span>Figma & Adobe XD tools</span>
+            </li>
+            <li class="flex items-center text-gray-600 dark:text-gray-300">
+              <i class="fas fa-check text-blue-500 mr-2 dark:text-blue-300"></i>
+              <span>Interactive prototyping</span>
+            </li>
+          </ul>
+          <div class="flex items-center justify-between">
+            <a href="category/design" class="text-blue-600 hover:text-blue-800 font-medium flex items-center dark:text-blue-400 dark:hover:text-blue-300">
+              Explore
+              <i class="fas fa-arrow-right ml-2"></i>
+            </a>
+            <span class="bg-blue-100 text-blue-600 text-xs px-3 py-1 rounded-full dark:bg-blue-900/20 dark:text-blue-400">
+              New
+            </span>
+          </div>
+        </div>
+      </div>
+
+      <!-- Card 3: AI -->
+      <div class="bg-gray-50 rounded-xl overflow-hidden transition duration-300 hover:shadow-xl dark:bg-gray-800 dark:border dark:border-gray-700">
+        <div class="h-48 bg-purple-100 flex items-center justify-center dark:bg-purple-900/10">
+          <i class="fas fa-brain text-6xl text-purple-600 dark:text-purple-400"></i>
+        </div>
+        <div class="p-6">
+          <h3 class="text-xl font-bold mb-4 text-gray-900 dark:text-white">Artificial Intelligence & Data</h3>
+          <ul class="space-y-3 mb-6">
+            <li class="flex items-center text-gray-600 dark:text-gray-300">
+              <i class="fas fa-check text-purple-500 mr-2 dark:text-purple-300"></i>
+              <span>Data analysis using Python</span>
+            </li>
+            <li class="flex items-center text-gray-600 dark:text-gray-300">
+              <i class="fas fa-check text-purple-500 mr-2 dark:text-purple-300"></i>
+              <span>Machine learning and classification</span>
+            </li>
+            <li class="flex items-center text-gray-600 dark:text-gray-300">
+              <i class="fas fa-check text-purple-500 mr-2 dark:text-purple-300"></i>
+              <span>Hands-on AI projects</span>
+            </li>
+          </ul>
+          <div class="flex items-center justify-between">
+            <a href="category/ai" class="text-purple-600 hover:text-purple-800 font-medium flex items-center dark:text-purple-400 dark:hover:text-purple-300">
+              Explore
+              <i class="fas fa-arrow-right ml-2"></i>
+            </a>
+            <span class="bg-purple-100 text-purple-600 text-xs px-3 py-1 rounded-full dark:bg-purple-900/20 dark:text-purple-400">
+              New
+            </span>
+          </div>
+        </div>
+      </div>
+
+    </div>
+
+    <div class="text-center mt-12">
+      <a href="all-categories.php" class="inline-flex items-center px-6 py-3 bg-gray-900 text-white rounded-lg hover:bg-gray-800 transition duration-200 dark:bg-gray-700 dark:hover:bg-gray-600">
+        View All Categories
+        <i class="fas fa-arrow-right ml-2"></i>
+      </a>
+    </div>
+  </div>
+</section>
+
+
+<!-- LMS Features Section -->
+<section id="features" class="py-24 bg-gray-50 dark:bg-gray-900 transition-colors duration-300" dir="ltr">
+  <div class="container mx-auto px-4">
+    <div class="max-w-4xl mx-auto text-center mb-16">
+      <h2 class="text-4xl font-extrabold text-gray-900 dark:text-white mb-4">Powerful LMS Features</h2>
+      <p class="text-gray-600 dark:text-gray-300 text-lg">
+        Everything you need to manage, deliver, and enhance your e-learning experience.
+      </p>
+    </div>
+
+    <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-10">
+      
+      <!-- Feature 1 -->
+      <div class="bg-white dark:bg-gray-800 rounded-xl p-6 shadow-md hover:shadow-xl transition">
+        <div class="text-primary text-3xl mb-4">
+          <i class="fas fa-book-open"></i>
+        </div>
+        <h3 class="text-xl font-semibold text-gray-800 dark:text-white mb-2">Interactive Courses</h3>
+        <p class="text-gray-600 dark:text-gray-300">
+          Deliver structured lessons with videos, documents, and downloadable content.
+        </p>
+      </div>
+
+      <!-- Feature 2 -->
+      <div class="bg-white dark:bg-gray-800 rounded-xl p-6 shadow-md hover:shadow-xl transition">
+        <div class="text-green-500 text-3xl mb-4">
+          <i class="fas fa-question-circle"></i>
+        </div>
+        <h3 class="text-xl font-semibold text-gray-800 dark:text-white mb-2">Quizzes & Exams</h3>
+        <p class="text-gray-600 dark:text-gray-300">
+          Add timed quizzes and assessments to test student understanding.
+        </p>
+      </div>
+
+      <!-- Feature 3 -->
+      <div class="bg-white dark:bg-gray-800 rounded-xl p-6 shadow-md hover:shadow-xl transition">
+        <div class="text-yellow-500 text-3xl mb-4">
+          <i class="fas fa-certificate"></i>
+        </div>
+        <h3 class="text-xl font-semibold text-gray-800 dark:text-white mb-2">Certificates</h3>
+        <p class="text-gray-600 dark:text-gray-300">
+          Award completion certificates automatically to students.
+        </p>
+      </div>
+
+      <!-- Feature 4 -->
+      <div class="bg-white dark:bg-gray-800 rounded-xl p-6 shadow-md hover:shadow-xl transition">
+        <div class="text-indigo-500 text-3xl mb-4">
+          <i class="fas fa-chart-line"></i>
+        </div>
+        <h3 class="text-xl font-semibold text-gray-800 dark:text-white mb-2">Progress Tracking</h3>
+        <p class="text-gray-600 dark:text-gray-300">
+          Visual progress bars and dashboards for students and admins.
+        </p>
+      </div>
+
+      <!-- Feature 5 -->
+      <div class="bg-white dark:bg-gray-800 rounded-xl p-6 shadow-md hover:shadow-xl transition">
+        <div class="text-red-500 text-3xl mb-4">
+          <i class="fas fa-comments"></i>
+        </div>
+        <h3 class="text-xl font-semibold text-gray-800 dark:text-white mb-2">Discussion Forums</h3>
+        <p class="text-gray-600 dark:text-gray-300">
+          Built-in student community and Q&A system for engagement.
+        </p>
+      </div>
+
+      <!-- Feature 6 -->
+      <div class="bg-white dark:bg-gray-800 rounded-xl p-6 shadow-md hover:shadow-xl transition">
+        <div class="text-pink-500 text-3xl mb-4">
+          <i class="fas fa-user-shield"></i>
+        </div>
+        <h3 class="text-xl font-semibold text-gray-800 dark:text-white mb-2">Admin & Instructor Panel</h3>
+        <p class="text-gray-600 dark:text-gray-300">
+          Manage courses, students, reports, and content from a single dashboard.
+        </p>
+      </div>
+
+    </div>
+  </div>
+</section>
+
+    <!-- API Services Section -->
+
+
+
+    <!-- Community Section -->
+    <section id="community" class="py-20 bg-gray-50 dark:bg-gray-800 transition-colors duration-300">
+        <div class="container mx-auto px-4">
+            <div class="max-w-3xl mx-auto text-center mb-16">
+                <span class="inline-block text-purple-500 font-semibold mb-2 dark:text-purple-400">مجتمع المطورين</span>
+                <h2 class="text-3xl md:text-4xl font-bold text-gray-900 mb-4 dark:text-white">انضم إلى مجتمع المطورين العرب</h2>
+                <p class="text-gray-600 dark:text-gray-300">
+                    كن جزءًا من مجتمع المبرمجين العرب، شارك خبراتك واستفد من تجارب الآخرين وساهم في إثراء المحتوى العربي.
+                </p>
+            </div>
+            
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
+                <div class="bg-white rounded-xl p-6 shadow-md hover:shadow-lg transition duration-300 dark:bg-gray-800 dark:border dark:border-gray-700">
+                    <div class="mb-6">
+                        <div class="w-14 h-14 bg-blue-100 text-primary rounded-lg flex items-center justify-center dark:bg-blue-900/30 dark:text-blue-400">
+                            <i class="fas fa-comments text-2xl"></i>
+                        </div>
+                    </div>
+                    <h3 class="text-xl font-bold mb-3 text-gray-900 dark:text-white">منتدى النقاش</h3>
+                    <p class="text-gray-600 mb-6 dark:text-gray-300">
+                        منصة للنقاش وتبادل الأفكار حول مختلف التقنيات والحلول البرمجية، مع دعم مستمر من المجتمع.
+                    </p>
+                    <a href="#" class="text-primary hover:text-primary/80 font-medium inline-flex items-center dark:text-blue-400 dark:hover:text-blue-300">
+                        انضم للمنتدى
+                        <i class="fas fa-arrow-left mr-2"></i>
+                    </a>
+                </div>
+                
+                <div class="bg-white rounded-xl p-6 shadow-md hover:shadow-lg transition duration-300 dark:bg-gray-800 dark:border dark:border-gray-700">
+                    <div class="mb-6">
+                        <div class="w-14 h-14 bg-indigo-100 text-indigo-500 rounded-lg flex items-center justify-center dark:bg-indigo-900/30 dark:text-indigo-400">
+                        <i class="fa-brands fa-telegram"></i>
+                        </div>
+                    </div>
+                    <h3 class="text-xl font-bold mb-3 text-gray-900 dark:text-white">مجتمع Telegram</h3>
+                    <p class="text-gray-600 mb-6 dark:text-gray-300">
+                        مجتمع نشط على Telegram للتواصل المباشر وطرح الأسئلة والاستفسارات والحصول على مساعدة فورية.
+                    </p>
+                    <a href="https://t.me/apiclubs" class="text-indigo-500 hover:text-indigo-600 font-medium inline-flex items-center dark:text-indigo-400 dark:hover:text-indigo-300">
+                        انضم للمجموعة
+                        <i class="fas fa-arrow-left mr-2"></i>
+                    </a>
+                </div>
+                
+                <div class="bg-white rounded-xl p-6 shadow-md hover:shadow-lg transition duration-300 dark:bg-gray-800 dark:border dark:border-gray-700">
+                    <div class="mb-6">
+                        <div class="w-14 h-14 bg-gray-100 text-gray-800 rounded-lg flex items-center justify-center dark:bg-gray-700 dark:text-gray-300">
+                            <i class="fab fa-github text-2xl"></i>
+                        </div>
+                    </div>
+                    <h3 class="text-xl font-bold mb-3 text-gray-900 dark:text-white">المساهمة في GitHub</h3>
+                    <p class="text-gray-600 mb-6 dark:text-gray-300">
+                        ساهم في إثراء المحتوى العربي من خلال المشاركة في مشاريع مفتوحة المصدر على GitHub.
+                    </p>
+                    <a href="#" class="text-gray-800 hover:text-gray-600 font-medium inline-flex items-center dark:text-gray-300 dark:hover:text-white">
+                        ابدأ المساهمة
+                        <i class="fas fa-arrow-left mr-2"></i>
+                    </a>
+                </div>
+            </div>
+            
+    </section>
+
+    <!-- Call to Action Section -->
+    <section class="py-16 bg-gradient-to-r from-primary to-indigo-600 text-white dark:from-primary/90 dark:to-indigo-700 transition-colors duration-300">
+        <div class="container mx-auto px-4">
+            <div class="max-w-4xl mx-auto text-center">
+                <h2 class="text-3xl md:text-4xl font-bold mb-6">
+                    انضم إلى منصة API Club اليوم
+                </h2>
+                <p class="text-xl text-white/80 mb-8">
+                    سجل الآن للاستفادة من جميع المميزات والخدمات واستكشف توثيق اللغات البرمجية بالعربية
+                </p>
+                <div class="flex flex-col sm:flex-row justify-center gap-4">
+                    <a href="#" class="bg-white text-primary px-8 py-3 rounded-lg hover:bg-gray-100 transition duration-200 font-bold">
+                        سجل الآن
+                    </a>
+                    <a href="#" class="bg-primary/30 text-white px-8 py-3 rounded-lg hover:bg-primary/40 transition duration-200 border border-white/20">
+                        تعرف علينا أكثر
+                    </a>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Newsletter -->
+    <section class="py-12 bg-white dark:bg-gray-900 transition-colors duration-300">
+        <div class="container mx-auto px-4">
+            <div class="max-w-3xl mx-auto bg-gray-50 rounded-2xl p-8 shadow-lg dark:bg-gray-800 dark:border dark:border-gray-700">
+                <div class="text-center mb-6">
+                    <h3 class="text-2xl font-bold mb-2 dark:text-white">اشترك في النشرة البريدية</h3>
+                    <p class="text-gray-600 dark:text-gray-300">
+                        احصل على آخر التحديثات والمقالات التقنية مباشرة إلى بريدك الإلكتروني
+                    </p>
+                </div>
+                <form class="flex flex-col sm:flex-row gap-4">
+                    <input type="email" placeholder="أدخل بريدك الإلكتروني" class="flex-1 px-4 py-3 rounded-lg border border-gray-200 focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary dark:bg-gray-700 dark:border-gray-600 dark:text-white dark:focus:ring-primary/40 dark:focus:border-primary/70 dark:placeholder-gray-400" />
+                    <button type="submit" class="px-6 py-3 bg-primary text-white rounded-lg hover:bg-primary/90 transition duration-200 font-bold dark:bg-primary/90 dark:hover:bg-primary">
+                        اشترك الآن
+                    </button>
+                </form>
+            </div>
+        </div>
+    </section>
+
+    <!-- Footer -->
+    <footer class="pt-16 pb-6 bg-gray-50 border-t border-gray-100 dark:bg-gray-900 dark:border-gray-800 transition-colors duration-300">
+        <div class="container mx-auto px-4">
+            <div class="grid grid-cols-1 md:grid-cols-4 gap-8 mb-12">
+                <div>
+                    <a href="#" class="inline-flex items-center gap-2 mb-4">
+                        <span class="text-primary text-xl font-bold dark:text-primary">API</span>
+                        <span class="text-secondary text-xl font-bold dark:text-secondary">Club</span>
+                    </a>
+                    <p class="text-gray-600 mb-6 dark:text-gray-300">
+                        منصة عربية للمطورين توفر توثيقًا شاملًا للغات البرمجة وخدمات API متكاملة.
+                    </p>
+                    <div class="flex space-x-3">
+                        <a href="#" class="w-10 h-10 bg-gray-100 rounded-full flex items-center justify-center text-gray-600 hover:bg-primary hover:text-white transition duration-200 dark:bg-gray-800 dark:text-gray-400 dark:hover:bg-primary dark:hover:text-white">
+                            <i class="fab fa-twitter"></i>
+                        </a>
+                        <a href="#" class="w-10 h-10 bg-gray-100 rounded-full flex items-center justify-center text-gray-600 hover:bg-primary hover:text-white transition duration-200 dark:bg-gray-800 dark:text-gray-400 dark:hover:bg-primary dark:hover:text-white">
+                            <i class="fab fa-github"></i>
+                        </a>
+                        <a href="#" class="w-10 h-10 bg-gray-100 rounded-full flex items-center justify-center text-gray-600 hover:bg-primary hover:text-white transition duration-200 dark:bg-gray-800 dark:text-gray-400 dark:hover:bg-primary dark:hover:text-white">
+                            <i class="fab fa-linkedin"></i>
+                        </a>
+                    </div>
+                </div>
+                
+                <div>
+                    <h4 class="font-bold text-lg mb-4 dark:text-white">روابط سريعة</h4>
+                    <ul class="space-y-2">
+                                                <li>
+                            <a href="#home" class="text-gray-600 hover:text-primary dark:text-gray-400 dark:hover:text-white">
+                                الرئيسية                            </a>
+                        </li>
+                                                <li>
+                            <a href="#docs" class="text-gray-600 hover:text-primary dark:text-gray-400 dark:hover:text-white">
+                                التوثيق                            </a>
+                        </li>
+                                                <li>
+                            <a href="#apis" class="text-gray-600 hover:text-primary dark:text-gray-400 dark:hover:text-white">
+                                خدمات API                            </a>
+                        </li>
+                                                <li>
+                            <a href="#community" class="text-gray-600 hover:text-primary dark:text-gray-400 dark:hover:text-white">
+                                المجتمع                            </a>
+                        </li>
+                                            </ul>
+                </div>
+                
+                <div>
+                    <h4 class="font-bold text-lg mb-4 dark:text-white">مصادر</h4>
+                    <ul class="space-y-2">
+                        <li><a href="#" class="text-gray-600 hover:text-primary dark:text-gray-400 dark:hover:text-white">دليل المستخدم</a></li>
+                        <li><a href="#" class="text-gray-600 hover:text-primary dark:text-gray-400 dark:hover:text-white">الأسئلة الشائعة</a></li>
+                        <li><a href="#" class="text-gray-600 hover:text-primary dark:text-gray-400 dark:hover:text-white">المدونة التقنية</a></li>
+                        <li><a href="#" class="text-gray-600 hover:text-primary dark:text-gray-400 dark:hover:text-white">مركز التحميل</a></li>
+                    </ul>
+                </div>
+                
+                <div>
+                    <h4 class="font-bold text-lg mb-4 dark:text-white">تواصل معنا</h4>
+                    <ul class="space-y-2">
+                        <li><a href="#" class="text-gray-600 hover:text-primary dark:text-gray-400 dark:hover:text-white">فريق الدعم</a></li>
+                        <li><a href="#" class="text-gray-600 hover:text-primary dark:text-gray-400 dark:hover:text-white">الشروط والأحكام</a></li>
+                        <li><a href="#" class="text-gray-600 hover:text-primary dark:text-gray-400 dark:hover:text-white">سياسة الخصوصية</a></li>
+                        <li><a href="#" class="text-gray-600 hover:text-primary dark:text-gray-400 dark:hover:text-white">تواصل معنا</a></li>
+                    </ul>
+                </div>
+            </div>
+            
+            <div class="border-t border-gray-200 pt-6 text-center dark:border-gray-800">
+                <p class="text-gray-600 dark:text-gray-400">
+                    &copy; 2025 API Club - جميع الحقوق محفوظة
+                </p>
+            </div>
+        </div>
+    </footer>
+
+    <!-- JavaScript -->
+    <script>
+        // Mobile Menu Toggle
+        const menuToggle = document.getElementById('menu-toggle');
+        const mobileMenu = document.getElementById('mobile-menu');
+        
+        menuToggle.addEventListener('click', () => {
+            mobileMenu.classList.toggle('hidden');
+        });
+        
+        // Smooth Scrolling
+        document.querySelectorAll('a[href^="#"]').forEach(anchor => {
+            anchor.addEventListener('click', function(e) {
+                e.preventDefault();
+                
+                const target = document.querySelector(this.getAttribute('href'));
+                if (target) {
+                    window.scrollTo({
+                        top: target.offsetTop - 80,
+                        behavior: 'smooth'
+                    });
+                    
+                    // Close mobile menu when a link is clicked
+                    if (!mobileMenu.classList.contains('hidden')) {
+                        mobileMenu.classList.add('hidden');
+                    }
+                }
+            });
+        });
+        
+        // Theme Toggle
+        const themeToggle = document.getElementById('theme-toggle');
+        const themeToggleMobile = document.getElementById('theme-toggle-mobile');
+        
+        // Function to toggle theme
+        function toggleTheme() {
+            if (document.documentElement.classList.contains('dark')) {
+                document.documentElement.classList.remove('dark');
+                localStorage.setItem('theme', 'light');
+            } else {
+                document.documentElement.classList.add('dark');
+                localStorage.setItem('theme', 'dark');
+            }
+        }
+        
+        // Add event listeners to both buttons
+        themeToggle.addEventListener('click', toggleTheme);
+        themeToggleMobile.addEventListener('click', toggleTheme);
+        
+        // Check user preference and localStorage on page load
+        document.addEventListener('DOMContentLoaded', () => {
+            // Check localStorage first
+            const savedTheme = localStorage.getItem('theme');
+            
+            if (savedTheme === 'dark' || 
+                (!savedTheme && window.matchMedia('(prefers-color-scheme: dark)').matches)) {
+                document.documentElement.classList.add('dark');
+            } else {
+                document.documentElement.classList.remove('dark');
+            }
+        });
+    </script>
+
+    <!-- Schema.org structured data -->
+    <script type="application/ld+json">
+    {
+      "@context": "https://schema.org",
+      "@type": "WebSite",
+      "name": "API Club",
+      "url": "https://apiclub.site/",
+      "potentialAction": {
+        "@type": "SearchAction",
+        "target": "https://apiclub.site/search?q={search_term_string}",
+        "query-input": "required name=search_term_string"
+      },
+      "description": "منصة API Club العربية توفر توثيقًا شاملًا للغات البرمجة وأطر العمل وخدمات API متكاملة للمطورين العرب",
+      "inLanguage": "ar"
+    }
+    </script>
+
+    <!-- Organization Schema -->
+    <script type="application/ld+json">
+    {
+      "@context": "https://schema.org",
+      "@type": "Organization",
+      "name": "API Club",
+      "url": "https://apiclub.site/",
+      "logo": "https://apiclub.site/assets/images/logo.png",
+      "sameAs": [
+        "https://twitter.com/apiclub",
+        "https://github.com/apiclub",
+        "https://linkedin.com/company/apiclub"
+      ]
+    }
+    </script>
+</body>
+</html>

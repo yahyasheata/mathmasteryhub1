@@ -1,0 +1,36 @@
+.env
+*.service-account.json
+google-drive-service-account.json
+
+# Large archives and backups
+*.zip
+*.tar
+*.tar.gz
+
+# macOS files
+.DS_Store
+__MACOSX/
+
+# Logs and temporary files
+error_log
+*.log
+*.tmp
+
+# Old or duplicate folders
+New folder/
+
+# User-generated uploads
+uploads/
+.well-known/
+.well-known/
+
+# Old and duplicate files
+index-old.php
+index_OLD_before_register.php
+composer - Copy.lock
+inc/*copy*.php
+notification/*BackUp*.php
+
+# Local backup copies
+* copy.php
+*BackUp*.php

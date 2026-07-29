@@ -1,0 +1,3 @@
+- Download Composer https://getcomposer.org/
+- Open command line, navigate to your project folder.
+- Run "composer require flowjs/flow-php-server"
