@@ -1,24 +1,15 @@
-name: Deploy to Production
+script: |
+  set -e
 
-on:
-  push:
-    branches:
-      - main
+  cd /home/mathqclj/public_html
 
-jobs:
-  deploy:
-    runs-on: ubuntu-latest
+  echo "Fetching latest code..."
+  git fetch origin main
 
-    steps:
-      - name: Deploy via SSH
-        uses: appleboy/ssh-action@v1.2.0
-        with:
-          host: ${{ secrets.SSH_HOST }}
-          username: ${{ secrets.SSH_USER }}
-          key: ${{ secrets.SSH_PRIVATE_KEY }}
-          port: ${{ secrets.SSH_PORT }}
-          script: |
-            cd /home/mathqclj/public_html
-            git fetch origin main
-            git reset --hard origin/main
-            php -l index.php
+  echo "Deploying..."
+  git reset --hard origin/main
+
+  echo "Verifying PHP..."
+  php -l index.php
+
+  echo "Deployment completed successfully."
