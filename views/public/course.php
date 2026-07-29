@@ -2,6 +2,7 @@
 require_once 'connection/config.php';
 require_once '__init.php';
 require_once 'inc/functions.php';
+require_once 'inc/learning_schema.php';
 require_once 'inc/PastPapers.php';
 require_once 'views/partials/past-papers-list.php';
 $pageName = "courses";
@@ -11,31 +12,67 @@ $site_settings = getSiteSettings();
 $site_name = $site_settings["website_name"];
 
 $conn = db();
-$courses_query = "SELECT *,
-    courses.id AS cid,
-    courses.course_id AS public_course_id,
-    course_items.id AS iid,
-    categories.category_title AS preview_category_title,
-    categories.category_link AS preview_category_link,
-    course_sections.section_id AS preview_section_id,
-    course_sections.title AS preview_section_title,
-    course_sections.description AS preview_section_description,
-    course_sections.section_type AS preview_section_type,
-    course_sections.sort_order AS preview_section_sort_order
-    FROM courses
-    LEFT JOIN categories ON courses.course_category = categories.id
-    LEFT JOIN course_items ON courses.course_id = course_items.course_id
-        AND (course_items.status IS NULL OR course_items.status = '' OR course_items.status = 'published')
-    LEFT JOIN course_sections ON course_items.section_id = course_sections.section_id
-        AND course_sections.course_id = courses.course_id
-        AND (course_sections.status IS NULL OR course_sections.status = '' OR course_sections.status = 'published')
-    WHERE courses.id='$courseId'
-    ORDER BY
-        CASE WHEN course_items.section_id IS NULL OR course_items.section_id = '' THEN 0 ELSE 1 END,
-        course_sections.sort_order ASC,
-        course_items.sort_order ASC,
-        course_items.page_order ASC,
-        course_items.id ASC";
+$courseId = filter_var($courseId ?? null, FILTER_VALIDATE_INT, ['options' => ['min_range' => 1]]);
+if ($courseId === false) {
+  http_response_code(404);
+  exit('Course not found.');
+}
+
+$structured_item_columns = ['section_id', 'status', 'sort_order'];
+$structured_section_columns = ['section_id', 'course_id', 'title', 'description', 'section_type', 'sort_order', 'status'];
+$has_structured_preview = mmh_table_exists($conn, 'course_sections');
+
+foreach ($structured_item_columns as $column) {
+  $has_structured_preview = $has_structured_preview && mmh_column_exists($conn, 'course_items', $column);
+}
+foreach ($structured_section_columns as $column) {
+  $has_structured_preview = $has_structured_preview && mmh_column_exists($conn, 'course_sections', $column);
+}
+
+if ($has_structured_preview) {
+  $courses_query = "SELECT *,
+      courses.id AS cid,
+      courses.course_id AS public_course_id,
+      course_items.id AS iid,
+      categories.category_title AS preview_category_title,
+      categories.category_link AS preview_category_link,
+      course_sections.section_id AS preview_section_id,
+      course_sections.title AS preview_section_title,
+      course_sections.description AS preview_section_description,
+      course_sections.section_type AS preview_section_type,
+      course_sections.sort_order AS preview_section_sort_order
+      FROM courses
+      LEFT JOIN categories ON courses.course_category = categories.id
+      LEFT JOIN course_items ON courses.course_id = course_items.course_id
+          AND (course_items.status IS NULL OR course_items.status = '' OR course_items.status = 'published')
+      LEFT JOIN course_sections ON course_items.section_id = course_sections.section_id
+          AND course_sections.course_id = courses.course_id
+          AND (course_sections.status IS NULL OR course_sections.status = '' OR course_sections.status = 'published')
+      WHERE courses.id={$courseId}
+      ORDER BY
+          CASE WHEN course_items.section_id IS NULL OR course_items.section_id = '' THEN 0 ELSE 1 END,
+          course_sections.sort_order ASC,
+          course_items.sort_order ASC,
+          course_items.page_order ASC,
+          course_items.id ASC";
+} else {
+  $courses_query = "SELECT *,
+      courses.id AS cid,
+      courses.course_id AS public_course_id,
+      course_items.id AS iid,
+      categories.category_title AS preview_category_title,
+      categories.category_link AS preview_category_link,
+      NULL AS preview_section_id,
+      NULL AS preview_section_title,
+      NULL AS preview_section_description,
+      NULL AS preview_section_type,
+      NULL AS preview_section_sort_order
+      FROM courses
+      LEFT JOIN categories ON courses.course_category = categories.id
+      LEFT JOIN course_items ON courses.course_id = course_items.course_id
+      WHERE courses.id={$courseId}
+      ORDER BY course_items.page_order ASC, course_items.id ASC";
+}
 $coures_result = mysqli_query($conn,$courses_query);
 
 $course = null;
