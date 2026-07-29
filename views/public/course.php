@@ -6,7 +6,7 @@ require_once 'inc/learning_schema.php';
 require_once 'inc/PastPapers.php';
 require_once 'views/partials/past-papers-list.php';
 $pageName = "courses";
-$username = $_SESSION['username'];
+$username = $_SESSION['username'] ?? '';
 
 $site_settings = getSiteSettings();
 $site_name = $site_settings["website_name"];
