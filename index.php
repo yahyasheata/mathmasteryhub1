@@ -208,6 +208,7 @@ $router->mount('/user', function() use ($router) {
     });
 
     $router->get('/live-session/join/{occurrenceId}', function($occurrenceId) {
+        global $baseUrl;
         require_once '__init.php';
         if (!isset($_SESSION['username'])) {
             header("Location: {$baseUrl}/auth/login");
@@ -229,6 +230,7 @@ $router->mount('/user', function() use ($router) {
     });
 
     $router->get('/{pageName}/{courseId}?', function($pageName, $courseId = null) {
+        global $baseUrl;
         require_once '__init.php';
         if (!isset($_SESSION['username'])) {
             header("Location: {$baseUrl}/auth/login");
@@ -239,6 +241,7 @@ $router->mount('/user', function() use ($router) {
     });
 
     $router->get('/{pageName}', function($pageName) {
+        global $baseUrl;
         require_once '__init.php';
         if (!isset($_SESSION['username'])) {
             header("Location: {$baseUrl}/auth/login");
