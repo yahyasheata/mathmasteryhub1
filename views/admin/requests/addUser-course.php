@@ -57,6 +57,126 @@ function add_user_course_section_options(mysqli $conn, $course_id)
     return $html;
 }
 
+function add_user_course_student_options(mysqli_result $result)
+{
+    $html = '';
+    while ($user_data = mysqli_fetch_assoc($result)) {
+        $user_id = htmlspecialchars((string) $user_data["user_id"], ENT_QUOTES, 'UTF-8');
+        $name = htmlspecialchars((string) $user_data["full_name"], ENT_QUOTES, 'UTF-8');
+        $user_phone = htmlspecialchars((string) $user_data["username"], ENT_QUOTES, 'UTF-8');
+        $html .= "<option value='{$user_id}'>{$name} | {$user_phone}</option>";
+    }
+    return $html;
+}
+
+function add_user_course_fetch_course(mysqli $conn, $course_id)
+{
+    $stmt = $conn->prepare('SELECT course_id, course_title, course_price, course_status FROM courses WHERE course_id = ? LIMIT 1');
+    if (!$stmt) {
+        return null;
+    }
+    $course_id = (string) $course_id;
+    $stmt->bind_param('s', $course_id);
+    $stmt->execute();
+    $course = $stmt->get_result()->fetch_assoc();
+    $stmt->close();
+    return $course ?: null;
+}
+
+function add_user_course_fetch_student(mysqli $conn, $user_id)
+{
+    $stmt = $conn->prepare("SELECT user_id, full_name, username, status, role FROM users WHERE user_id = ? AND role = 'user' LIMIT 1");
+    if (!$stmt) {
+        return null;
+    }
+    $user_id = (int) $user_id;
+    $stmt->bind_param('i', $user_id);
+    $stmt->execute();
+    $student = $stmt->get_result()->fetch_assoc();
+    $stmt->close();
+    return $student ?: null;
+}
+
+function add_user_course_log_exists(mysqli $conn, $course_id, $user_id)
+{
+    $stmt = $conn->prepare('SELECT id FROM course_logs WHERE course_id = ? AND user_id = ? LIMIT 1');
+    if (!$stmt) {
+        return false;
+    }
+    $course_id_int = (int) $course_id;
+    $user_id_string = (string) $user_id;
+    $stmt->bind_param('is', $course_id_int, $user_id_string);
+    $stmt->execute();
+    $exists = $stmt->get_result()->num_rows > 0;
+    $stmt->close();
+    return $exists;
+}
+
+function add_user_course_transaction_exists(mysqli $conn, $course_id, $user_id)
+{
+    $stmt = $conn->prepare('SELECT id FROM transactions WHERE course_id = ? AND user_id = ? LIMIT 1');
+    if (!$stmt) {
+        return false;
+    }
+    $course_id_int = (int) $course_id;
+    $user_id_int = (int) $user_id;
+    $stmt->bind_param('ii', $course_id_int, $user_id_int);
+    $stmt->execute();
+    $exists = $stmt->get_result()->num_rows > 0;
+    $stmt->close();
+    return $exists;
+}
+
+function add_user_course_create_course_log(mysqli $conn, array $course, $user_id)
+{
+    if (add_user_course_log_exists($conn, $course['course_id'], $user_id)) {
+        return ['status' => 1, 'message' => 'Student is already enrolled.'];
+    }
+
+    $stmt = $conn->prepare('INSERT INTO course_logs (user_id, course_id, course_title, purchase_date) VALUES (?, ?, ?, NOW())');
+    if (!$stmt) {
+        return ['status' => 0, 'message' => 'Error', 'reason' => $conn->error];
+    }
+    $user_id_string = (string) $user_id;
+    $course_id_int = (int) $course['course_id'];
+    $course_title = (string) $course['course_title'];
+    $stmt->bind_param('sis', $user_id_string, $course_id_int, $course_title);
+    $ok = $stmt->execute();
+    $reason = $stmt->error ?: $conn->error;
+    $stmt->close();
+
+    return $ok
+        ? ['status' => 1, 'message' => 'Student enrolled successfully.']
+        : ['status' => 0, 'message' => 'Error', 'reason' => $reason];
+}
+
+function add_user_course_enroll_student(mysqli $conn, array $course, $user_id)
+{
+    if (add_user_course_log_exists($conn, $course['course_id'], $user_id)) {
+        return ['status' => 1, 'message' => 'Student is already enrolled.'];
+    }
+
+    if (add_user_course_transaction_exists($conn, $course['course_id'], $user_id)) {
+        return add_user_course_create_course_log($conn, $course, $user_id);
+    }
+
+    $amountToAdd = (int) ($course['course_price'] ?? 0);
+    $updateBalance = updateBalance((int) $user_id, $amountToAdd);
+    if (!$updateBalance) {
+        return ['status' => 0, 'message' => 'Error', 'reason' => 'An error occurred while adding balance to the account.'];
+    }
+
+    require_once 'inc/TransactionLog.php';
+    $transactionLogHandler = new TransactionLog($conn);
+    $result = $transactionLogHandler->saveCourseLog((int) $user_id, (int) $course['course_id']);
+
+    if (add_user_course_log_exists($conn, $course['course_id'], $user_id)) {
+        return ['status' => 1, 'message' => $result['message'] ?? 'Student enrolled successfully.'];
+    }
+
+    return is_array($result) ? $result : ['status' => 0, 'message' => 'Error', 'reason' => 'Enrollment record was not created.'];
+}
+
 if($_SERVER['REQUEST_METHOD'] == "POST" ){
     if(isset($_POST['_method']) && $_POST['_method'] == 'GET' ){
 
@@ -72,17 +192,7 @@ if($_SERVER['REQUEST_METHOD'] == "POST" ){
             $result = mysqli_query($conn,$query);
             if($result){
 
-                $user_data = mysqli_fetch_assoc($result);
-                $user_id = $user_data["user_id"];
-                $name = $user_data["full_name"];
-
-                $user_options = '';
-                while ($user_data = mysqli_fetch_assoc($result)) {
-                    $user_id = $user_data["user_id"];
-                    $name = $user_data["full_name"];
-                    $user_phone = $user_data["username"];
-                    $user_options .= "<option value='$user_id'>$name | $user_phone</option>";
-                }
+                $user_options = add_user_course_student_options($result);
 
                   
 
@@ -211,58 +321,37 @@ if($_SERVER['REQUEST_METHOD'] == "POST" ){
         if(isset($_POST['course_id'],$_POST['user_id']) && !empty($_POST['course_id']) && !empty($_POST['user_id']) ){
 
             $conn = db();
-            $course_id = $_POST['course_id'];
+            $course_id = trim((string) $_POST['course_id']);
             $user_id = (int) $_POST['user_id'];
-            $course_price = getCourseInfo($course_id)->course_price;
-            $amountToAdd = $course_price;
-            $checkCourse = mysqli_query($conn,"SELECT id from transactions WHERE (course_id='$course_id' AND user_id ='$user_id' ) ");
-            if ($checkCourse->num_rows == 0) {
-                $updateBalance = updateBalance($user_id,$amountToAdd);
-                if($updateBalance){
 
-                    require_once 'inc/TransactionLog.php' ;   
-    
-                    $transactionLogHandler = new TransactionLog($conn);
-                            
-                    // Save course log
-                    $result = $transactionLogHandler->saveCourseLog($user_id, $course_id);
-                    if($result){
-                        $overrideResult = add_user_course_save_learning_override($conn, $course_id, $user_id);
-                        if(isset($overrideResult['status']) && $overrideResult['status'] == 0){
-                            echo json_encode([
-                                'status' => 0,
-                                'message' => 'Student enrolled, but learning override could not be saved.',
-                                'reason' => $overrideResult['reason'] ?? ''
-                            ]);
-                        }else{
-                            echo json_encode($result);
-                        }
-                    }else{
-                        echo json_encode($result);
-                    }
-    
-                }else{
-                    $response = array(
-                        'status' => 0,
-                        'message' => 'Error',
-                        'reason' => 'An error occurred while adding balance to the account.'
-                    );
-                    echo json_encode($response);
-                }
+            $course = add_user_course_fetch_course($conn, $course_id);
+            $student = add_user_course_fetch_student($conn, $user_id);
+            if (!$course) {
+                echo json_encode(['status' => 0, 'message' => 'Error', 'reason' => 'Selected course was not found.']);
+            } elseif (!$student || (string) ($student['status'] ?? '') !== '1') {
+                echo json_encode(['status' => 0, 'message' => 'Error', 'reason' => 'Selected student is not active.']);
             }else{
-                $overrideResult = add_user_course_save_learning_override($conn, $course_id, $user_id);
-                if(isset($overrideResult['status']) && $overrideResult['status'] == 1){
+                $result = add_user_course_enroll_student($conn, $course, $user_id);
+                if(!isset($result['status']) || $result['status'] != 1){
                     echo json_encode([
-                        'status' => 1,
-                        'message' => 'Student is already enrolled. Learning override updated successfully.'
+                        'status' => 0,
+                        'message' => $result['message'] ?? 'Error',
+                        'reason' => $result['reason'] ?? 'Enrollment could not be completed.'
                     ]);
                 }else{
-                    $response = array(
-                        'status' => 0,
-                        'message' => 'Error',
-                        'reason' => 'This course has already been purchased, and the override could not be saved.'
-                    );
-                    echo json_encode($response);
+                    $overrideResult = add_user_course_save_learning_override($conn, $course_id, $user_id);
+                    if(isset($overrideResult['status']) && $overrideResult['status'] == 1){
+                        echo json_encode([
+                            'status' => 1,
+                            'message' => ($result['message'] ?? 'Student enrolled successfully.') . ' Learning override updated successfully.'
+                        ]);
+                    }else{
+                        echo json_encode([
+                            'status' => 0,
+                            'message' => 'Student enrolled, but learning override could not be saved.',
+                            'reason' => $overrideResult['reason'] ?? ''
+                        ]);
+                    }
                 }
             }
 
