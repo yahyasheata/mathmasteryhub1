@@ -269,6 +269,11 @@ function public_nav_html($value) { return htmlspecialchars((string)$value, ENT_Q
     right: 0;
     top: 100%;
     z-index: 55;
+    max-height: calc(100vh - var(--public-header-offset, 66px));
+    max-height: calc(100dvh - var(--public-header-offset, 66px));
+    overflow-y: auto;
+    overscroll-behavior: contain;
+    -webkit-overflow-scrolling: touch;
     border-top: 1px solid var(--border);
     background: var(--surface-elevated, var(--surface));
     box-shadow: var(--shadow-lg);
