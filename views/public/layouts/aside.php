@@ -5,33 +5,16 @@ $publicLogoUrl = mmh_site_settings_asset_url($site_settings, 'website_logo', 're
 $publicDarkLogoUrl = mmh_site_public_url('resources/images/branding/mathhub-logo-white.png');
 $publicUserLoggedIn = !empty($_SESSION['username']);
 $publicUserName = 'Account';
-$publicUserIsEnrolled = false;
 
 if ($publicUserLoggedIn && function_exists('db')) {
     try {
-        $publicConn = db();
         if (function_exists('getUserData')) {
             $publicUserData = getUserData($_SESSION['username']);
             $publicNameCandidate = trim((string)($publicUserData['full_name'] ?? ''));
             if ($publicNameCandidate !== '') { $publicUserName = $publicNameCandidate; }
         }
-        if (function_exists('getUserInfo')) {
-            $publicInfo = getUserInfo($_SESSION['username']);
-            $publicUserId = (int)($publicInfo->user_id ?? 0);
-            if ($publicUserId > 0) {
-                $publicEnrollStmt = $publicConn->prepare('SELECT COUNT(*) AS total FROM course_logs WHERE user_id = ?');
-                if ($publicEnrollStmt) {
-                    $publicEnrollStmt->bind_param('i', $publicUserId);
-                    $publicEnrollStmt->execute();
-                    $publicEnrollRow = $publicEnrollStmt->get_result()->fetch_assoc();
-                    $publicUserIsEnrolled = (int)($publicEnrollRow['total'] ?? 0) > 0;
-                    $publicEnrollStmt->close();
-                }
-            }
-        }
     } catch (Throwable $publicNavError) {
         $publicUserName = 'Account';
-        $publicUserIsEnrolled = false;
     }
 }
 
@@ -58,18 +41,13 @@ if (!$publicOrderedNavigation) $publicOrderedNavigation[] = ['label' => 'Home', 
 $publicNavItems = array_slice($publicOrderedNavigation, 0, 4);
 $publicMoreItems = array_slice($publicOrderedNavigation, 4);
 $publicAnnouncement = mmh_site_settings_active_announcement($site_settings, $publicUserLoggedIn);
-$publicAccountItems = $publicUserIsEnrolled ? [
+$publicAccountItems = [
     ['label' => 'My Courses', 'href' => $publicBaseUrl . '/user/my-courses'],
     ['label' => 'My Progress', 'href' => $publicBaseUrl . '/user/analytics'],
     ['label' => 'Assignments', 'href' => $publicBaseUrl . '/user/assignments'],
     ['label' => 'Live Sessions', 'href' => $publicBaseUrl . '/user/live-sessions'],
     ['label' => 'Notifications', 'href' => $publicBaseUrl . '/user/notifications'],
     ['label' => 'Settings', 'href' => $publicBaseUrl . '/user/settings'],
-    ['label' => 'Logout', 'href' => $publicBaseUrl . '/user/logout'],
-] : [
-    ['label' => 'Browse Courses', 'href' => $publicBaseUrl . '/courses'],
-    ['label' => 'Past Papers', 'href' => $publicBaseUrl . '/past-papers'],
-    ['label' => 'Account Settings', 'href' => $publicBaseUrl . '/user/settings'],
     ['label' => 'Logout', 'href' => $publicBaseUrl . '/user/logout'],
 ];
 function public_nav_html($value) { return htmlspecialchars((string)$value, ENT_QUOTES, 'UTF-8'); }
