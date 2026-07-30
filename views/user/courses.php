@@ -186,60 +186,6 @@ Ahmed Shawqi
         </main>
         <?php include "layouts/user/footer.php"; ?>
 
-<div class='col-12 ds-border' style="background-image: linear-gradient(to right, var(--surface), var(--surface)); display: flex; align-items: center; justify-content: center; direction: ltr"> <div class="container"> <div class="col-12 row d-flex justify-content-between p-0"> <div class="col-12 text-center mt-1 mb-2 pt-3 pb-2"> <p style="font-size: 14px; line-height: 1.8; margin: 0px" class="my-0 kufi text-center"><span class="d-inline-block kufi"> All rights reserved © <?=$site_name;?> 2023 </span> <span class="d-inline-block kufi"> All rights reserved</span></p> 
-
-    <div class="developer" style="text-align: center; direction: ltr; font-size: 16px; font-weight: bold; cursor: pointer">
-      <span>
-        <span> <</span>
-        <span>Developed With ❤ By </span>
-        <span>></span>
-      </span>
-      <span class="text-primary">ENG/ Abdulrahman Mohamed Eid</span>
-    </div>
-    
-        <script>
-              $(document).ready(function() {
-        $('.developer').click(function() {
-    Swal.fire({
-      title: `<h5 class='modal-title' style='font-size: 35px; text-align: center; margin-bottom: 16px'><span class='fas fa-phone mx-1'></span>Contact the Developer</h5>`,
-      html: `<div class='col-lg-4 d-flex' style='width: 100%; flex-direction: column; justify-content: center; align-items: center'>
-              <div class='d-flex flex-row' style='justify-content: space-between; width: 100%; flex-direction: row'>
-                <div class='col-lg-6 col-md-6 col-sm-12 col-xs-12'>
-                  <div>
-                    <div class='icon text-primary fs-28 me-4 mt-n1'> <i class='fas fa-phone'></i> </div>
-                  </div>
-                  <div>
-                    <h5 class='mb-1' style='margin-right: 10px'>Phone</h5>
-                    <p style='fon-size: 17px'>01080842899 <br>01011626776</p>
-                  </div>
-                </div>
-    
-                <div class='col-lg-6 col-md-6 col-sm-12 col-xs-12'>
-                  <div class='icon text-info fs-28 me-4 mt-n1'> <i class='fa fa-globe'></i> </div>
-                  <div>
-                    <h5 class='mb-1' style='margin-right: 10px'>Social Media</h5>
-                    <p class='mb-0'><a href='https://wa.me/+201080842899' target='_blank' class='btn btn-outline-success btn-sm'>WhatsApp<i class='fab fa-whatsapp' style='margin-right: 5px; font-size: 22px'></i> </a></p>
-                    <p class='mb-0'><a href='https://www.facebook.com/abdo0m/' target='_blank' class='btn btn-outline-primary btn-sm'>Facebook<i class='fab fa-facebook' style='margin-right: 5px; font-size: 22px'></i> </a></p>
-                  </div>
-                </div>
-              </div>
-            </div>`,
-      // icon: "info",
-      showCancelButton: true,
-      confirmButtonColor: "var(--primary)",
-      cancelButtonColor: "var(--danger)",
-      confirmButtonText: "!",
-      cancelButtonText: "Cancel",
-      showConfirmButton: false,
-    });
-    
-        });
-      });
-    
-    </script>
-    </div> </div> </div> </div>    </div>
-
-
     <link rel="modulepreload" href="<?=$baseUrl?>/resources/build/assets/app-e4352ad6.js" /><link rel="modulepreload" href="<?=$baseUrl?>/resources/build/assets/main-07febffb.js" /><script type="module" src="<?=$baseUrl?>/resources/build/assets/app-e4352ad6.js" data-navigate-track="reload"></script>    <!-- Livewire Scripts -->
     
     

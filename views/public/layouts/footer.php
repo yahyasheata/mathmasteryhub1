@@ -16,7 +16,8 @@ $footerSocialLinks = array_filter($footerSocialLinks, static fn(array $meta, str
   .public-footer-grid { display: grid; grid-template-columns: minmax(0, 1.5fr) minmax(150px, .7fr) minmax(190px, .8fr); gap: clamp(1.5rem, 5vw, 4rem); }
   .public-footer-brand p { max-width: 480px; margin: .8rem 0 0; color: var(--text-secondary); font-size: .92rem; line-height: 1.65; }
   .public-footer-logo-link { display: inline-flex; align-items: center; }
-  .public-footer-logo { width: min(160px, 100%); height: auto; display: block; }
+  .public-footer-logo { width: min(160px, 100%); height: auto; }
+  .public-footer-logo:not(.mathhub-logo--dark) { display: block; }
   .public-footer-links h2, .public-footer-social h2 { margin: .15rem 0 .85rem; color: var(--text-primary); font-size: .94rem; font-weight: 800; }
   .public-footer-links ul { display: grid; gap: .55rem; margin: 0; padding: 0; list-style: none; }
   .public-footer-links a { color: var(--text-secondary); font-size: .9rem; text-decoration: none; }

@@ -135,7 +135,7 @@ function public_nav_html($value) { return htmlspecialchars((string)$value, ENT_Q
     flex: 0 0 auto;
     text-decoration: none;
   }
-  .public-logo-link img {
+  .public-logo-link img:not(.mathhub-logo--dark) {
     width: 112px;
     height: auto;
     display: block;

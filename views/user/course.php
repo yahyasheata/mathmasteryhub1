@@ -954,20 +954,6 @@ if ($lesson_progress_available) {
             </div>
         </main>
         <?php include "layouts/user/footer.php"; ?>
-
-
-        <div class='col-12 ds-border' style="background-image: linear-gradient(to right, var(--surface), var(--surface)); display: flex; align-items: center; justify-content: center; direction: ltr"
-           >
-            <div class="container">
-                <div class="col-12 row d-flex justify-content-between p-0">
-                    <div class="col-12 text-center mt-1 mb-2 pt-3 pb-2">
-                        <p style="font-size: 14px; line-height: 1.8; margin: 0px" class="my-0 kufi text-center"><span
-                                class="d-inline-block kufi"> All rights reserved © <?=$site_name;?> 2023 </span> <span
-                                class="d-inline-block kufi"> All rights reserved</span></p>
-                    </div>
-                </div>
-            </div>
-        </div>
     </div>
 
 
