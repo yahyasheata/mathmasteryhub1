@@ -167,6 +167,47 @@ function mmh_parent_report_date($value): ?string
     return $date && $date->format('Y-m-d') === $value ? $value : null;
 }
 
+/** Shared reporting-period choices used by Parent Reports and student My Progress. */
+function mmh_report_period_options(bool $allowCustom = false): array
+{
+    $options = [
+        'current_week' => 'Current teaching week',
+        'last_30_days' => 'Last 30 days',
+        'course_to_date' => 'Course to date',
+    ];
+    if ($allowCustom) { $options['custom'] = 'Custom date range'; }
+    return $options;
+}
+
+/** Resolve a period to the same inclusive date range for every report consumer. */
+function mmh_report_period(mysqli $conn, string $courseId, int $studentId, string $period = 'current_week', ?string $customStart = null, ?string $customEnd = null, bool $allowCustom = false): array
+{
+    $period = strtolower(trim($period));
+    if (!array_key_exists($period, mmh_report_period_options($allowCustom))) { $period = 'current_week'; }
+    $today = new DateTimeImmutable('today');
+    $range = match ($period) {
+        'last_30_days' => ['start' => $today->modify('-29 days')->format('Y-m-d'), 'end' => $today->format('Y-m-d')],
+        'course_to_date' => null,
+        'custom' => ['start' => mmh_parent_report_date($customStart), 'end' => mmh_parent_report_date($customEnd)],
+        default => mmh_parent_report_current_week(),
+    };
+    if ($period === 'course_to_date') {
+        $start = null;
+        $stmt = $conn->prepare('SELECT MIN(purchase_date) AS enrolled_at FROM course_logs WHERE course_id = ? AND user_id = ?');
+        if ($stmt) {
+            $stmt->bind_param('si', $courseId, $studentId);
+            $stmt->execute();
+            $row = $stmt->get_result()->fetch_assoc() ?: [];
+            $stmt->close();
+            $start = mmh_parent_report_date(substr((string) ($row['enrolled_at'] ?? ''), 0, 10));
+        }
+        $range = ['start' => $start ?: $today->format('Y-m-d'), 'end' => $today->format('Y-m-d')];
+    }
+    if (!$range || empty($range['start']) || empty($range['end'])) { throw new InvalidArgumentException('Choose a valid report date range.'); }
+    if ($range['start'] > $range['end']) { throw new InvalidArgumentException('The report start date must be before the end date.'); }
+    return ['key' => $period, 'label' => mmh_report_period_options($allowCustom)[$period] ?? 'Current teaching week', 'start' => $range['start'], 'end' => $range['end']];
+}
+
 function mmh_parent_report_students(mysqli $conn, string $courseId): array
 {
     $course = trim($courseId);
@@ -311,13 +352,13 @@ function mmh_parent_report_apply_overrides(array $report, array $overrides): arr
 
             if (!$section['recordings']) { $recordingKey = 'no_recording'; }
             elseif (in_array($attendanceKey, ['present', 'late'], true)) { $recordingKey = 'not_required'; }
-            else { $recordingKey = array_reduce($section['recordings'], static fn(bool $opened, array $recording): bool => $opened || $recording['label'] === 'Opened', false) ? 'viewed' : 'not_viewed'; }
+            else { $recordingKey = array_reduce($section['recordings'], static fn(bool $opened, array $recording): bool => $opened || !empty($recording['opened']) || in_array(($recording['status_key'] ?? ''), ['opened', 'completed'], true) || $recording['label'] === 'Opened', false) ? 'viewed' : 'not_viewed'; }
             if ($hasOverride('recording_override')) { $recordingKey = $override['recording_override']; $manual = true; }
             $recording = mmh_parent_report_final_status('recording', $recordingKey);
             $recording['source'] = $hasOverride('recording_override') ? 'override' : 'lms';
             $revision = null;
         } else {
-            $revisionKey = !$section['recordings'] ? 'no_video' : (array_reduce($section['recordings'], static fn(bool $opened, array $recording): bool => $opened || $recording['label'] === 'Opened', false) ? 'viewed' : 'not_viewed');
+            $revisionKey = !$section['recordings'] ? 'no_video' : (array_reduce($section['recordings'], static fn(bool $opened, array $recording): bool => $opened || !empty($recording['opened']) || in_array(($recording['status_key'] ?? ''), ['opened', 'completed'], true) || $recording['label'] === 'Opened', false) ? 'viewed' : 'not_viewed');
             if ($hasOverride('revision_override')) { $revisionKey = $override['revision_override']; $manual = true; }
             $revision = mmh_parent_report_final_status('revision', $revisionKey);
             $revision['source'] = $hasOverride('revision_override') ? 'override' : 'lms';
@@ -435,14 +476,15 @@ function mmh_parent_report_suggested_comment(array $report): string
     return '';
 }
 
-function mmh_parent_report_resolve(mysqli $conn, string $courseId, int $studentId, string $start, string $end, ?string $comment = null): array
+/** Shared section-progress report service. Parent Reports and My Progress both consume this. */
+function mmh_report_resolve(mysqli $conn, string $courseId, int $studentId, string $start, string $end, ?string $comment = null): array
 {
     mmh_parent_report_ensure_schema($conn);
     $course = mmh_parent_report_course($conn, $courseId);
     if (!$course) { throw new RuntimeException('The selected course is unavailable.'); }
     $start = mmh_parent_report_date($start) ?? throw new InvalidArgumentException('Choose a valid report start date.');
     $end = mmh_parent_report_date($end) ?? throw new InvalidArgumentException('Choose a valid report end date.');
-    if ($start > $end || (strtotime($end) - strtotime($start)) > 31 * 86400) { throw new InvalidArgumentException('Choose a valid report range of up to 31 days.'); }
+    if ($start > $end) { throw new InvalidArgumentException('Choose a valid report date range.'); }
 
     $courseId = (string) $course['course_id'];
     $studentStmt = $conn->prepare('SELECT u.user_id, u.full_name FROM users u INNER JOIN course_logs cl ON cl.user_id = u.user_id WHERE u.user_id = ? AND cl.course_id = ? LIMIT 1');
@@ -451,16 +493,16 @@ function mmh_parent_report_resolve(mysqli $conn, string $courseId, int $studentI
     if (!$student) { throw new RuntimeException('The selected student is not enrolled in the selected course.'); }
 
     $from = $start . ' 00:00:00'; $to = date('Y-m-d H:i:s', strtotime($end . ' +1 day'));
-    $sectionStmt = $conn->prepare("SELECT s.section_id, s.title, s.sort_order, s.release_occurrence_id, o.scheduled_start_at, o.scheduled_end_at, COALESCE(a.status, 'unknown') AS attendance_status FROM course_sections s INNER JOIN live_session_occurrences o ON o.occurrence_id = s.release_occurrence_id AND o.course_id = s.course_id LEFT JOIN live_session_attendance a ON a.occurrence_id = o.occurrence_id AND a.user_id = ? WHERE s.course_id = ? AND o.scheduled_start_at >= ? AND o.scheduled_start_at < ? ORDER BY o.scheduled_start_at ASC, s.sort_order ASC");
+    $sectionStmt = $conn->prepare("SELECT s.section_id, s.title, s.sort_order, s.release_occurrence_id, o.scheduled_start_at, o.scheduled_end_at, COALESCE(a.status, 'unknown') AS attendance_status FROM course_sections s INNER JOIN live_session_occurrences o ON o.occurrence_id = s.release_occurrence_id AND o.course_id = s.course_id LEFT JOIN live_session_attendance a ON a.occurrence_id = o.occurrence_id AND a.user_id = ? WHERE s.course_id = ? AND s.status = 'published' AND o.scheduled_start_at >= ? AND o.scheduled_start_at < ? AND o.scheduled_start_at <= NOW() ORDER BY o.scheduled_start_at ASC, s.sort_order ASC");
     $sectionStmt->bind_param('isss', $studentId, $courseId, $from, $to); $sectionStmt->execute(); $sections = $sectionStmt->get_result()->fetch_all(MYSQLI_ASSOC); $sectionStmt->close();
 
     // Workshops deliberately have no live occurrence. Include only explicit/narrowly-matched
     // Workshops whose existing release, unlock, or creation date lies in the report window.
-    $workshopStmt = $conn->prepare('SELECT section_id, title, sort_order, section_type, custom_type, metadata, release_at, unlock_at, created_at FROM course_sections WHERE course_id = ? AND (release_occurrence_id IS NULL OR release_occurrence_id = \'\')');
+    $workshopStmt = $conn->prepare('SELECT section_id, title, sort_order, section_type, custom_type, metadata, release_at, unlock_at, created_at FROM course_sections WHERE course_id = ? AND status = \'published\' AND (release_occurrence_id IS NULL OR release_occurrence_id = \'\')');
     $workshopStmt->bind_param('s', $courseId); $workshopStmt->execute(); $workshopCandidates = $workshopStmt->get_result()->fetch_all(MYSQLI_ASSOC); $workshopStmt->close();
     foreach ($workshopCandidates as $workshop) {
         $workshopDate = mmh_parent_report_workshop_date($workshop);
-        if (!mmh_parent_report_workshop_section($workshop) || $workshopDate === '' || $workshopDate < $from || $workshopDate >= $to) { continue; }
+        if (!mmh_parent_report_workshop_section($workshop) || $workshopDate === '' || $workshopDate < $from || $workshopDate >= $to || strtotime($workshopDate) > time()) { continue; }
         $workshop['scheduled_start_at'] = $workshopDate;
         $workshop['scheduled_end_at'] = '';
         $workshop['attendance_status'] = 'unknown';
@@ -473,7 +515,7 @@ function mmh_parent_report_resolve(mysqli $conn, string $courseId, int $studentI
     $sectionIds = array_column($sections, 'section_id'); $sectionSet = array_fill_keys($sectionIds, true);
     $sectionsById = []; foreach ($sections as $section) { $sectionsById[(string) $section['section_id']] = $section; }
 
-    $itemStmt = $conn->prepare('SELECT item_id, item_title, section_id, item_type, template_type, template_data FROM course_items WHERE course_id = ?');
+    $itemStmt = $conn->prepare("SELECT item_id, item_title, section_id, item_type, template_type, template_data FROM course_items WHERE course_id = ? AND status = 'published'");
     $itemStmt->bind_param('s', $courseId); $itemStmt->execute(); $allItems = $itemStmt->get_result()->fetch_all(MYSQLI_ASSOC); $itemStmt->close();
     $recordingsBySection = [];
     foreach ($allItems as $item) {
@@ -491,11 +533,30 @@ function mmh_parent_report_resolve(mysqli $conn, string $courseId, int $studentI
         }
     }
 
-    $eventStmt = $conn->prepare('SELECT item_id, MAX(created_at) AS opened_at FROM learning_events WHERE user_id = ? AND course_id = ? AND event_type = ? GROUP BY item_id');
-    $eventType = 'recording_started'; $eventStmt->bind_param('iss', $studentId, $courseId, $eventType); $eventStmt->execute(); $eventRows = $eventStmt->get_result()->fetch_all(MYSQLI_ASSOC); $eventStmt->close();
-    $opened = []; foreach ($eventRows as $row) { $opened[(string) $row['item_id']] = (string) $row['opened_at']; }
+    $eventStmt = $conn->prepare('SELECT item_id, event_type, MAX(created_at) AS event_at FROM learning_events WHERE user_id = ? AND course_id = ? AND event_type IN (?, ?) AND created_at >= ? AND created_at < ? GROUP BY item_id, event_type');
+    $opened = []; $completed = [];
+    if ($eventStmt) {
+        $startedType = 'recording_started'; $completedType = 'recording_completed';
+        $eventStmt->bind_param('isssss', $studentId, $courseId, $startedType, $completedType, $from, $to); $eventStmt->execute();
+        foreach ($eventStmt->get_result()->fetch_all(MYSQLI_ASSOC) as $row) {
+            $itemKey = (string) ($row['item_id'] ?? '');
+            if ($itemKey === '') { continue; }
+            if ((string) $row['event_type'] === $completedType) { $completed[$itemKey] = (string) $row['event_at']; }
+            else { $opened[$itemKey] = (string) $row['event_at']; }
+        }
+        $eventStmt->close();
+    }
+    $progressStmt = $conn->prepare('SELECT item_id, MAX(last_viewed_at) AS viewed_at FROM course_item_progress WHERE user_id = ? AND course_id = ? AND last_viewed_at >= ? AND last_viewed_at < ? GROUP BY item_id');
+    if ($progressStmt) {
+        $progressStmt->bind_param('isss', $studentId, $courseId, $from, $to); $progressStmt->execute();
+        foreach ($progressStmt->get_result()->fetch_all(MYSQLI_ASSOC) as $row) {
+            $itemKey = (string) ($row['item_id'] ?? '');
+            if ($itemKey !== '' && !isset($opened[$itemKey])) { $opened[$itemKey] = (string) $row['viewed_at']; }
+        }
+        $progressStmt->close();
+    }
 
-    $assignmentStmt = $conn->prepare('SELECT a.*, i.section_id AS item_section_id FROM assignments a LEFT JOIN course_items i ON i.course_id = a.course_id AND i.item_id = a.item_id WHERE a.course_id = ? ORDER BY a.due_date ASC, a.id ASC');
+    $assignmentStmt = $conn->prepare("SELECT a.*, i.section_id AS item_section_id FROM assignments a LEFT JOIN course_items i ON i.course_id = a.course_id AND i.item_id = a.item_id WHERE a.course_id = ? AND (a.item_id IS NULL OR a.item_id = '' OR i.status = 'published') ORDER BY a.due_date ASC, a.id ASC");
     $assignmentStmt->bind_param('s', $courseId); $assignmentStmt->execute(); $allAssignments = $assignmentStmt->get_result()->fetch_all(MYSQLI_ASSOC); $assignmentStmt->close();
     $submissionStmt = $conn->prepare('SELECT s.* FROM assignment_submissions s INNER JOIN assignments a ON a.assignment_id = s.assignment_id WHERE s.student_id = ? AND a.course_id = ? ORDER BY s.submitted_at DESC, s.id DESC');
     $submissionStmt->bind_param('is', $studentId, $courseId); $submissionStmt->execute(); $submissionRows = $submissionStmt->get_result()->fetch_all(MYSQLI_ASSOC); $submissionStmt->close();
@@ -510,6 +571,8 @@ function mmh_parent_report_resolve(mysqli $conn, string $courseId, int $studentI
     $sectionMeta = []; foreach ($allSections as $row) { $sectionMeta[(string) $row['section_id']] = $row; }
     $homeworkBySection = []; $unresolvedHomework = 0;
     foreach ($allAssignments as $assignment) {
+        $dueDate = trim((string) ($assignment['due_date'] ?? ''));
+        if ($dueDate !== '' && strtotime($dueDate) !== false && strtotime($dueDate) > time()) { continue; }
         $assignmentSection = trim((string) ($assignment['section_id'] ?? '')) ?: trim((string) ($assignment['item_section_id'] ?? ''));
         if ($assignmentSection === '') { $unresolvedHomework++; continue; }
         if (isset($sectionSet[$assignmentSection])) { $homeworkBySection[$assignmentSection][] = ['assignment' => $assignment, 'state' => mmh_parent_report_submission_state($submissions[(string) $assignment['assignment_id']] ?? null, $assignment)]; }
@@ -520,9 +583,11 @@ function mmh_parent_report_resolve(mysqli $conn, string $courseId, int $studentI
         $attendance = mmh_parent_report_attendance($section['attendance_status']); $recordingRows = [];
         foreach ($recordingsBySection[$section['section_id']] ?? [] as $recording) {
             $openedState = isset($opened[(string) $recording['item_id']]);
-            if (empty($section['is_workshop']) && in_array($attendance['key'], ['present', 'late'], true)) { $label = 'Not Required'; $tone = 'muted'; }
-            else { $label = $openedState ? 'Opened' : 'Not Opened'; $tone = $openedState ? 'success' : 'muted'; }
-            $recordingRows[] = ['title' => $recording['item_title'], 'label' => $label, 'tone' => $tone, 'opened_at' => $opened[(string) $recording['item_id']] ?? ''];
+            $recordingId = (string) $recording['item_id']; $completedState = isset($completed[$recordingId]);
+            if (empty($section['is_workshop']) && in_array($attendance['key'], ['present', 'late'], true)) { $label = 'Not Required'; $tone = 'muted'; $statusKey = 'not_required'; }
+            elseif ($completedState || $openedState) { $label = 'Opened'; $tone = 'success'; $statusKey = $completedState ? 'completed' : 'opened'; }
+            else { $label = 'Not Opened'; $tone = 'muted'; $statusKey = 'not_viewed'; }
+            $recordingRows[] = ['item_id' => $recordingId, 'title' => $recording['item_title'], 'label' => $label, 'tone' => $tone, 'status_key' => $statusKey, 'opened' => $openedState || $completedState, 'completed' => $completedState, 'opened_at' => $opened[$recordingId] ?? ($completed[$recordingId] ?? '')];
         }
         $examRows = [];
         foreach ($examsBySection[$section['section_id']] ?? [] as $exam) {
@@ -532,6 +597,8 @@ function mmh_parent_report_resolve(mysqli $conn, string $courseId, int $studentI
     }
     $minOrder = $sections ? min(array_map(static fn($s) => (int) $s['sort_order'], $sections)) : null; $outstanding = [];
     if ($minOrder !== null) foreach ($allAssignments as $assignment) {
+        $dueDate = trim((string) ($assignment['due_date'] ?? ''));
+        if ($dueDate !== '' && strtotime($dueDate) !== false && strtotime($dueDate) > time()) { continue; }
         $sectionId = trim((string) ($assignment['section_id'] ?? '')) ?: trim((string) ($assignment['item_section_id'] ?? ''));
         if ($sectionId === '' || !isset($sectionMeta[$sectionId]) || (int) $sectionMeta[$sectionId]['sort_order'] >= $minOrder || isset($submissions[(string) $assignment['assignment_id']])) { continue; }
         $outstanding[] = ['title' => $assignment['assignment_title'], 'section_title' => $sectionMeta[$sectionId]['title'], 'due_date' => (string) ($assignment['due_date'] ?? '')];
@@ -541,6 +608,77 @@ function mmh_parent_report_resolve(mysqli $conn, string $courseId, int $studentI
     $report = ['course' => $course, 'student' => $student, 'start' => $start, 'end' => $end, 'generated_at' => date('Y-m-d H:i:s'), 'sections' => $weekly, 'outstanding' => $outstanding, 'unresolved' => ['sections' => $unlinkedSections, 'homework' => $unresolvedHomework, 'recordings' => $unresolvedRecordings], 'comment' => $comment !== null ? trim(mb_substr($comment, 0, 1000)) : mmh_parent_report_comment($conn, $courseId, $studentId, $start, $end)];
     $report['suggested_comment'] = mmh_parent_report_suggested_comment($report);
     return $report;
+}
+
+/** Backward-compatible Parent Report entry point. */
+function mmh_parent_report_resolve(mysqli $conn, string $courseId, int $studentId, string $start, string $end, ?string $comment = null): array
+{
+    return mmh_report_resolve($conn, $courseId, $studentId, $start, $end, $comment);
+}
+
+/**
+ * Student-facing, presentation-neutral summary derived from the shared report.
+ * It deliberately says Recording Opened/Not Viewed because completion evidence
+ * is not currently reliable. If recording_completed events exist later, the
+ * same structure automatically exposes Recording Completed.
+ */
+function mmh_report_student_summary(array $report): array
+{
+    $sections = []; $weak = []; $liveTotal = $liveAttended = $liveAbsent = 0;
+    $homeworkTotal = $homeworkSubmitted = $homeworkMissing = $homeworkAwaiting = $homeworkGraded = 0;
+    $recordingTotal = $recordingOpened = $recordingCompleted = $recordingNotViewed = 0;
+    $gradeTotal = 0.0; $gradeCount = 0;
+    foreach ($report['sections'] ?? [] as $section) {
+        $sectionId = (string) ($section['section_id'] ?? ''); $workshop = !empty($section['is_workshop']);
+        $attendanceKey = (string) ($section['attendance']['key'] ?? 'not_recorded');
+        $attendanceStatus = $workshop ? null : (in_array($attendanceKey, ['present', 'late'], true) ? ['key' => 'attended_live', 'label' => 'Attended Live'] : ['key' => $attendanceKey, 'label' => $section['attendance']['label'] ?? 'Not Recorded']);
+        if (!$workshop) { $liveTotal++; if ($attendanceKey === 'present' || $attendanceKey === 'late') { $liveAttended++; } if ($attendanceKey === 'absent') { $liveAbsent++; } }
+
+        $recordingRows = [];
+        foreach ($section['recordings'] ?? [] as $recording) {
+            $statusKey = (string) ($recording['status_key'] ?? (empty($recording['opened']) ? 'not_viewed' : 'opened'));
+            if ($statusKey === 'not_required') { $status = ['key' => 'not_required', 'label' => 'Not Required']; }
+            elseif ($statusKey === 'completed') { $status = ['key' => 'completed', 'label' => 'Recording Completed']; $recordingCompleted++; }
+            elseif ($statusKey === 'opened') { $status = ['key' => 'opened', 'label' => 'Recording Opened']; $recordingOpened++; }
+            else { $status = ['key' => 'not_viewed', 'label' => 'Not Viewed']; $recordingNotViewed++; }
+            if ($statusKey !== 'not_required') { $recordingTotal++; }
+            $recordingRows[] = ['item_id' => (string) ($recording['item_id'] ?? ''), 'title' => (string) ($recording['title'] ?? ''), 'status' => $status, 'opened_at' => (string) ($recording['opened_at'] ?? '')];
+            if ($statusKey === 'not_viewed' && !$workshop && !in_array($attendanceKey, ['present', 'late'], true)) {
+                $weak[$sectionId] ??= ['section_id' => $sectionId, 'section_title' => (string) $section['title'], 'reasons' => [], 'actions' => []];
+                $weak[$sectionId]['reasons'][] = 'Recording not viewed';
+                if ((string) ($recording['item_id'] ?? '') !== '') { $weak[$sectionId]['actions'][] = ['type' => 'recording', 'item_id' => (string) $recording['item_id'], 'label' => 'Continue Recording']; }
+            }
+        }
+        $homeworkRows = [];
+        foreach ($section['homework'] ?? [] as $homework) {
+            $state = $homework['state'] ?? []; $submitted = !empty($state['submitted']); $grade = trim((string) ($state['grade'] ?? ''));
+            $homeworkTotal++;
+            if (!$submitted) { $status = ['key' => 'missing', 'label' => 'Missing']; $homeworkMissing++; }
+            elseif ($grade !== '' && $grade !== 'Grade not entered') { $status = ['key' => 'graded', 'label' => 'Graded']; $homeworkGraded++; }
+            else { $status = ['key' => 'awaiting_grading', 'label' => 'Awaiting Grading']; $homeworkSubmitted++; $homeworkAwaiting++; }
+            if ($submitted && $status['key'] === 'graded') { $homeworkSubmitted++; }
+            $assignment = $homework['assignment'] ?? [];
+            $homeworkRows[] = ['assignment_id' => (string) ($assignment['assignment_id'] ?? ''), 'item_id' => (string) ($assignment['item_id'] ?? ''), 'title' => (string) ($assignment['assignment_title'] ?? ''), 'status' => $status, 'submitted_at' => (string) ($state['submitted_at'] ?? ''), 'grade' => $grade === '' || $grade === 'Grade not entered' ? '' : $grade, 'feedback' => (string) ($state['feedback'] ?? '')];
+            if (!$submitted) {
+                $weak[$sectionId] ??= ['section_id' => $sectionId, 'section_title' => (string) $section['title'], 'reasons' => [], 'actions' => []];
+                $weak[$sectionId]['reasons'][] = 'Homework missing';
+                if ((string) ($assignment['item_id'] ?? '') !== '') { $weak[$sectionId]['actions'][] = ['type' => 'homework', 'item_id' => (string) $assignment['item_id'], 'label' => 'Open Homework']; }
+            }
+            if ($grade !== '' && $grade !== 'Grade not entered' && preg_match('/^\s*(\d+(?:\.\d+)?)\s*\/\s*(\d+(?:\.\d+)?)/', $grade, $match) && (float) $match[2] > 0) { $gradeTotal += ((float) $match[1] / (float) $match[2]) * 10; $gradeCount++; }
+        }
+        if (!$workshop && $attendanceKey === 'absent') {
+            $weak[$sectionId] ??= ['section_id' => $sectionId, 'section_title' => (string) $section['title'], 'reasons' => [], 'actions' => []];
+            $weak[$sectionId]['reasons'][] = 'Live session missed';
+        }
+        $sections[] = ['section_id' => $sectionId, 'title' => (string) $section['title'], 'date' => (string) ($section['date'] ?? ''), 'is_workshop' => $workshop, 'attendance' => $attendanceStatus, 'recordings' => $recordingRows, 'homework' => $homeworkRows];
+    }
+    foreach ($weak as &$entry) {
+        $uniqueReasons = []; foreach ($entry['reasons'] as $reason) { $uniqueReasons[$reason] = true; } $entry['reasons'] = array_keys($uniqueReasons);
+        $uniqueActions = []; foreach ($entry['actions'] as $action) { $uniqueActions[$action['type'] . ':' . $action['item_id']] = $action; } $entry['actions'] = array_values($uniqueActions);
+    }
+    unset($entry);
+    $periodDays = max(1, (int) ((strtotime((string) $report['end']) - strtotime((string) $report['start'])) / 86400) + 1);
+    return ['period' => ['start' => (string) $report['start'], 'end' => (string) $report['end'], 'days' => $periodDays], 'sections' => $sections, 'counts' => ['live_total' => $liveTotal, 'live_attended' => $liveAttended, 'live_absent' => $liveAbsent, 'homework_total' => $homeworkTotal, 'homework_submitted' => $homeworkSubmitted, 'homework_missing' => $homeworkMissing, 'homework_awaiting_grading' => $homeworkAwaiting, 'homework_graded' => $homeworkGraded, 'recording_total' => $recordingTotal, 'recording_opened' => $recordingOpened, 'recording_completed' => $recordingCompleted, 'recording_not_viewed' => $recordingNotViewed, 'average_grade' => $gradeCount ? round($gradeTotal / $gradeCount, 1) : null], 'weak_points' => array_values($weak)];
 }
 
 function mmh_parent_report_escape($value): string { return htmlspecialchars((string) $value, ENT_QUOTES, 'UTF-8'); }
