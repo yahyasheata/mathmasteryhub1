@@ -375,6 +375,7 @@ $governorates = [
                                             $student_status = 1;
                                           }
                                           $governorateName = governoratesInfo($users_data['governorate'])['governorate_name_ar'];
+                                          $progressUrl = htmlspecialchars(rtrim((string) $baseUrl, '/') . '/admin/previous-progress?student_id=' . (int) $users_data['user_id'], ENT_QUOTES, 'UTF-8');
                                             $html_rows = "
                                                 <tr>
                                                     <td>$count</td>
@@ -396,7 +397,7 @@ $governorates = [
                                                     </td>
 
                                                     <!--<td style='width: 250px'> -->
-                                                    <td style='width: 265px'>
+                                                    <td style='width: 340px'>
 
                                                         <form method='POST' action=''
                                                             class='d-inline-block editUser'>
@@ -407,6 +408,10 @@ $governorates = [
                                                                 <span class='fas fa-wrench'></span> Actions
                                                             </button>
                                                         </form>
+
+                                                        <a class='btn btn-outline-secondary btn-sm font-small mx-1' href='{$progressUrl}'>
+                                                            <span class='fas fa-chart-line'></span> Progress
+                                                        </a>
 
                                                         <form method='POST' action=''
                                                             class='d-inline-block notificationForm'>
