@@ -2,6 +2,7 @@
 require_once 'connection/config.php';
 require_once '__init.php';
 require_once 'inc/functions.php';
+require_once 'inc/LandingPage.php';
 
 $username = $_SESSION['username'] ?? null;
 $site_settings = getSiteSettings();
@@ -40,6 +41,7 @@ $plain = static function ($value, int $limit = 160): string {
 };
 
 $conn = db();
+mmh_landing_ensure_schema($conn);
 $homeCategories = [];
 $categories_result = mysqli_query($conn, 'SELECT * FROM categories ORDER BY created_at DESC, id DESC LIMIT 6');
 if ($categories_result) {
@@ -52,11 +54,31 @@ if ($courses_result) {
     while ($row = mysqli_fetch_assoc($courses_result)) $homeCourses[] = $row;
 }
 
-$landingStats = [
-    ['value' => max(1, count($homeCourses)), 'label' => 'Premium learning spaces'],
-    ['value' => max(1, count($homeCategories)), 'label' => 'Focused learning paths'],
-    ['value' => 'Weekly', 'label' => 'homework and progress review'],
-];
+$landingItems = mmh_landing_grouped_items($conn, true);
+$landingStats = $landingItems['trust_stats'] ?? [];
+$whyItems = $landingItems['why'] ?? [];
+$experienceItems = $landingItems['features'] ?? [];
+$testimonialItems = $landingItems['testimonials'] ?? [];
+$faqItems = $landingItems['faq'] ?? [];
+
+$statsTitle = mmh_landing_setting($site_settings, 'landing_stats_title');
+$statsDescription = mmh_landing_setting($site_settings, 'landing_stats_description');
+$whyTitle = mmh_landing_setting($site_settings, 'landing_why_title', 'A focused learning environment, not another noisy dashboard.');
+$whyDescription = mmh_landing_setting($site_settings, 'landing_why_description', 'Everything is organized around what students actually need each week: the lesson, the recording, the homework and the feedback.');
+$pathsTitle = mmh_landing_setting($site_settings, 'landing_paths_title', 'Browse by what you are studying.');
+$pathsDescription = mmh_landing_setting($site_settings, 'landing_paths_description', 'Start with the path that matches your syllabus, level or current goal.');
+$experienceTitle = mmh_landing_setting($site_settings, 'landing_experience_title', 'One place for lessons, practice and parent-friendly progress.');
+$experienceDescription = mmh_landing_setting($site_settings, 'landing_experience_description', 'The platform supports the live course instead of replacing it. Students can review, submit and continue without hunting for links.');
+$testimonialsTitle = mmh_landing_setting($site_settings, 'landing_testimonials_title', 'Designed to make the next step obvious.');
+$testimonialsDescription = mmh_landing_setting($site_settings, 'landing_testimonials_description');
+$faqTitle = mmh_landing_setting($site_settings, 'landing_faq_title', 'Simple answers before you begin.');
+$faqDescription = mmh_landing_setting($site_settings, 'landing_faq_description');
+$ctaTitle = mmh_landing_setting($site_settings, 'landing_cta_title', 'Start with a clear learning path.');
+$ctaDescription = mmh_landing_setting($site_settings, 'landing_cta_description', 'Browse the course spaces and choose the one that matches your current mathematics goal.');
+$ctaPrimaryLabel = mmh_landing_setting($site_settings, 'landing_cta_primary_label', 'Browse Courses');
+$ctaPrimaryUrl = mmh_landing_setting($site_settings, 'landing_cta_primary_url', '/courses');
+$ctaSecondaryLabel = mmh_landing_setting($site_settings, 'landing_cta_secondary_label');
+$ctaSecondaryUrl = mmh_landing_setting($site_settings, 'landing_cta_secondary_url');
 
 if ($homeHeroDescription === '') {
     $homeHeroDescription = $site_description !== ''
@@ -153,51 +175,55 @@ trackTraffic();
       </main>
     <?php endif; ?>
 
-    <section class="landing-stats" aria-label="Trusted by students">
-      <div class="landing-shell landing-stats-grid">
-        <?php foreach ($landingStats as $stat): ?>
-          <article>
-            <strong><?= $e($stat['value']); ?></strong>
-            <span><?= $e($stat['label']); ?></span>
-          </article>
-        <?php endforeach; ?>
-      </div>
-    </section>
-
-    <section class="landing-section landing-why" aria-labelledby="why-title">
-      <div class="landing-shell">
-        <div class="landing-section-heading">
-          <p class="landing-eyebrow">Why Math Mastery Hub</p>
-          <h2 id="why-title">A focused learning environment, not another noisy dashboard.</h2>
-          <p>Everything is organized around what students actually need each week: the lesson, the recording, the homework and the feedback.</p>
+    <?php if (mmh_landing_section_enabled($site_settings, 'stats') && $landingStats): ?>
+      <section class="landing-stats" aria-label="Trusted by students">
+        <div class="landing-shell">
+          <?php if ($statsTitle !== '' || $statsDescription !== ''): ?>
+            <div class="landing-stats-heading">
+              <?php if ($statsTitle !== ''): ?><h2><?= $e($statsTitle); ?></h2><?php endif; ?>
+              <?php if ($statsDescription !== ''): ?><p><?= $e($statsDescription); ?></p><?php endif; ?>
+            </div>
+          <?php endif; ?>
+          <div class="landing-stats-grid">
+            <?php foreach ($landingStats as $stat): ?>
+              <article>
+                <strong><?= $e($stat['value'] ?? ''); ?></strong>
+                <span><?= $e($stat['label'] ?? ''); ?></span>
+              </article>
+            <?php endforeach; ?>
+          </div>
         </div>
-        <div class="landing-card-grid three">
-          <article class="landing-info-card">
-            <i class="fas fa-layer-group" aria-hidden="true"></i>
-            <h3>Structured by teaching week</h3>
-            <p>Course sections follow the real class sequence, so students always know where to continue.</p>
-          </article>
-          <article class="landing-info-card">
-            <i class="fas fa-chalkboard-teacher" aria-hidden="true"></i>
-            <h3>Built for live learning</h3>
-            <p>Live sessions, recordings and resources stay connected to the same course experience.</p>
-          </article>
-          <article class="landing-info-card">
-            <i class="fas fa-user-graduate" aria-hidden="true"></i>
-            <h3>Simple for students</h3>
-            <p>Clear actions, calm layouts and accessible resources help students focus on mathematics.</p>
-          </article>
-        </div>
-      </div>
-    </section>
+      </section>
+    <?php endif; ?>
 
-    <?php if ($homeCategories): ?>
+    <?php if (mmh_landing_section_enabled($site_settings, 'why') && $whyItems): ?>
+      <section class="landing-section landing-why" aria-labelledby="why-title">
+        <div class="landing-shell">
+          <div class="landing-section-heading">
+            <p class="landing-eyebrow">Why Math Mastery Hub</p>
+            <h2 id="why-title"><?= $e($whyTitle); ?></h2>
+            <?php if ($whyDescription !== ''): ?><p><?= $e($whyDescription); ?></p><?php endif; ?>
+          </div>
+          <div class="landing-card-grid three">
+            <?php foreach ($whyItems as $item): ?>
+              <article class="landing-info-card">
+                <i class="<?= $e(mmh_landing_icon_class($item['icon'] ?? '', 'fas fa-layer-group')); ?>" aria-hidden="true"></i>
+                <h3><?= $e($item['title'] ?? ''); ?></h3>
+                <p><?= $e($item['description'] ?? ''); ?></p>
+              </article>
+            <?php endforeach; ?>
+          </div>
+        </div>
+      </section>
+    <?php endif; ?>
+
+    <?php if (mmh_landing_section_enabled($site_settings, 'paths') && $homeCategories): ?>
       <section class="landing-section landing-paths" aria-labelledby="paths-title">
         <div class="landing-shell landing-split">
           <div class="landing-section-heading compact">
             <p class="landing-eyebrow">Learning paths</p>
-            <h2 id="paths-title">Browse by what you are studying.</h2>
-            <p>Start with the path that matches your syllabus, level or current goal.</p>
+            <h2 id="paths-title"><?= $e($pathsTitle); ?></h2>
+            <?php if ($pathsDescription !== ''): ?><p><?= $e($pathsDescription); ?></p><?php endif; ?>
           </div>
           <div class="landing-path-list">
             <?php foreach ($homeCategories as $category): ?>
@@ -211,58 +237,53 @@ trackTraffic();
       </section>
     <?php endif; ?>
 
-    <section class="landing-section landing-experience" aria-labelledby="experience-title">
-      <div class="landing-shell landing-experience-grid">
-        <div class="landing-section-heading compact">
-          <p class="landing-eyebrow">Learning experience</p>
-          <h2 id="experience-title">One place for lessons, practice and parent-friendly progress.</h2>
-          <p>The platform supports the live course instead of replacing it. Students can review, submit and continue without hunting for links.</p>
+    <?php if (mmh_landing_section_enabled($site_settings, 'experience') && $experienceItems): ?>
+      <section class="landing-section landing-experience" aria-labelledby="experience-title">
+        <div class="landing-shell landing-experience-grid">
+          <div class="landing-section-heading compact">
+            <p class="landing-eyebrow">Learning experience</p>
+            <h2 id="experience-title"><?= $e($experienceTitle); ?></h2>
+            <?php if ($experienceDescription !== ''): ?><p><?= $e($experienceDescription); ?></p><?php endif; ?>
+          </div>
+          <div class="landing-feature-stack">
+            <?php foreach ($experienceItems as $item): ?>
+              <article>
+                <i class="<?= $e(mmh_landing_icon_class($item['icon'] ?? '', 'fas fa-check-circle')); ?>" aria-hidden="true"></i>
+                <div><h3><?= $e($item['title'] ?? ''); ?></h3><p><?= $e($item['description'] ?? ''); ?></p></div>
+              </article>
+            <?php endforeach; ?>
+          </div>
         </div>
-        <div class="landing-feature-stack">
-          <article>
-            <i class="fas fa-clipboard-list" aria-hidden="true"></i>
-            <div><h3>Homework</h3><p>Submit work confidently, track what is due and receive teacher feedback in one place.</p></div>
-          </article>
-          <article>
-            <i class="fas fa-play-circle" aria-hidden="true"></i>
-            <div><h3>Recorded lessons</h3><p>Revisit explanations after class without searching through scattered links or chats.</p></div>
-          </article>
-          <article>
-            <i class="fas fa-broadcast-tower" aria-hidden="true"></i>
-            <div><h3>Live sessions</h3><p>Join lessons from the same course space where resources, homework and recordings live.</p></div>
-          </article>
-          <article>
-            <i class="fas fa-chart-bar" aria-hidden="true"></i>
-            <div><h3>Progress reports</h3><p>Understand the week quickly with simple attendance, homework and grade summaries.</p></div>
-          </article>
-        </div>
-      </div>
-    </section>
+      </section>
+    <?php endif; ?>
 
-    <section class="landing-section landing-testimonials" aria-labelledby="testimonials-title">
-      <div class="landing-shell">
-        <div class="landing-section-heading">
-          <p class="landing-eyebrow">Student feedback</p>
-          <h2 id="testimonials-title">Designed to make the next step obvious.</h2>
+    <?php if (mmh_landing_section_enabled($site_settings, 'testimonials') && $testimonialItems): ?>
+      <section class="landing-section landing-testimonials" aria-labelledby="testimonials-title">
+        <div class="landing-shell">
+          <div class="landing-section-heading">
+            <p class="landing-eyebrow">Student feedback</p>
+            <h2 id="testimonials-title"><?= $e($testimonialsTitle); ?></h2>
+            <?php if ($testimonialsDescription !== ''): ?><p><?= $e($testimonialsDescription); ?></p><?php endif; ?>
+          </div>
+          <div class="landing-card-grid three">
+            <?php foreach ($testimonialItems as $item): ?>
+              <blockquote class="landing-quote-card">
+                <?php $photoUrl = mmh_landing_photo_url($item['photo_path'] ?? ''); ?>
+                <?php if ($photoUrl !== ''): ?><img src="<?= $e($photoUrl); ?>" alt="" class="landing-quote-photo"><?php endif; ?>
+                <p>“<?= $e($item['quote'] ?? ''); ?>”</p>
+                <footer>
+                  <?= $e($item['student_name'] ?? ''); ?>
+                  <?php $meta = array_filter([trim((string)($item['grade'] ?? '')), trim((string)($item['exam_board'] ?? ''))]); ?>
+                  <?php if ($meta): ?><span><?= $e(implode(' · ', $meta)); ?></span><?php endif; ?>
+                </footer>
+              </blockquote>
+            <?php endforeach; ?>
+          </div>
         </div>
-        <div class="landing-card-grid three">
-          <blockquote class="landing-quote-card">
-            <p>“I can find the lesson recording and homework without asking where the links are.”</p>
-            <footer>Grade 10 student</footer>
-          </blockquote>
-          <blockquote class="landing-quote-card">
-            <p>“The course page feels organized by the way we study every week.”</p>
-            <footer>IGCSE mathematics student</footer>
-          </blockquote>
-          <blockquote class="landing-quote-card">
-            <p>“The progress report makes it clear what is done and what still needs attention.”</p>
-            <footer>Parent feedback</footer>
-          </blockquote>
-        </div>
-      </div>
-    </section>
+      </section>
+    <?php endif; ?>
 
-    <?php if ($homeCoursesEnabled): ?>
+    <?php if ($homeCoursesEnabled && $homeCourses): ?>
       <section id="courses" class="landing-section landing-pricing" aria-labelledby="courses-title">
         <div class="landing-shell">
           <div class="landing-section-heading">
@@ -270,78 +291,78 @@ trackTraffic();
             <h2 id="courses-title"><?= $e($homeCoursesHeading); ?></h2>
             <p><?= $e($homeCoursesDescription); ?></p>
           </div>
-          <?php if ($homeCourses): ?>
-            <div class="landing-course-grid">
-              <?php foreach (array_slice($homeCourses, 0, 6) as $course): ?>
-                <?php
-                  $courseTitle = (string) ($course['course_title'] ?? 'Course');
-                  $courseDescription = $plain($course['course_description'] ?? '', 150);
-                  $courseUrl = $homeBasePath . '/course/' . rawurlencode((string) ($course['id'] ?? ''));
-                  $price = !empty($course['course_price']) ? $course['course_price'] . ' EGP' : 'Free';
-                  $oldPrice = (!empty($course['preDiscount_course_price']) && (float) $course['preDiscount_course_price'] > (float) ($course['course_price'] ?? 0))
-                    ? $course['preDiscount_course_price'] . ' EGP'
-                    : '';
-                ?>
-                <article class="landing-course-card">
-                  <div>
-                    <span class="landing-course-label">Course</span>
-                    <h3><?= $e($courseTitle); ?></h3>
-                    <p><?= $e($courseDescription !== '' ? $courseDescription : 'A structured Math Mastery Hub learning space.'); ?></p>
+          <div class="landing-course-grid">
+            <?php foreach (array_slice($homeCourses, 0, 6) as $course): ?>
+              <?php
+                $courseTitle = (string) ($course['course_title'] ?? 'Course');
+                $courseDescription = $plain($course['course_description'] ?? '', 150);
+                $courseUrl = $homeBasePath . '/course/' . rawurlencode((string) ($course['id'] ?? ''));
+                $price = !empty($course['course_price']) ? $course['course_price'] . ' EGP' : 'Free';
+                $oldPrice = (!empty($course['preDiscount_course_price']) && (float) $course['preDiscount_course_price'] > (float) ($course['course_price'] ?? 0))
+                  ? $course['preDiscount_course_price'] . ' EGP'
+                  : '';
+              ?>
+              <article class="landing-course-card">
+                <div>
+                  <span class="landing-course-label">Course</span>
+                  <h3><?= $e($courseTitle); ?></h3>
+                  <?php if ($courseDescription !== ''): ?><p><?= $e($courseDescription); ?></p><?php endif; ?>
+                </div>
+                <div class="landing-course-footer">
+                  <div class="landing-price">
+                    <?php if ($oldPrice !== ''): ?><small><?= $e($oldPrice); ?></small><?php endif; ?>
+                    <strong><?= $e($price); ?></strong>
                   </div>
-                  <div class="landing-course-footer">
-                    <div class="landing-price">
-                      <?php if ($oldPrice !== ''): ?><small><?= $e($oldPrice); ?></small><?php endif; ?>
-                      <strong><?= $e($price); ?></strong>
-                    </div>
-                    <a class="landing-button landing-button-secondary small" href="<?= $e($courseUrl); ?>">View course</a>
-                  </div>
-                </article>
-              <?php endforeach; ?>
-            </div>
-          <?php else: ?>
-            <div class="landing-empty-state">
-              <i class="fas fa-book" aria-hidden="true"></i>
-              <strong>Courses will appear here soon.</strong>
-              <p>Published courses are displayed automatically once available.</p>
-            </div>
-          <?php endif; ?>
+                  <a class="landing-button landing-button-secondary small" href="<?= $e($courseUrl); ?>">View course</a>
+                </div>
+              </article>
+            <?php endforeach; ?>
+          </div>
         </div>
       </section>
     <?php endif; ?>
 
-    <section class="landing-section landing-faq" aria-labelledby="faq-title">
-      <div class="landing-shell landing-faq-grid">
-        <div class="landing-section-heading compact">
-          <p class="landing-eyebrow">FAQ</p>
-          <h2 id="faq-title">Simple answers before you begin.</h2>
+    <?php if (mmh_landing_section_enabled($site_settings, 'faq') && $faqItems): ?>
+      <section class="landing-section landing-faq" aria-labelledby="faq-title">
+        <div class="landing-shell landing-faq-grid">
+          <div class="landing-section-heading compact">
+            <p class="landing-eyebrow">FAQ</p>
+            <h2 id="faq-title"><?= $e($faqTitle); ?></h2>
+            <?php if ($faqDescription !== ''): ?><p><?= $e($faqDescription); ?></p><?php endif; ?>
+          </div>
+          <div class="landing-faq-list">
+            <?php foreach ($faqItems as $item): ?>
+              <details>
+                <summary><?= $e($item['question'] ?? ''); ?></summary>
+                <p><?= $e($item['answer'] ?? ''); ?></p>
+              </details>
+            <?php endforeach; ?>
+          </div>
         </div>
-        <div class="landing-faq-list">
-          <details>
-            <summary>Can I still access free resources after enrolling?</summary>
-            <p>Yes. Free learning resources remain available, and enrolled courses add premium course spaces on top.</p>
-          </details>
-          <details>
-            <summary>Are recordings and homework kept together?</summary>
-            <p>Yes. Course sections are organized so lessons, recordings and homework stay connected to the same week.</p>
-          </details>
-          <details>
-            <summary>Can parents understand progress quickly?</summary>
-            <p>Weekly reports are designed to show attendance, homework and grades in a clean format.</p>
-          </details>
-        </div>
-      </div>
-    </section>
+      </section>
+    <?php endif; ?>
 
-    <section class="landing-final-cta" aria-labelledby="final-cta-title">
-      <div class="landing-shell">
-        <h2 id="final-cta-title">Start with a clear learning path.</h2>
-        <p>Browse the course spaces and choose the one that matches your current mathematics goal.</p>
-        <a class="landing-button landing-button-primary" href="<?= $e($homeBasePath . '/courses'); ?>">
-          <i class="fas fa-arrow-right" aria-hidden="true"></i>
-          <span>Browse Courses</span>
-        </a>
-      </div>
-    </section>
+    <?php if (mmh_landing_section_enabled($site_settings, 'cta') && ($ctaTitle !== '' || $ctaDescription !== '' || ($ctaPrimaryLabel !== '' && $ctaPrimaryUrl !== '') || ($ctaSecondaryLabel !== '' && $ctaSecondaryUrl !== ''))): ?>
+      <section class="landing-final-cta" aria-labelledby="final-cta-title">
+        <div class="landing-shell">
+          <?php if ($ctaTitle !== ''): ?><h2 id="final-cta-title"><?= $e($ctaTitle); ?></h2><?php endif; ?>
+          <?php if ($ctaDescription !== ''): ?><p><?= $e($ctaDescription); ?></p><?php endif; ?>
+          <div class="landing-actions center">
+            <?php if ($ctaPrimaryLabel !== '' && $ctaPrimaryUrl !== ''): ?>
+              <a class="landing-button landing-button-primary" href="<?= $e($homeUrl($ctaPrimaryUrl)); ?>">
+                <i class="fas fa-arrow-right" aria-hidden="true"></i>
+                <span><?= $e($ctaPrimaryLabel); ?></span>
+              </a>
+            <?php endif; ?>
+            <?php if ($ctaSecondaryLabel !== '' && $ctaSecondaryUrl !== ''): ?>
+              <a class="landing-button landing-button-secondary" href="<?= $e($homeUrl($ctaSecondaryUrl)); ?>">
+                <span><?= $e($ctaSecondaryLabel); ?></span>
+              </a>
+            <?php endif; ?>
+          </div>
+        </div>
+      </section>
+    <?php endif; ?>
 
     <?php include $_SERVER['DOCUMENT_ROOT'] . dirname($_SERVER['SCRIPT_NAME']) . '/views/public/layouts/footer.php'; ?>
   </div>

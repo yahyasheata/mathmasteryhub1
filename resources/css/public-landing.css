@@ -37,7 +37,7 @@
 .public-landing p {
   margin: 0;
   color: var(--landing-copy);
-  line-height: 1.72;
+  line-height: 1.66;
 }
 
 .landing-eyebrow {
@@ -58,7 +58,7 @@
   gap: .55rem;
   justify-content: center;
   min-height: 46px;
-  padding: .72rem 1.15rem;
+  padding: .68rem 1.12rem;
   transition: background-color var(--transition), border-color var(--transition), box-shadow var(--transition), color var(--transition), transform var(--transition);
 }
 
@@ -114,7 +114,7 @@
   background:
     linear-gradient(180deg, color-mix(in srgb, var(--secondary) 5%, var(--surface)) 0%, var(--bg-primary) 100%);
   border-bottom: 1px solid var(--landing-soft-line);
-  padding-block: clamp(4.6rem, 8vw, 7.2rem) clamp(3.3rem, 6vw, 5.3rem);
+  padding-block: clamp(4.1rem, 7vw, 6.4rem) clamp(3rem, 5.5vw, 4.8rem);
 }
 
 .landing-hero-grid {
@@ -130,24 +130,24 @@
 
 .landing-hero-copy h1 {
   color: var(--text-primary);
-  font-size: clamp(2.35rem, 5.2vw, 4.85rem);
+  font-size: clamp(2.15rem, 4.8vw, 4.35rem);
   font-weight: 850;
   letter-spacing: 0;
-  line-height: 1.03;
-  margin: .85rem 0 1.15rem;
+  line-height: 1.06;
+  margin: .78rem 0 1rem;
   text-wrap: balance;
 }
 
 .landing-hero-description {
-  font-size: clamp(1rem, 1.6vw, 1.18rem);
-  max-width: 610px;
+  font-size: clamp(.98rem, 1.4vw, 1.08rem);
+  max-width: 585px;
 }
 
 .landing-actions {
   display: flex;
   flex-wrap: wrap;
   gap: .8rem;
-  margin-top: 1.85rem;
+  margin-top: 1.55rem;
 }
 
 .landing-dashboard-preview {
@@ -168,7 +168,7 @@
   border-bottom: 1px solid var(--border);
   display: flex;
   justify-content: space-between;
-  min-height: 54px;
+  min-height: 50px;
   padding: 0 .95rem;
 }
 
@@ -195,7 +195,7 @@
 .preview-body {
   display: grid;
   gap: 1rem;
-  padding: clamp(1rem, 3vw, 1.35rem);
+  padding: clamp(.95rem, 2.5vw, 1.25rem);
 }
 
 .preview-course,
@@ -208,7 +208,7 @@
 }
 
 .preview-course {
-  padding: 1.25rem;
+  padding: 1.15rem;
 }
 
 .preview-course small,
@@ -222,7 +222,7 @@
 
 .preview-course h2 {
   color: var(--text-primary);
-  font-size: clamp(1.2rem, 2vw, 1.55rem);
+  font-size: clamp(1.12rem, 1.8vw, 1.42rem);
   line-height: 1.2;
   margin: .35rem 0 1rem;
 }
@@ -289,6 +289,24 @@
   padding-block: 1rem;
 }
 
+.landing-stats-heading {
+  margin: 0 auto .55rem;
+  max-width: 720px;
+  text-align: center;
+}
+
+.landing-stats-heading h2 {
+  color: var(--text-primary);
+  font-size: clamp(1.25rem, 2.4vw, 1.8rem);
+  font-weight: 830;
+  line-height: 1.15;
+  margin: 0 0 .25rem;
+}
+
+.landing-stats-heading p {
+  font-size: .9rem;
+}
+
 .landing-stats-grid {
   display: grid;
   gap: .8rem;
@@ -318,11 +336,11 @@
 }
 
 .landing-section {
-  padding-block: clamp(3.6rem, 7vw, 6.2rem);
+  padding-block: clamp(3.1rem, 6vw, 5.1rem);
 }
 
 .landing-section-heading {
-  margin: 0 auto clamp(1.8rem, 4vw, 3.15rem);
+  margin: 0 auto clamp(1.55rem, 3.5vw, 2.55rem);
   max-width: 720px;
   text-align: center;
 }
@@ -336,16 +354,16 @@
 .landing-section-heading h2,
 .landing-final-cta h2 {
   color: var(--text-primary);
-  font-size: clamp(1.85rem, 3.8vw, 3.2rem);
+  font-size: clamp(1.65rem, 3.2vw, 2.75rem);
   font-weight: 830;
   letter-spacing: 0;
-  line-height: 1.1;
-  margin: .55rem 0 .8rem;
+  line-height: 1.13;
+  margin: .48rem 0 .65rem;
   text-wrap: balance;
 }
 
 .landing-section-heading p:not(.landing-eyebrow) {
-  font-size: 1rem;
+  font-size: .94rem;
 }
 
 .landing-card-grid {
@@ -368,7 +386,7 @@
 }
 
 .landing-info-card {
-  padding: clamp(1.1rem, 2vw, 1.45rem);
+  padding: clamp(1rem, 1.8vw, 1.32rem);
   transition: border-color var(--transition), box-shadow var(--transition), transform var(--transition);
 }
 
@@ -397,7 +415,7 @@
 .landing-feature-stack h3,
 .landing-course-card h3 {
   color: var(--text-primary);
-  font-size: 1.08rem;
+  font-size: 1rem;
   font-weight: 820;
   line-height: 1.25;
   margin: 0 0 .5rem;
@@ -409,7 +427,7 @@
 .landing-quote-card p,
 .landing-faq-list p,
 .landing-final-cta p {
-  font-size: .95rem;
+  font-size: .9rem;
 }
 
 .landing-paths,
@@ -439,8 +457,8 @@
   display: flex;
   font-weight: 800;
   justify-content: space-between;
-  min-height: 54px;
-  padding: .9rem 1rem;
+  min-height: 50px;
+  padding: .82rem .95rem;
   transition: background-color var(--transition), border-color var(--transition), box-shadow var(--transition), transform var(--transition);
 }
 
@@ -470,7 +488,7 @@
   display: grid;
   gap: 1rem;
   grid-template-columns: auto minmax(0, 1fr);
-  padding: 1rem;
+  padding: .92rem;
 }
 
 .landing-feature-stack i {
@@ -486,8 +504,18 @@
 
 .landing-quote-card {
   margin: 0;
-  padding: clamp(1.1rem, 2vw, 1.45rem);
+  padding: clamp(1rem, 1.8vw, 1.3rem);
   transition: border-color var(--transition), box-shadow var(--transition), transform var(--transition);
+}
+
+.landing-quote-photo {
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  display: block;
+  height: 42px;
+  margin-bottom: .75rem;
+  object-fit: cover;
+  width: 42px;
 }
 
 .landing-quote-card p {
@@ -500,6 +528,13 @@
   font-size: .82rem;
   font-weight: 760;
   margin-top: .9rem;
+}
+
+.landing-quote-card footer span {
+  display: block;
+  font-size: .76rem;
+  font-weight: 650;
+  margin-top: .18rem;
 }
 
 .landing-pricing {
@@ -517,8 +552,8 @@
   flex-direction: column;
   gap: 1.35rem;
   justify-content: space-between;
-  min-height: 245px;
-  padding: clamp(1.1rem, 2vw, 1.45rem);
+  min-height: 220px;
+  padding: clamp(1rem, 1.8vw, 1.32rem);
   transition: border-color var(--transition), box-shadow var(--transition), transform var(--transition);
 }
 
@@ -620,7 +655,7 @@
 .landing-final-cta {
   background: var(--surface);
   border-top: 1px solid var(--landing-soft-line);
-  padding-block: clamp(3.2rem, 6vw, 5rem);
+  padding-block: clamp(2.8rem, 5vw, 4.2rem);
   text-align: center;
 }
 
@@ -635,6 +670,10 @@
 
 .landing-final-cta .landing-button {
   margin-top: 1.4rem;
+}
+
+.landing-final-cta .landing-actions.center {
+  justify-content: center;
 }
 
 @media (prefers-reduced-motion: reduce) {
@@ -684,7 +723,7 @@
   }
 
   .landing-hero {
-    padding-block: 3rem 2.65rem;
+    padding-block: 2.65rem 2.35rem;
   }
 
   .landing-actions {
