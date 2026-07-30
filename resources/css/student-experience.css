@@ -1181,6 +1181,31 @@ html[data-student-theme] body.student-dashboard-page .student-dashboard-empty p 
 }
 
 @media (max-width: 767.98px) {
+  html[data-student-theme] body.student-dashboard-page .student-dashboard-shell {
+    display: flex;
+    flex-direction: column;
+  }
+
+  html[data-student-theme] body.student-dashboard-page .student-live-priority {
+    order: 0;
+  }
+
+  html[data-student-theme] body.student-dashboard-page .student-dashboard-overview {
+    order: 1;
+  }
+
+  html[data-student-theme] body.student-dashboard-page .student-courses-section[aria-label="My courses"] {
+    order: 2;
+  }
+
+  html[data-student-theme] body.student-dashboard-page .student-dashboard-grid {
+    order: 3;
+  }
+
+  html[data-student-theme] body.student-dashboard-page .student-courses-section[aria-label="This week live sessions"] {
+    order: 4;
+  }
+
   html[data-student-theme] body.student-dashboard-page .student-dashboard-welcome {
     min-height: 112px;
     padding-inline: 10px;
