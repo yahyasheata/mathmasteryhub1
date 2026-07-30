@@ -9,7 +9,8 @@ $site_name = (string) ($site_settings['website_name'] ?? 'Math Mastery Hub');
 $site_description = (string) ($site_settings['website_bio'] ?? '');
 
 $homeHeroEnabled = mmh_site_setting_truthy($site_settings['home_hero_enabled'] ?? '1');
-$homeHeroTitle = trim(str_replace('{site_name}', $site_name, (string) ($site_settings['home_hero_title'] ?? 'Welcome to {site_name}')));
+$configuredHeroTitle = trim((string) ($site_settings['home_hero_title'] ?? 'Welcome to {site_name}'));
+$homeHeroTitle = trim(str_replace('{site_name}', $site_name, $configuredHeroTitle));
 $homeHeroDescription = trim((string) ($site_settings['home_hero_description'] ?? ''));
 $homePrimaryLabel = trim((string) ($site_settings['home_primary_label'] ?? 'Browse Courses')) ?: 'Browse Courses';
 $homePrimaryUrl = trim((string) ($site_settings['home_primary_url'] ?? '/courses')) ?: '/courses';
@@ -20,6 +21,9 @@ $homeCoursesHeading = trim((string) ($site_settings['home_courses_heading'] ?? '
 $homeCoursesDescription = trim((string) ($site_settings['home_courses_description'] ?? 'Focused course spaces for live lessons, recordings, homework and feedback.')) ?: 'Focused course spaces for live lessons, recordings, homework and feedback.';
 $homeBasePath = rtrim(mmh_site_public_base_path(), '/');
 $homeFaviconUrl = mmh_site_settings_asset_url($site_settings, 'website_icon', 'resources/images/default/favicon.png');
+$landingCssPath = __DIR__ . '/../resources/css/public-landing.css';
+$landingCssVersion = file_exists($landingCssPath) ? (string) filemtime($landingCssPath) : '1';
+$landingCssUrl = mmh_site_public_url('resources/css/public-landing.css') . '?v=' . rawurlencode($landingCssVersion);
 
 $homeUrl = static function (string $url) use ($homeBasePath): string {
     $url = trim($url);
@@ -59,7 +63,12 @@ if ($homeHeroDescription === '') {
         ? $site_description
         : 'A calm, structured online learning space for IGCSE mathematics students, with live teaching, recordings, homework, feedback and progress reports in one place.';
 }
-if ($homeHeroTitle === '') $homeHeroTitle = 'Math learning, organized around real teaching.';
+if ($homeHeroTitle === '' || $configuredHeroTitle === 'Welcome to {site_name}') {
+    $homeHeroTitle = 'Math learning that feels clear, structured, and supported.';
+}
+if ($homeHeroDescription === 'Discover structured mathematics courses and learning resources designed for confident progress.') {
+    $homeHeroDescription = 'Live teaching, recorded lessons, homework feedback and weekly progress reports in one calm student workspace.';
+}
 
 trackTraffic();
 ?>
@@ -77,7 +86,7 @@ trackTraffic();
   <link rel="apple-touch-icon" href="<?= $e($homeFaviconUrl); ?>">
   <link rel="stylesheet" href="<?= $e(mmh_site_public_url('resources/css/fontawsome5.min.css')); ?>">
   <link rel="stylesheet" href="<?= $e(mmh_site_public_url('resources/css/design-system.css')); ?>" data-design-system="mathhub">
-  <link rel="stylesheet" href="<?= $e(mmh_site_public_url('resources/css/public-landing.css')); ?>">
+  <link rel="stylesheet" href="<?= $e($landingCssUrl); ?>">
 </head>
 <body class="public-landing-body">
   <div class="public-landing">
@@ -212,19 +221,19 @@ trackTraffic();
         <div class="landing-feature-stack">
           <article>
             <i class="fas fa-clipboard-list" aria-hidden="true"></i>
-            <div><h3>Homework</h3><p>Upload work, receive feedback and keep every submission connected to the correct lesson.</p></div>
+            <div><h3>Homework</h3><p>Submit work confidently, track what is due and receive teacher feedback in one place.</p></div>
           </article>
           <article>
             <i class="fas fa-play-circle" aria-hidden="true"></i>
-            <div><h3>Recorded lessons</h3><p>Open recordings inside the LMS viewer when supported, with protected access.</p></div>
+            <div><h3>Recorded lessons</h3><p>Revisit explanations after class without searching through scattered links or chats.</p></div>
           </article>
           <article>
             <i class="fas fa-broadcast-tower" aria-hidden="true"></i>
-            <div><h3>Live sessions</h3><p>Keep live teaching connected to weekly sections and student attendance evidence.</p></div>
+            <div><h3>Live sessions</h3><p>Join lessons from the same course space where resources, homework and recordings live.</p></div>
           </article>
           <article>
             <i class="fas fa-chart-bar" aria-hidden="true"></i>
-            <div><h3>Progress reports</h3><p>Show attendance, resources opened, homework status and grades in a readable format.</p></div>
+            <div><h3>Progress reports</h3><p>Understand the week quickly with simple attendance, homework and grade summaries.</p></div>
           </article>
         </div>
       </div>
