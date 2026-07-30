@@ -108,14 +108,20 @@ function public_nav_html($value) { return htmlspecialchars((string)$value, ENT_Q
 </script>
 <style>
   .public-site-header {
-    position: sticky;
+    position: fixed;
     top: 0;
+    left: 0;
+    right: 0;
     z-index: 50;
     background: var(--surface);
     border-bottom: 1px solid var(--border);
     box-shadow: var(--shadow-sm);
     backdrop-filter: saturate(140%) blur(16px);
     transition: background var(--transition-fast), border-color var(--transition-fast), box-shadow var(--transition-fast);
+  }
+  body {
+    --public-header-offset: 72px;
+    padding-top: var(--public-header-offset);
   }
   .public-header-shell {
     width: min(1180px, calc(100% - 32px));
@@ -306,7 +312,7 @@ function public_nav_html($value) { return htmlspecialchars((string)$value, ENT_Q
     .public-nav-button { padding-inline: .75rem; }
   }
   @media (max-width: 1023px) {
-    .public-site-header { position: sticky; }
+    body { --public-header-offset: 66px; }
     .public-header-row { min-height: 66px; }
     .public-desktop-nav { display: none; }
     .public-mobile-actions { display: flex; }

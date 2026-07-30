@@ -10,6 +10,9 @@ if (!function_exists('mmh_oauth_env')) {
     function mmh_oauth_env(string $key): string
     {
         $value = getenv($key);
+        if (!is_string($value) || trim($value) === '') {
+            $value = $_ENV[$key] ?? $_SERVER[$key] ?? '';
+        }
         return is_string($value) ? trim($value) : '';
     }
 }

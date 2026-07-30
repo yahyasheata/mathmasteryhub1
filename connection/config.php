@@ -27,7 +27,10 @@ if (!function_exists('mmh_load_local_env')) {
             }
             $key = trim(substr($line, 0, $position));
             $value = trim(substr($line, $position + 1));
-            if (!preg_match('/\A[A-Z][A-Z0-9_]*\z/', $key) || getenv($key) !== false) {
+            if (!preg_match('/\A[A-Z][A-Z0-9_]*\z/', $key)
+                || getenv($key) !== false
+                || array_key_exists($key, $_ENV)
+                || array_key_exists($key, $_SERVER)) {
                 continue;
             }
             if (strlen($value) >= 2 && (($value[0] === '"' && substr($value, -1) === '"') || ($value[0] === "'" && substr($value, -1) === "'"))) {
