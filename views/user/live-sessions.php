@@ -5,6 +5,7 @@ require_once 'inc/functions.php';
 require_once 'inc/StudentCourseAccess.php';
 require_once 'inc/LiveSessions.php';
 require_once 'inc/LearningEvents.php';
+require_once 'inc/CourseResourceResolver.php';
 
 $pageName = 'live_sessions';
 $username = $_SESSION['username'];
@@ -44,8 +45,78 @@ function live_user_group(array $sessions)
     return $groups;
 }
 
+function live_user_minutes_until_open(array $session)
+{
+    $start = mmh_live_occurrence_timestamp($session, 'scheduled_start_at');
+    if ($start === false) {
+        return null;
+    }
+    return max(1, (int) ceil((($start - 1800) - time()) / 60));
+}
+
+function live_user_attendance_text(array $session)
+{
+    $status = trim((string) ($session['attendance_status'] ?? 'unknown')) ?: 'unknown';
+    $hasJoin = !empty($session['first_join_clicked_at']);
+    if ($hasJoin) {
+        return 'Join recorded at ' . mmh_live_format_local_datetime($session['first_join_clicked_at'], $session['timezone'] ?? 'Asia/Riyadh')
+            . ' · ' . mmh_live_student_attendance_label($session);
+    }
+    if ($status !== 'unknown') {
+        return mmh_live_student_attendance_label($session);
+    }
+    return '';
+}
+
+function live_user_recording_map(mysqli $conn, array $sessions)
+{
+    $occurrenceIds = array_values(array_unique(array_filter(array_map(static fn($session) => (string) ($session['occurrence_id'] ?? ''), $sessions))));
+    if (!$occurrenceIds) {
+        return [];
+    }
+
+    $placeholders = implode(',', array_fill(0, count($occurrenceIds), '?'));
+    $types = str_repeat('s', count($occurrenceIds));
+    $sql = "SELECT s.release_occurrence_id, i.course_id, i.item_id, i.item_title, i.template_type, i.template_data
+            FROM course_sections AS s
+            INNER JOIN course_items AS i ON i.course_id = s.course_id AND i.section_id = s.section_id
+            WHERE s.release_occurrence_id IN ({$placeholders})
+              AND (i.status IS NULL OR i.status = '' OR i.status = 'published')
+            ORDER BY s.sort_order ASC, i.page_order ASC, i.id ASC";
+    $stmt = $conn->prepare($sql);
+    if (!$stmt) {
+        return [];
+    }
+    $stmt->bind_param($types, ...$occurrenceIds);
+    $stmt->execute();
+    $rows = $stmt->get_result()->fetch_all(MYSQLI_ASSOC);
+    $stmt->close();
+
+    $recordings = [];
+    foreach ($rows as $row) {
+        $templateType = strtolower(trim((string) ($row['template_type'] ?? '')));
+        $isRecording = in_array($templateType, ['recording', 'video'], true);
+        if (!$isRecording && $templateType === 'resource') {
+            $data = mmh_course_resource_template_data($row['template_data'] ?? '');
+            $resourceType = strtolower(trim((string) ($data['resource_type'] ?? ($data['resource']['type'] ?? ''))));
+            $provider = strtolower(trim((string) ($data['resource_provider'] ?? ($data['resource']['provider'] ?? ''))));
+            $isRecording = in_array($resourceType, ['recording', 'video'], true)
+                || in_array($provider, ['microsoft_stream', 'sharepoint', 'youtube', 'vimeo'], true);
+        }
+        if (!$isRecording) {
+            continue;
+        }
+        $occurrenceId = (string) ($row['release_occurrence_id'] ?? '');
+        if ($occurrenceId !== '' && !isset($recordings[$occurrenceId])) {
+            $recordings[$occurrenceId] = $row;
+        }
+    }
+    return $recordings;
+}
+
 $groups = live_user_group($sessions);
 $liveJoinBase = rtrim((string) $baseUrl, '/') . '/user/live-session/join/';
+$recordingsByOccurrence = live_user_recording_map($conn, $sessions);
 ?>
 <!doctype html>
 <html lang="en" dir="ltr">
@@ -54,7 +125,7 @@ $liveJoinBase = rtrim((string) $baseUrl, '/') . '/user/live-session/join/';
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <?php include "layouts/user/header.php"; ?>
 </head>
-<body class='body ds-bg-primary student-dashboard-page' style="margin-top: 65px">
+<body class='body ds-bg-primary student-dashboard-page student-live-sessions-page'>
 <div id="app">
     <div id="body-overlay" onclick="document.getElementById('aside-menu').classList.toggle('active');document.getElementById('body-overlay').classList.toggle('active');"></div>
     <?php include "layouts/user/aside.php"; ?>
@@ -66,7 +137,6 @@ $liveJoinBase = rtrim((string) $baseUrl, '/') . '/user/live-session/join/';
                         <div><span class="student-dashboard-eyebrow">Live sessions</span><h1>Your live teaching schedule</h1><p>Join through Math Mastery Hub so your teacher can see join-click evidence.</p></div>
                     </section>
                 </div>
-                <div class="student-dashboard-nav-wrap"><div class="container p-0"><div class="col-12 row user-menu"><nav class='navbar navbar-expand-lg navbar-light ds-surface-muted'><div class="container-fluid p-0"><div class="col-12 px-0 row d-flex m-0 py-3 py-lg-0 justify-content-between align-items-center d-lg-none"><div class='navbar-brand navbar-toggler font-2 px-3 col-auto ds-text-secondary' data-bs-toggle="collapse" data-bs-target="#navbarSupportedContent">Live Sessions</div><button class='navbar-toggler d-flex col-auto ds-shadow-sm' type="button" data-bs-toggle="collapse" data-bs-target="#navbarSupportedContent"><span class="fas fa-bars"></span></button></div><?php include "layouts/user/main-nav.php"; ?></div></nav></div></div></div>
             </div>
             <div class="container student-dashboard-shell">
                 <?php foreach ($groups as $label => $items): ?>
@@ -79,25 +149,36 @@ $liveJoinBase = rtrim((string) $baseUrl, '/') . '/user/live-session/join/';
                                     <?php
                                         $joinState = mmh_live_join_state($session);
                                         $statusLabel = ucwords(str_replace('_', ' ', (string) $session['status']));
+                                        $isEnded = ($joinState['state'] ?? '') === 'ended';
+                                        $recording = $recordingsByOccurrence[(string) ($session['occurrence_id'] ?? '')] ?? null;
+                                        $attendanceText = live_user_attendance_text($session);
+                                        if (!$attendanceText && !$isEnded) {
+                                            $attendanceText = 'Not recorded yet';
+                                        }
+                                        $actionLabel = '';
+                                        if (($joinState['state'] ?? '') === 'opens_soon') {
+                                            $minutes = live_user_minutes_until_open($session);
+                                            $actionLabel = $minutes === null ? 'Opens soon' : 'Opens in ' . $minutes . ' minute' . ($minutes === 1 ? '' : 's');
+                                        }
                                     ?>
                                     <article class="student-upcoming-item live-session-card">
                                         <div class="live-session-card-copy">
+                                            <span class="live-session-meta-label">Course</span>
                                             <strong><?=live_user_html($session['course_title'])?></strong>
-                                            <small><?=live_user_html($session['schedule_title'] ?: 'Live session')?> · <?=live_user_html(mmh_live_display_time($session))?></small>
-                                            <span class="live-session-attendance-summary">
-                                                <?php if (!empty($session['first_join_clicked_at'])): ?>
-                                                    Join recorded at <?=live_user_html(mmh_live_format_local_datetime($session['first_join_clicked_at'], $session['timezone'] ?? 'Asia/Riyadh'))?> · <?=live_user_html(mmh_live_student_attendance_label($session))?>
-                                                <?php else: ?>
-                                                    <?=live_user_html(mmh_live_student_attendance_label($session))?>
-                                                <?php endif; ?>
-                                            </span>
+                                            <div class="live-session-card-grid">
+                                                <span><em>Lesson</em><?=live_user_html($session['schedule_title'] ?: 'Live session')?></span>
+                                                <span><em>Date &amp; Time</em><?=live_user_html(mmh_live_display_time($session))?></span>
+                                                <?php if ($attendanceText !== ''): ?><span><em>Attendance</em><?=live_user_html($attendanceText)?></span><?php endif; ?>
+                                            </div>
                                         </div>
                                         <div class="live-session-card-actions">
-                                            <span class="student-upcoming-status <?=live_user_html($session['status'])?>"><?=live_user_html($statusLabel)?></span>
+                                            <?php if (!$isEnded): ?><span class="student-upcoming-status <?=live_user_html($session['status'])?>"><?=live_user_html($statusLabel)?></span><?php endif; ?>
                                             <?php if (!empty($joinState['active'])): ?>
-                                                <a class="student-dashboard-btn primary live-session-join-button" href="<?=live_user_html($liveJoinBase)?><?=live_user_html($session['occurrence_id'])?>"><span class="fas fa-video" aria-hidden="true"></span> <?=live_user_html($joinState['label'])?></a>
-                                            <?php else: ?>
-                                                <button class="student-dashboard-btn secondary live-session-join-button is-disabled" type="button" disabled><?=live_user_html($joinState['label'])?></button>
+                                                <a class="student-dashboard-btn primary live-session-join-button" href="<?=live_user_html($liveJoinBase)?><?=live_user_html($session['occurrence_id'])?>"><span class="fas fa-video" aria-hidden="true"></span> Join Live</a>
+                                            <?php elseif ($recording): ?>
+                                                <a class="student-dashboard-btn secondary live-session-join-button" href="<?=live_user_html(rtrim((string)$baseUrl, '/'))?>/user/course/resource/<?=live_user_html($recording['course_id'])?>/<?=live_user_html($recording['item_id'])?>"><span class="fas fa-play-circle" aria-hidden="true"></span> Watch Recording</a>
+                                            <?php elseif (!$isEnded): ?>
+                                                <button class="student-dashboard-btn secondary live-session-join-button is-disabled" type="button" disabled><?=live_user_html($actionLabel ?: $joinState['label'])?></button>
                                             <?php endif; ?>
                                         </div>
                                     </article>
