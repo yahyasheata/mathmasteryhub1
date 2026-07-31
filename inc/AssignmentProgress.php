@@ -155,6 +155,121 @@ if (!function_exists('mmh_assignment_progress_latest_submissions')) {
     }
 }
 
+if (!function_exists('mmh_assignment_progress_decode_template_data')) {
+    function mmh_assignment_progress_decode_template_data($value)
+    {
+        $data = json_decode((string) $value, true);
+        return is_array($data) ? $data : [];
+    }
+}
+
+if (!function_exists('mmh_assignment_progress_legacy_assignment_ids')) {
+    function mmh_assignment_progress_legacy_assignment_ids($html)
+    {
+        $html = (string) $html;
+        if ($html === '' || stripos($html, 'show-assignment') === false) {
+            return [];
+        }
+        preg_match_all('/\bdata-assignment-id\s*=\s*(["\'])\s*([A-Za-z0-9_-]{1,40})\s*\1/i', $html, $matches);
+        $ids = [];
+        foreach ($matches[2] ?? [] as $candidate) {
+            $assignmentId = mmh_assignment_progress_id($candidate);
+            if ($assignmentId !== null) {
+                $ids[$assignmentId] = true;
+            }
+        }
+        return array_keys($ids);
+    }
+}
+
+if (!function_exists('mmh_assignment_progress_course_sources')) {
+    function mmh_assignment_progress_course_sources(mysqli $conn, $courseId)
+    {
+        $courseId = mmh_assignment_progress_id($courseId);
+        if ($courseId === null) {
+            return ['items' => [], 'assignments' => []];
+        }
+
+        $stmt = $conn->prepare(
+            "SELECT i.id, i.item_id, i.item_title, i.item_description, i.course_id, i.section_id, i.item_type,
+                    i.template_type, i.template_data, i.assignment_id, i.due_date, i.page_order, i.sort_order
+             FROM course_items AS i
+             LEFT JOIN course_sections AS s
+                ON s.course_id = i.course_id
+               AND s.section_id = i.section_id
+             WHERE i.course_id = ?
+               AND i.status = 'published'
+               AND (i.section_id IS NULL OR i.section_id = '' OR s.status = 'published')
+             ORDER BY COALESCE(i.page_order, i.sort_order, i.id) ASC, i.id ASC"
+        );
+        if (!$stmt) {
+            return ['items' => [], 'assignments' => []];
+        }
+
+        $stmt->bind_param('s', $courseId);
+        $items = [];
+        $assignmentSources = [];
+        if ($stmt->execute()) {
+            $result = $stmt->get_result();
+            while ($item = $result->fetch_assoc()) {
+                $itemId = mmh_assignment_progress_id($item['item_id'] ?? '');
+                if ($itemId === null) {
+                    continue;
+                }
+
+                $source = [
+                    'item_id' => $itemId,
+                    'section_id' => mmh_assignment_progress_section_id($item['section_id'] ?? '') ?? '',
+                    'item_title' => (string) ($item['item_title'] ?? ''),
+                    'due_date' => (string) ($item['due_date'] ?? ''),
+                    'page_order' => (int) ($item['page_order'] ?? $item['sort_order'] ?? $item['id'] ?? 0),
+                    'row_id' => (int) ($item['id'] ?? 0),
+                ];
+                $items[$itemId] = $source;
+
+                $data = mmh_assignment_progress_decode_template_data($item['template_data'] ?? '');
+                $templateType = strtolower(trim((string) ($item['template_type'] ?? '')));
+                $itemType = strtolower(trim((string) ($item['item_type'] ?? '')));
+                $structuredIds = [];
+                foreach ([
+                    $item['assignment_id'] ?? '',
+                    $data['assignment_id'] ?? '',
+                    $data['assignment']['assignment_id'] ?? '',
+                ] as $candidate) {
+                    $assignmentId = mmh_assignment_progress_id($candidate);
+                    if ($assignmentId !== null) {
+                        $structuredIds[$assignmentId] = true;
+                    }
+                }
+
+                $legacyIds = mmh_assignment_progress_legacy_assignment_ids($item['item_description'] ?? '');
+                $isAssignmentItem = in_array($templateType, ['classified_assignment', 'assignment', 'homework', 'exam'], true)
+                    || in_array($itemType, ['quiz', 'assignment', 'homework'], true)
+                    || !empty($structuredIds)
+                    || !empty($legacyIds);
+
+                if (!$isAssignmentItem) {
+                    continue;
+                }
+
+                foreach (array_keys($structuredIds) as $assignmentId) {
+                    if (!isset($assignmentSources[$assignmentId])) {
+                        $assignmentSources[$assignmentId] = $source;
+                    }
+                }
+                foreach ($legacyIds as $assignmentId) {
+                    if (!isset($assignmentSources[$assignmentId])) {
+                        $assignmentSources[$assignmentId] = $source;
+                    }
+                }
+            }
+        }
+        $stmt->close();
+
+        return ['items' => $items, 'assignments' => $assignmentSources];
+    }
+}
+
 if (!function_exists('mmh_assignment_progress_is_teacher_confirmed')) {
     function mmh_assignment_progress_is_teacher_confirmed(?array $submission)
     {
@@ -316,22 +431,15 @@ if (!function_exists('mmh_assignment_progress_load_course')) {
         if ($studentId <= 0 || $courseId === null) {
             return [];
         }
+        $sources = mmh_assignment_progress_course_sources($conn, $courseId);
+        $activeItems = $sources['items'];
+        $assignmentSources = $sources['assignments'];
         $stmt = $conn->prepare(
             "SELECT a.assignment_id, a.assignment_title, a.assignment_description, a.due_date, a.late_submission_enabled, a.late_submission_until,
                     a.file_path, a.course_id, a.section_id, a.item_id, a.max_score, a.passing_score, a.allow_self_score,
-                    a.require_teacher_verification, a.completion_requirement, a.completion_rule, a.minimum_score
+                    a.require_teacher_verification, a.completion_requirement, a.completion_rule, a.minimum_score, a.id
              FROM assignments AS a
-             INNER JOIN course_items AS i
-                ON i.course_id = a.course_id
-               AND i.item_id = a.item_id
-               AND i.status = 'published'
-             LEFT JOIN course_sections AS s
-                ON s.course_id = i.course_id
-               AND s.section_id = i.section_id
              WHERE a.course_id = ?
-               AND a.item_id IS NOT NULL
-               AND a.item_id <> ''
-               AND (i.section_id IS NULL OR i.section_id = '' OR s.status = 'published')
              ORDER BY a.due_date ASC, a.id ASC"
         );
         if (!$stmt) {
@@ -342,7 +450,29 @@ if (!function_exists('mmh_assignment_progress_load_course')) {
         if ($stmt->execute()) {
             $result = $stmt->get_result();
             while ($row = $result->fetch_assoc()) {
-                $assignments[(string) $row['assignment_id']] = $row;
+                $assignmentId = (string) $row['assignment_id'];
+                $source = null;
+                $itemId = mmh_assignment_progress_id($row['item_id'] ?? '');
+                if ($itemId !== null && isset($activeItems[$itemId])) {
+                    $source = $activeItems[$itemId];
+                } elseif (isset($assignmentSources[$assignmentId])) {
+                    $source = $assignmentSources[$assignmentId];
+                }
+                if ($source === null) {
+                    continue;
+                }
+
+                if (trim((string) ($row['item_id'] ?? '')) === '') {
+                    $row['item_id'] = $source['item_id'];
+                }
+                if (trim((string) ($row['section_id'] ?? '')) === '') {
+                    $row['section_id'] = $source['section_id'];
+                }
+                $row['_source_item_id'] = $source['item_id'];
+                $row['_source_section_id'] = $source['section_id'];
+                $row['_source_item_title'] = $source['item_title'];
+                unset($row['id']);
+                $assignments[$assignmentId] = $row;
             }
         }
         $stmt->close();
