@@ -11,7 +11,7 @@ $pageName = 'live_sessions';
 $username = $_SESSION['username'];
 $conn = db();
 $user_id = student_course_access_student_id($conn, $username);
-$sessions = $user_id ? mmh_live_occurrences($conn, '', -7, 45, $user_id) : [];
+$sessions = $user_id ? mmh_live_occurrences($conn, '', -30, 45, $user_id) : [];
 if ($user_id) {
     mmh_log_event($conn, $user_id, 'live_session_viewed');
 }
@@ -21,27 +21,74 @@ function live_user_html($value)
     return htmlspecialchars((string) $value, ENT_QUOTES, 'UTF-8');
 }
 
-function live_user_group(array $sessions)
+function live_user_session_local_datetime(array $session, $field = 'scheduled_start_at')
+{
+    $value = trim((string) ($session[$field] ?? ''));
+    if ($value === '') {
+        return null;
+    }
+    try {
+        $timezone = mmh_live_timezone($session['timezone'] ?? 'Asia/Riyadh');
+        $datetime = new DateTimeImmutable($value, new DateTimeZone('UTC'));
+        return $datetime->setTimezone($timezone);
+    } catch (Throwable $exception) {
+        return null;
+    }
+}
+
+function live_user_week_end(DateTimeImmutable $now)
+{
+    return $now->modify('sunday this week')->setTime(23, 59, 59);
+}
+
+function live_user_group(array $sessions, array $recordingsByOccurrence)
 {
     $now = time();
-    $endToday = strtotime('today 23:59:59');
-    $endWeek = strtotime('today +7 days 23:59:59');
-    $groups = ['Today' => [], 'Upcoming this week' => [], 'Later' => [], 'Recently completed' => []];
+    $groups = ['Previous Recordings' => [], 'Today' => [], 'Upcoming This Week' => []];
+    $previousRecordings = [];
+
     foreach ($sessions as $session) {
         $start = mmh_live_occurrence_timestamp($session, 'scheduled_start_at');
         if ($start === false) {
             continue;
         }
-        if ($start < $now && in_array($session['status'], ['completed', 'cancelled'], true)) {
-            $groups['Recently completed'][] = $session;
-        } elseif ($start <= $endToday) {
+
+        $joinState = mmh_live_join_state($session, $now);
+        $state = (string) ($joinState['state'] ?? '');
+        $isEnded = $state === 'ended' || in_array(strtolower((string) ($session['status'] ?? '')), ['completed'], true);
+        $isCancelled = $state === 'cancelled' || strtolower((string) ($session['status'] ?? '')) === 'cancelled';
+        $occurrenceId = (string) ($session['occurrence_id'] ?? '');
+
+        if ($isEnded && !$isCancelled && isset($recordingsByOccurrence[$occurrenceId])) {
+            $previousRecordings[] = $session;
+            continue;
+        }
+
+        if ($isEnded || $isCancelled) {
+            continue;
+        }
+
+        $localStart = live_user_session_local_datetime($session, 'scheduled_start_at');
+        if (!$localStart) {
+            continue;
+        }
+        $localNow = (new DateTimeImmutable('now', $localStart->getTimezone()));
+        $today = $localNow->format('Y-m-d');
+        $sessionDay = $localStart->format('Y-m-d');
+        $weekEnd = live_user_week_end($localNow);
+
+        if ($sessionDay === $today) {
             $groups['Today'][] = $session;
-        } elseif ($start <= $endWeek) {
-            $groups['Upcoming this week'][] = $session;
-        } else {
-            $groups['Later'][] = $session;
+        } elseif ($start > $now && $localStart <= $weekEnd) {
+            $groups['Upcoming This Week'][] = $session;
         }
     }
+
+    usort($previousRecordings, static function ($a, $b) {
+        return (mmh_live_occurrence_timestamp($b, 'scheduled_start_at') ?: 0) <=> (mmh_live_occurrence_timestamp($a, 'scheduled_start_at') ?: 0);
+    });
+    $groups['Previous Recordings'] = array_slice($previousRecordings, 0, 2);
+
     return $groups;
 }
 
@@ -114,9 +161,9 @@ function live_user_recording_map(mysqli $conn, array $sessions)
     return $recordings;
 }
 
-$groups = live_user_group($sessions);
 $liveJoinBase = rtrim((string) $baseUrl, '/') . '/user/live-session/join/';
 $recordingsByOccurrence = live_user_recording_map($conn, $sessions);
+$groups = live_user_group($sessions, $recordingsByOccurrence);
 ?>
 <!doctype html>
 <html lang="en" dir="ltr">
@@ -140,53 +187,50 @@ $recordingsByOccurrence = live_user_recording_map($conn, $sessions);
             </div>
             <div class="container student-dashboard-shell">
                 <?php foreach ($groups as $label => $items): ?>
-                    <?php if ($label === 'Recently completed') { $items = array_slice($items, 0, 5); } ?>
+                    <?php if (empty($items)) { continue; } ?>
+                    <?php $isRecordingGroup = $label === 'Previous Recordings'; ?>
                     <section class="student-courses-section mb-4">
                         <div class="student-section-heading"><span><?=live_user_html($label)?></span><h2><?=count($items)?> session<?=count($items) === 1 ? '' : 's'?></h2></div>
-                        <?php if ($items): ?>
-                            <div class="student-upcoming-list">
-                                <?php foreach ($items as $session): ?>
-                                    <?php
-                                        $joinState = mmh_live_join_state($session);
-                                        $statusLabel = ucwords(str_replace('_', ' ', (string) $session['status']));
-                                        $isEnded = ($joinState['state'] ?? '') === 'ended';
-                                        $recording = $recordingsByOccurrence[(string) ($session['occurrence_id'] ?? '')] ?? null;
-                                        $attendanceText = live_user_attendance_text($session);
-                                        if (!$attendanceText && !$isEnded) {
-                                            $attendanceText = 'Not recorded yet';
-                                        }
-                                        $actionLabel = '';
-                                        if (($joinState['state'] ?? '') === 'opens_soon') {
-                                            $minutes = live_user_minutes_until_open($session);
-                                            $actionLabel = $minutes === null ? 'Opens soon' : 'Opens in ' . $minutes . ' minute' . ($minutes === 1 ? '' : 's');
-                                        }
-                                    ?>
-                                    <article class="student-upcoming-item live-session-card">
-                                        <div class="live-session-card-copy">
-                                            <span class="live-session-meta-label">Course</span>
-                                            <strong><?=live_user_html($session['course_title'])?></strong>
-                                            <div class="live-session-card-grid">
-                                                <span><em>Lesson</em><?=live_user_html($session['schedule_title'] ?: 'Live session')?></span>
-                                                <span><em>Date &amp; Time</em><?=live_user_html(mmh_live_display_time($session))?></span>
-                                                <?php if ($attendanceText !== ''): ?><span><em>Attendance</em><?=live_user_html($attendanceText)?></span><?php endif; ?>
-                                            </div>
+                        <div class="student-upcoming-list">
+                            <?php foreach ($items as $session): ?>
+                                <?php
+                                    $joinState = mmh_live_join_state($session);
+                                    $statusLabel = ucwords(str_replace('_', ' ', (string) $session['status']));
+                                    $isEnded = ($joinState['state'] ?? '') === 'ended';
+                                    $recording = $recordingsByOccurrence[(string) ($session['occurrence_id'] ?? '')] ?? null;
+                                    $attendanceText = live_user_attendance_text($session);
+                                    if (!$attendanceText && !$isEnded) {
+                                        $attendanceText = 'Not recorded yet';
+                                    }
+                                    $actionLabel = '';
+                                    if (($joinState['state'] ?? '') === 'opens_soon') {
+                                        $minutes = live_user_minutes_until_open($session);
+                                        $actionLabel = $minutes === null ? 'Opens soon' : 'Opens in ' . $minutes . ' minute' . ($minutes === 1 ? '' : 's');
+                                    }
+                                ?>
+                                <article class="student-upcoming-item live-session-card">
+                                    <div class="live-session-card-copy">
+                                        <span class="live-session-meta-label">Course</span>
+                                        <strong><?=live_user_html($session['course_title'])?></strong>
+                                        <div class="live-session-card-grid">
+                                            <span><em>Lesson</em><?=live_user_html($session['schedule_title'] ?: 'Live session')?></span>
+                                            <span><em>Date &amp; Time</em><?=live_user_html(mmh_live_display_time($session))?></span>
+                                            <?php if ($attendanceText !== ''): ?><span><em>Attendance</em><?=live_user_html($attendanceText)?></span><?php endif; ?>
                                         </div>
-                                        <div class="live-session-card-actions">
-                                            <?php if (!$isEnded): ?><span class="student-upcoming-status <?=live_user_html($session['status'])?>"><?=live_user_html($statusLabel)?></span><?php endif; ?>
-                                            <?php if (!empty($joinState['active'])): ?>
-                                                <a class="student-dashboard-btn primary live-session-join-button" href="<?=live_user_html($liveJoinBase)?><?=live_user_html($session['occurrence_id'])?>"><span class="fas fa-video" aria-hidden="true"></span> Join Live</a>
-                                            <?php elseif ($recording): ?>
-                                                <a class="student-dashboard-btn secondary live-session-join-button" href="<?=live_user_html(rtrim((string)$baseUrl, '/'))?>/user/course/resource/<?=live_user_html($recording['course_id'])?>/<?=live_user_html($recording['item_id'])?>"><span class="fas fa-play-circle" aria-hidden="true"></span> Watch Recording</a>
-                                            <?php elseif (!$isEnded): ?>
-                                                <button class="student-dashboard-btn secondary live-session-join-button is-disabled" type="button" disabled><?=live_user_html($actionLabel ?: $joinState['label'])?></button>
-                                            <?php endif; ?>
-                                        </div>
-                                    </article>
-                                <?php endforeach; ?>
-                            </div>
-                        <?php else: ?>
-                            <div class="student-dashboard-empty compact"><span class="fas fa-calendar" aria-hidden="true"></span><p>No sessions in this group.</p></div>
-                        <?php endif; ?>
+                                    </div>
+                                    <div class="live-session-card-actions">
+                                        <?php if (!$isEnded): ?><span class="student-upcoming-status <?=live_user_html($session['status'])?>"><?=live_user_html($statusLabel)?></span><?php endif; ?>
+                                        <?php if ($isRecordingGroup && $recording): ?>
+                                            <a class="student-dashboard-btn secondary live-session-join-button" href="<?=live_user_html(rtrim((string)$baseUrl, '/'))?>/user/course/resource/<?=live_user_html($recording['course_id'])?>/<?=live_user_html($recording['item_id'])?>"><span class="fas fa-play-circle" aria-hidden="true"></span> Watch Recording</a>
+                                        <?php elseif (!empty($joinState['active'])): ?>
+                                            <a class="student-dashboard-btn primary live-session-join-button" href="<?=live_user_html($liveJoinBase)?><?=live_user_html($session['occurrence_id'])?>"><span class="fas fa-video" aria-hidden="true"></span> Join Live</a>
+                                        <?php elseif (!$isEnded): ?>
+                                            <button class="student-dashboard-btn secondary live-session-join-button is-disabled" type="button" disabled><?=live_user_html($actionLabel ?: $joinState['label'])?></button>
+                                        <?php endif; ?>
+                                    </div>
+                                </article>
+                            <?php endforeach; ?>
+                        </div>
                     </section>
                 <?php endforeach; ?>
             </div>

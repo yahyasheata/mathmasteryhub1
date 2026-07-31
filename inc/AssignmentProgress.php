@@ -316,7 +316,24 @@ if (!function_exists('mmh_assignment_progress_load_course')) {
         if ($studentId <= 0 || $courseId === null) {
             return [];
         }
-        $stmt = $conn->prepare('SELECT assignment_id, assignment_title, assignment_description, due_date, late_submission_enabled, late_submission_until, file_path, course_id, section_id, item_id, max_score, passing_score, allow_self_score, require_teacher_verification, completion_requirement, completion_rule, minimum_score FROM assignments WHERE course_id = ? ORDER BY due_date ASC, id ASC');
+        $stmt = $conn->prepare(
+            "SELECT a.assignment_id, a.assignment_title, a.assignment_description, a.due_date, a.late_submission_enabled, a.late_submission_until,
+                    a.file_path, a.course_id, a.section_id, a.item_id, a.max_score, a.passing_score, a.allow_self_score,
+                    a.require_teacher_verification, a.completion_requirement, a.completion_rule, a.minimum_score
+             FROM assignments AS a
+             INNER JOIN course_items AS i
+                ON i.course_id = a.course_id
+               AND i.item_id = a.item_id
+               AND i.status = 'published'
+             LEFT JOIN course_sections AS s
+                ON s.course_id = i.course_id
+               AND s.section_id = i.section_id
+             WHERE a.course_id = ?
+               AND a.item_id IS NOT NULL
+               AND a.item_id <> ''
+               AND (i.section_id IS NULL OR i.section_id = '' OR s.status = 'published')
+             ORDER BY a.due_date ASC, a.id ASC"
+        );
         if (!$stmt) {
             return [];
         }
