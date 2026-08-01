@@ -309,7 +309,7 @@ if ($username !== '') {
         .dark-transition { transition: background-color 0.3s, color 0.3s, border-color 0.3s, box-shadow 0.3s; }
     </style>
     <link rel="stylesheet" href="<?=$baseUrl?>/resources/css/design-system.css" data-design-system="mathhub" />
-    <link rel="stylesheet" href="<?=rtrim($baseUrl, '/')?>/resources/css/public-course-preview.css" />
+    <link rel="stylesheet" href="<?=rtrim($baseUrl, '/')?>/resources/css/public-course-preview.css?v=<?=@filemtime('resources/css/public-course-preview.css') ?: 1?>" />
     <link rel="stylesheet" href="<?=rtrim($baseUrl, '/')?>/resources/css/past-papers-frontend.css" />
 </head>
 <body class='font-tajawal ds-bg-primary ds-text-primary transition-colors duration-300'>
@@ -404,9 +404,9 @@ if ($username !== '') {
           </div>
           <p class="public-course-price-note"><?= $public_course_enrolled ? 'Your learning workspace is ready.' : 'Enroll to unlock the complete learning workspace.' ?></p>
           <?php if ($public_course_enrolled): ?>
-            <a class="public-course-action-link" href="<?=$continue_course_url?>"><i class="fas fa-play" aria-hidden="true"></i>Continue Learning</a>
+            <a class="public-course-action-link" href="<?=$continue_course_url?>">Continue Learning<i class="fas fa-play" aria-hidden="true"></i></a>
           <?php else: ?>
-            <a class="public-course-action-link" href="<?=$course_checkout_url?>"><i class="fas fa-arrow-right" aria-hidden="true"></i>Enroll Now</a>
+            <a class="public-course-action-link" href="<?=$course_checkout_url?>">Enroll Now<i class="fas fa-arrow-right" aria-hidden="true"></i></a>
           <?php endif; ?>
           <ul class="public-course-includes">
             <li><i class="fas fa-layer-group" aria-hidden="true"></i><span><?=$lesson_count?> <?=$lesson_count === 1 ? 'lesson' : 'lessons'?> included</span></li>
