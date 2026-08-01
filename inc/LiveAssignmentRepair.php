@@ -2,7 +2,7 @@
 /**
  * Repairs copied visible homework links before the student assignment list is
  * read. This is intentionally idempotent: once each visible item owns a
- * distinct assignment row, subsequent requests do nothing.
+ * distinct assignment row, subsequent requests do nothing. (Deployment retry.)
  */
 if (!function_exists('mmh_live_assignment_repair')) {
     function mmh_live_assignment_repair(mysqli $conn, string $courseId): void
