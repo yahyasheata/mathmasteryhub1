@@ -7,6 +7,7 @@ require_once 'inc/CourseDuration.php';
 require_once 'inc/StudentCourseAccess.php';
 require_once 'inc/StudentCourseCsrf.php';
 require_once 'inc/StudentCourseProgress.php';
+require_once 'inc/StudentLearningJourney.php';
 require_once 'inc/AssignmentProgress.php';
 require_once 'inc/CourseResourceResolver.php';
 require_once 'inc/CourseHomeworkRenderer.php';
@@ -23,6 +24,8 @@ $user_id = null;
 $course_id = '';
 $lesson_progress_available = false;
 $lesson_progress_map = [];
+$learning_journey = ['items' => [], 'sections' => [], 'total' => 0, 'completed' => 0, 'percentage' => null];
+$learning_journey_item_map = [];
 $course_progress_summary = [
     'available' => false,
     'eligible_count' => 0,
@@ -54,6 +57,8 @@ if ($username !== '' && $requested_course_id !== '') {
         if (student_course_access_enrolled($conn, $user_id, $course_id)) {
             $course_access_allowed = true;
             $assignment_progress_map = mmh_assignment_progress_load_course($conn, $user_id, $course_id);
+            $learning_journey = mmh_learning_journey_resolve($conn, $user_id, $course_id);
+            foreach ($learning_journey['items'] as $journeyItem) { $learning_journey_item_map[(string) ($journeyItem['item_id'] ?? '')] = $journeyItem; }
         } else {
             $course_access_message = 'You are not enrolled in this course.';
         }
@@ -425,7 +430,7 @@ if ($coures_result && mysqli_num_rows($coures_result) > 0) {
     ];
     $lesson_manual_eligible = $lesson_progress_available && student_course_progress_manual_completion_eligible($lesson_progress_item);
     $lesson_assignment_complete = !empty($lesson_requirement_state['has_requirements']) && !empty($lesson_requirement_state['complete']);
-    $lesson_completed = ($lesson_progress_available && student_course_progress_is_completed($lesson_progress_map, $lesson_progress_item['item_id'])) || $lesson_assignment_complete;
+    $lesson_completed = !empty($learning_journey_item_map[$lesson_progress_item['item_id']]['is_completed']) || $lesson_assignment_complete;
     $lesson_completion_action = '';
     if ($lesson_manual_eligible && !$lesson_completed) {
       $lesson_completion_action = "
@@ -546,7 +551,10 @@ if ($coures_result && mysqli_num_rows($coures_result) > 0) {
     if ((int) $section['count'] <= 0) {
       continue;
     }
-    $section['completed'] = !empty($completed_map[(string) $section['key']]);
+    $journeySection = null;
+    foreach ($learning_journey['sections'] ?? [] as $candidateSection) { if ((string) ($candidateSection['section_id'] ?? '') === (string) $section['key']) { $journeySection = $candidateSection; break; } }
+    $journeySectionItems = $journeySection ? array_merge($journeySection['items'] ?? [], $journeySection['live_sessions'] ?? []) : [];
+    $section['completed'] = $journeySectionItems ? count(array_filter($journeySectionItems, static fn($item) => !empty($item['is_completed']))) === count($journeySectionItems) : !empty($completed_map[(string) $section['key']]);
     $unlock_state = student_course_access_section_unlock_state($conn, $section, $section_index, $ordered_sections, $completed_map, $learning_override, $learning_enabled, $user_id);
     $section['locked'] = $unlock_state['locked'];
     $section['lock_reason'] = $unlock_state['reason'];
@@ -565,12 +573,12 @@ if ($coures_result && mysqli_num_rows($coures_result) > 0) {
     }
     $renderable_sections[] = $section;
   }
-  if ($lesson_progress_available) {
-    $course_progress_summary = student_course_progress_calculate($accessible_lesson_inventory, $lesson_progress_map, $assignment_progress_map);
-    $resume_lesson = student_course_progress_resolve_resume($accessible_lesson_inventory, $lesson_progress_map);
+  if ($course_access_allowed) {
+    $course_progress_summary = ['available' => (int) ($learning_journey['total'] ?? 0) > 0, 'eligible_count' => (int) ($learning_journey['total'] ?? 0), 'completed_count' => (int) ($learning_journey['completed'] ?? 0), 'incomplete_count' => max(0, (int) ($learning_journey['total'] ?? 0) - (int) ($learning_journey['completed'] ?? 0)), 'percentage' => $learning_journey['percentage'] ?? null, 'remaining_minutes' => 0, 'known_remaining_count' => 0, 'unknown_remaining_count' => max(0, (int) ($learning_journey['total'] ?? 0) - (int) ($learning_journey['completed'] ?? 0))];
+    $resume_lesson = mmh_learning_journey_resume($learning_journey, $accessible_lesson_inventory);
   }
   if (!isset($resume_lesson)) {
-    $resume_lesson = student_course_progress_resolve_resume($accessible_lesson_inventory, $lesson_progress_map);
+    $resume_lesson = mmh_learning_journey_resume($learning_journey, $accessible_lesson_inventory);
   }
 
   foreach ($accessible_lesson_inventory as $lesson_inventory_item) {
@@ -615,7 +623,7 @@ if ($coures_result && mysqli_num_rows($coures_result) > 0) {
   }
   if ($continue_lesson === null) {
     foreach ($accessible_lesson_inventory as $lesson_inventory_item) {
-      if (!empty($lesson_inventory_item['manual_eligible']) && !student_course_progress_is_completed($lesson_progress_map, $lesson_inventory_item['item_id'])) {
+      if (!empty($lesson_inventory_item['manual_eligible']) && empty($learning_journey_item_map[(string) $lesson_inventory_item['item_id']]['is_completed'])) {
         $continue_lesson = $lesson_inventory_item;
         break;
       }
@@ -635,7 +643,7 @@ if ($coures_result && mysqli_num_rows($coures_result) > 0) {
       break;
     }
   }
-  $course_completed = $lesson_progress_available
+  $course_completed = $course_access_allowed
     && !empty($course_progress_summary['available'])
     && (int) $course_progress_summary['incomplete_count'] === 0
     && $all_sections_complete;
@@ -745,9 +753,9 @@ $selected_lesson_id_html = student_course_html($selected_lesson_id);
 $course_progress_percentage = (int) ($course_progress_summary['percentage'] ?? 0);
 $course_progress_status = 'Progress tracking unavailable';
 $course_remaining_duration_label = 'Remaining duration not available';
-if ($lesson_progress_available) {
+if ($course_access_allowed) {
   if (!empty($course_progress_summary['available'])) {
-    $course_progress_status = (int) $course_progress_summary['completed_count'] . ' of ' . (int) $course_progress_summary['eligible_count'] . ' eligible lessons complete';
+    $course_progress_status = (int) $course_progress_summary['completed_count'] . ' of ' . (int) $course_progress_summary['eligible_count'] . ' course items complete';
     if ((int) $course_progress_summary['incomplete_count'] === 0) {
       $course_remaining_duration_label = 'No remaining eligible lesson duration';
     } elseif ((int) $course_progress_summary['known_remaining_count'] > 0) {
@@ -914,12 +922,12 @@ if ($lesson_progress_available) {
                         <div class="course-progress-summary-heading">
                             <div>
                                 <span class="course-eyebrow">Learning Progress</span>
-                                <strong><?= $lesson_progress_available && !empty($course_progress_summary['available']) ? $course_progress_percentage . '%' : '—'; ?></strong>
+                                <strong><?= $course_access_allowed && !empty($course_progress_summary['available']) ? $course_progress_percentage . '%' : '—'; ?></strong>
                             </div>
                             <span class="course-progress-status"><?=student_course_html($course_progress_status);?></span>
                         </div>
-                        <div class="progress course-progress-track" role="progressbar" aria-label="Eligible lesson progress" aria-valuemin="0" aria-valuemax="100" aria-valuenow="<?= $lesson_progress_available && !empty($course_progress_summary['available']) ? $course_progress_percentage : 0; ?>">
-                            <div class="progress-bar course-progress-bar" style="width: <?= $lesson_progress_available && !empty($course_progress_summary['available']) ? $course_progress_percentage : 0; ?>%"></div>
+                        <div class="progress course-progress-track" role="progressbar" aria-label="Learning Journey progress" aria-valuemin="0" aria-valuemax="100" aria-valuenow="<?= $course_access_allowed && !empty($course_progress_summary['available']) ? $course_progress_percentage : 0; ?>">
+                            <div class="progress-bar course-progress-bar" style="width: <?= $course_access_allowed && !empty($course_progress_summary['available']) ? $course_progress_percentage : 0; ?>%"></div>
                         </div>
                         <div class="course-progress-summary-footer">
                             <span class="fas fa-clock" aria-hidden="true"></span>

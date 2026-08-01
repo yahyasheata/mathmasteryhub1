@@ -5,11 +5,10 @@
  */
 require_once __DIR__ . '/CourseResourceResolver.php';
 require_once __DIR__ . '/Auth.php';
-require_once __DIR__ . '/PreviousProgress.php';
+require_once __DIR__ . '/StudentLearningJourney.php';
 
 function mmh_parent_report_ensure_schema(mysqli $conn): void
 {
-    mmh_previous_progress_ensure_schema($conn);
     $conn->query("CREATE TABLE IF NOT EXISTS parent_weekly_report_comments (
         id INT UNSIGNED NOT NULL AUTO_INCREMENT,
         course_id VARCHAR(40) NOT NULL,
@@ -451,7 +450,8 @@ function mmh_parent_report_submission_state(?array $submission, array $assignmen
     $gradeLabel = $grade !== '' ? $grade . ($max !== '' ? ' / ' . $max : '') : 'Grade not entered';
     $feedback = trim((string) ($submission['feedback'] ?? ''));
     if (mb_strlen($feedback) > 350) { $feedback = ''; }
-    if ($grade !== '') { $label = 'Graded'; $tone = 'success'; }
+    if (!empty($submission['historical'])) { $label = 'Completed'; $tone = 'success'; }
+    elseif ($grade !== '') { $label = 'Graded'; $tone = 'success'; }
     elseif ($late) { $label = 'Submitted Late'; $tone = 'warning'; }
     else { $label = 'Awaiting Grading'; $tone = 'warning'; }
     return ['label' => $label, 'tone' => $tone, 'submitted' => true, 'late' => $late, 'grade' => $gradeLabel, 'imported' => $source === 'legacy_import', 'submitted_at' => $submittedAt, 'original_submitted_at' => $original, 'feedback' => $feedback];
@@ -517,6 +517,17 @@ function mmh_report_resolve(mysqli $conn, string $courseId, int $studentId, stri
     $sectionIds = array_column($sections, 'section_id'); $sectionSet = array_fill_keys($sectionIds, true);
     $sectionsById = []; foreach ($sections as $section) { $sectionsById[(string) $section['section_id']] = $section; }
 
+    $journeyEvidence = mmh_learning_journey_load_evidence($conn, $studentId, $courseId);
+    $journeyItemsById = [];
+    foreach (mmh_learning_journey_item_records($conn, $studentId, $courseId) as $journeyItem) { $journeyItemsById[(string) ($journeyItem['item_id'] ?? '')] = $journeyItem; }
+    foreach ($sections as &$resolvedSection) {
+        $occurrenceId = trim((string) ($resolvedSection['release_occurrence_id'] ?? ''));
+        $historicalAttendance = $occurrenceId !== '' ? ($journeyEvidence[mmh_learning_journey_entity_key('live_session', '', '', $occurrenceId)] ?? null) : null;
+        if ($historicalAttendance && in_array((string) ($historicalAttendance['state'] ?? ''), ['present', 'attended', 'completed'], true) && strtolower((string) ($resolvedSection['attendance_status'] ?? 'unknown')) === 'unknown') {
+            $resolvedSection['attendance_status'] = 'present_live';
+        }
+    }
+    unset($resolvedSection);
     $itemStmt = $conn->prepare("SELECT item_id, item_title, section_id, item_type, template_type, template_data FROM course_items WHERE course_id = ? AND status = 'published'");
     $itemStmt->bind_param('s', $courseId); $itemStmt->execute(); $allItems = $itemStmt->get_result()->fetch_all(MYSQLI_ASSOC); $itemStmt->close();
     $recordingsBySection = [];
@@ -557,6 +568,11 @@ function mmh_report_resolve(mysqli $conn, string $courseId, int $studentId, stri
         }
         $progressStmt->close();
     }
+    foreach ($journeyEvidence as $historical) {
+        if (($historical['item_kind'] ?? '') !== 'recording' || ($historical['state'] ?? '') !== 'watched') { continue; }
+        $itemKey = trim((string) ($historical['item_id'] ?? ''));
+        if ($itemKey !== '' && !isset($opened[$itemKey])) { $opened[$itemKey] = ''; }
+    }
 
     $assignmentStmt = $conn->prepare("SELECT a.*, i.section_id AS item_section_id FROM assignments a LEFT JOIN course_items i ON i.course_id = a.course_id AND i.item_id = a.item_id WHERE a.course_id = ? AND (a.item_id IS NULL OR a.item_id = '' OR i.status = 'published') ORDER BY a.due_date ASC, a.id ASC");
     $assignmentStmt->bind_param('s', $courseId); $assignmentStmt->execute(); $allAssignments = $assignmentStmt->get_result()->fetch_all(MYSQLI_ASSOC); $assignmentStmt->close();
@@ -577,15 +593,24 @@ function mmh_report_resolve(mysqli $conn, string $courseId, int $studentId, stri
         if ($dueDate !== '' && strtotime($dueDate) !== false && strtotime($dueDate) > time()) { continue; }
         $assignmentSection = trim((string) ($assignment['section_id'] ?? '')) ?: trim((string) ($assignment['item_section_id'] ?? ''));
         if ($assignmentSection === '') { $unresolvedHomework++; continue; }
-        if (isset($sectionSet[$assignmentSection])) { $homeworkBySection[$assignmentSection][] = ['assignment' => $assignment, 'state' => mmh_parent_report_submission_state($submissions[(string) $assignment['assignment_id']] ?? null, $assignment)]; }
+        if (isset($sectionSet[$assignmentSection])) {
+            $assignmentKey = mmh_learning_journey_entity_key('homework', '', (string) $assignment['assignment_id']);
+            $historical = $journeyEvidence[$assignmentKey] ?? null;
+            $stateSource = $submissions[(string) $assignment['assignment_id']] ?? null;
+            if (!$stateSource && $historical && in_array((string) ($historical['state'] ?? ''), ['completed', 'submitted'], true)) {
+                $stateSource = ['historical' => true, 'submission_source' => (string) ($historical['source'] ?? 'manual'), 'submitted_at' => ''];
+            }
+            $homeworkBySection[$assignmentSection][] = ['assignment' => $assignment, 'state' => mmh_parent_report_submission_state($stateSource, $assignment)];
+        }
     }
 
     $weekly = [];
     foreach ($sections as $section) {
         $attendance = mmh_parent_report_attendance($section['attendance_status']); $recordingRows = [];
         foreach ($recordingsBySection[$section['section_id']] ?? [] as $recording) {
-            $openedState = isset($opened[(string) $recording['item_id']]);
-            $recordingId = (string) $recording['item_id']; $completedState = isset($completed[$recordingId]);
+            $recordingId = (string) $recording['item_id']; $journeyRecording = $journeyItemsById[$recordingId] ?? [];
+            $completedState = !empty($journeyRecording['is_completed']) || isset($completed[$recordingId]);
+            $openedState = isset($opened[$recordingId]) || $completedState;
             if (empty($section['is_workshop']) && in_array($attendance['key'], ['present', 'late'], true)) { $label = 'Not Required'; $tone = 'muted'; $statusKey = 'not_required'; }
             elseif ($completedState || $openedState) { $label = 'Opened'; $tone = 'success'; $statusKey = $completedState ? 'completed' : 'opened'; }
             else { $label = 'Not Opened'; $tone = 'muted'; $statusKey = 'not_viewed'; }
@@ -607,7 +632,7 @@ function mmh_report_resolve(mysqli $conn, string $courseId, int $studentId, stri
     }
     $unresolvedRecordings = 0; foreach ($allItems as $item) { if (mmh_parent_report_recording($item) && trim((string) ($item['section_id'] ?? '')) === '') { $unresolvedRecordings++; } }
     $unlinkedSections = 0; foreach ($allSections as $section) { if (trim((string) ($section['release_occurrence_id'] ?? '')) === '' && !mmh_parent_report_workshop_section($section)) { $unlinkedSections++; } }
-    $report = ['course' => $course, 'student' => $student, 'start' => $start, 'end' => $end, 'generated_at' => date('Y-m-d H:i:s'), 'sections' => $weekly, 'outstanding' => $outstanding, 'unresolved' => ['sections' => $unlinkedSections, 'homework' => $unresolvedHomework, 'recordings' => $unresolvedRecordings], 'previous_progress' => mmh_previous_progress_load($conn, $courseId, $studentId), 'comment' => $comment !== null ? trim(mb_substr($comment, 0, 1000)) : mmh_parent_report_comment($conn, $courseId, $studentId, $start, $end)];
+    $report = ['course' => $course, 'student' => $student, 'start' => $start, 'end' => $end, 'generated_at' => date('Y-m-d H:i:s'), 'sections' => $weekly, 'outstanding' => $outstanding, 'unresolved' => ['sections' => $unlinkedSections, 'homework' => $unresolvedHomework, 'recordings' => $unresolvedRecordings], 'learning_journey' => mmh_learning_journey_resolve($conn, $studentId, $courseId), 'comment' => $comment !== null ? trim(mb_substr($comment, 0, 1000)) : mmh_parent_report_comment($conn, $courseId, $studentId, $start, $end)];
     $report['suggested_comment'] = mmh_parent_report_suggested_comment($report);
     return $report;
 }
@@ -681,7 +706,7 @@ function mmh_report_student_summary(array $report): array
     unset($entry);
     $periodDays = max(1, (int) ((strtotime((string) $report['end']) - strtotime((string) $report['start'])) / 86400) + 1);
     $summary = ['period' => ['start' => (string) $report['start'], 'end' => (string) $report['end'], 'days' => $periodDays], 'sections' => $sections, 'counts' => ['live_total' => $liveTotal, 'live_attended' => $liveAttended, 'live_absent' => $liveAbsent, 'homework_total' => $homeworkTotal, 'homework_submitted' => $homeworkSubmitted, 'homework_missing' => $homeworkMissing, 'homework_awaiting_grading' => $homeworkAwaiting, 'homework_graded' => $homeworkGraded, 'recording_total' => $recordingTotal, 'recording_opened' => $recordingOpened, 'recording_completed' => $recordingCompleted, 'recording_not_viewed' => $recordingNotViewed, 'average_grade' => $gradeCount ? round($gradeTotal / $gradeCount, 1) : null], 'weak_points' => array_values($weak)];
-    $summary['combined_progress'] = mmh_previous_progress_combine($report['previous_progress'] ?? mmh_previous_progress_empty(), mmh_previous_progress_lms_counts($summary));
+    $summary['learning_journey'] = $report['learning_journey'] ?? [];
     return $summary;
 }
 
@@ -767,7 +792,7 @@ function mmh_parent_report_presentation(array $report): array
     else { $overall = ['label' => 'Immediate Follow-up Recommended', 'tone' => 'danger']; }
 
     $studentSummary = mmh_report_student_summary($report);
-    $overallProgress = $studentSummary['combined_progress']['overall']['percent'] ?? null;
+    $overallProgress = $studentSummary['learning_journey']['percentage'] ?? null;
     return [
         'overall' => $overall,
         'live' => $sessionTotal ? $attended . ' / ' . $sessionTotal : 'Not Available',

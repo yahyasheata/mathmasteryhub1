@@ -410,7 +410,7 @@ $governorates = [
                                                         </form>
 
                                                         <a class='btn btn-outline-secondary btn-sm font-small mx-1' href='{$progressUrl}'>
-                                                            <span class='fas fa-chart-line'></span> Progress
+                                                            <span class='fas fa-route'></span> Manage Learning Journey
                                                         </a>
 
                                                         <form method='POST' action=''

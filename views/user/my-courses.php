@@ -5,6 +5,7 @@ require_once 'inc/functions.php';
 require_once 'inc/LiveSessions.php';
 require_once 'inc/StudentCourseAccess.php';
 require_once 'inc/AssignmentProgress.php';
+require_once 'inc/StudentLearningJourney.php';
 $pageName = "mycourses";
 $username = $_SESSION['username'];
 $user_info = getUserInfo($username);
@@ -140,6 +141,8 @@ if (student_dashboard_table_exists($conn, 'learning_events')) {
 }
 
 $section_progress_by_course = [];
+$learning_journey_by_course = [];
+$resume_by_course = [];
 $assignment_progress_by_course = [];
 $upcoming_items = [];
 $homework_due_count = 0;
@@ -152,14 +155,17 @@ foreach ($enrolled_courses as $enrolledCourse) {
     }
     $assignmentMap = mmh_assignment_progress_load_course($conn, $user_id, $courseKey);
     $assignment_progress_by_course[$courseKey] = $assignmentMap;
-    $courseRecord = student_course_access_course($conn, $courseKey);
-    $sections = $courseRecord ? student_course_access_visible_sections($conn, $courseKey) : [];
-    $sectionProgress = $courseRecord ? student_course_access_progress_map($conn, $courseKey, $user_id) : [];
+    $journey = mmh_learning_journey_resolve($conn, $user_id, $courseKey);
+    $learning_journey_by_course[$courseKey] = $journey;
+    $resume = mmh_learning_journey_resume($journey);
+    if ($resume) {
+        $resume_by_course[$courseKey] = ['course_id' => $courseKey, 'course_title' => $enrolledCourse['course_title'], 'course_image' => $enrolledCourse['course_image'] ?? '', 'section_title' => $resume['section_title'] ?? '', 'item_title' => $resume['item_title'] ?? '', 'item_id' => $resume['item_id'] ?? ''];
+    }
+    $sections = $journey['sections'] ?? [];
     $completedSections = 0;
     foreach ($sections as $section) {
-        if (student_course_access_section_completed($conn, $section, $sectionProgress, $user_id, $assignmentMap)) {
-            $completedSections++;
-        }
+        $sectionItems = array_merge($section['items'] ?? [], $section['live_sessions'] ?? []);
+        if ($sectionItems && count(array_filter($sectionItems, static fn($item) => !empty($item['is_completed']))) === count($sectionItems)) { $completedSections++; }
     }
     $section_progress_by_course[$courseKey] = [
         'total_sections' => count($sections),
@@ -221,6 +227,8 @@ if ($priority_assignment) {
         'created_at' => $priority_assignment['due_date'] ?? '',
         'item_id' => $priority_assignment['item_id'] ?? '',
     ];
+} elseif (!empty($resume_by_course)) {
+    $continue_course = reset($resume_by_course);
 } elseif ($latest_activity) {
     $continue_course = $latest_activity;
 } elseif (!empty($enrolled_courses)) {

@@ -9,6 +9,7 @@ require_once dirname(__DIR__, 3) . '/__init.php';
 require_once 'connection/config.php';
 require_once 'inc/StudentCourseAccess.php';
 require_once 'inc/StudentCourseProgress.php';
+require_once 'inc/StudentLearningJourney.php';
 require_once 'inc/CourseResourceResolver.php';
 require_once 'inc/CourseHomeworkRenderer.php';
 
@@ -110,10 +111,10 @@ function course_resource_render_viewer(mysqli $conn, $baseUrl, $userId, array $c
     $durationLabel = $durationMinutes > 0 ? ($durationMinutes >= 60 ? floor($durationMinutes / 60) . 'h ' . ($durationMinutes % 60 ? ($durationMinutes % 60) . 'm' : '') : $durationMinutes . ' min') : '';
     $lessonPosition = (int) ($navigation['position'] ?? 0);
     $lessonTotal = (int) ($navigation['total'] ?? 0);
-    $progressMap = student_course_progress_available($conn)
-        ? student_course_progress_load($conn, $userId, $course['course_id'])
-        : [];
-    $isCompleted = student_course_progress_is_completed($progressMap, $itemId);
+    $journey = mmh_learning_journey_resolve($conn, (int) $userId, (string) $course['course_id']);
+    $journeyItem = null;
+    foreach ($journey['items'] as $candidate) { if ((string) ($candidate['item_id'] ?? '') === (string) $itemId) { $journeyItem = $candidate; break; } }
+    $isCompleted = !empty($journeyItem['is_completed']);
     $completionLabel = $isCompleted ? 'Completed' : 'Not completed';
     $completionIcon = $isCompleted ? 'fas fa-check-circle' : 'far fa-circle';
 

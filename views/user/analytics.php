@@ -42,22 +42,6 @@ $statusClass = static function (string $key): string {
 $progressLabel = static function (?float $percent): string {
     return $percent === null ? 'Not Available' : rtrim(rtrim(number_format($percent, 1), '0'), '.') . '%';
 };
-$progressStatus = static function (array $combined): string {
-    $overall = $combined['overall'] ?? [];
-    $percent = $overall['percent'] ?? null;
-    if ($percent === null) { return 'Progress will appear here'; }
-    $homeworkTotal = (int) ($overall['homework_total'] ?? 0);
-    $homeworkCompleted = (int) ($overall['homework_completed'] ?? 0);
-    $attendanceTotal = (int) ($overall['attendance_total'] ?? 0);
-    $attendanceCompleted = (int) ($overall['attendance_completed'] ?? 0);
-    if ($homeworkTotal > 0 && $homeworkCompleted < $homeworkTotal) { return 'Outstanding Homework'; }
-    if ($percent >= 90 && ($attendanceTotal === 0 || $attendanceCompleted === $attendanceTotal)) { return 'Excellent Progress'; }
-    if ($percent >= 75) { return 'Great Consistency'; }
-    return 'Keep Going';
-};
-$formatQuizAverage = static function ($value) use ($escape): string {
-    return $value === null || $value === '' ? '' : $escape(rtrim(rtrim(number_format((float) $value, 1), '0'), '.') . '%');
-};
 ?>
 <!doctype html>
 <html lang="en" dir="ltr">
@@ -77,19 +61,17 @@ $formatQuizAverage = static function ($value) use ($escape): string {
     <?php elseif ($error): ?><div class="alert alert-danger" role="alert"><?= $escape($error) ?></div>
     <?php elseif ($summary): ?>
 	      <p class="student-progress-period"><strong><?= $escape($selectedCourse['course_title']) ?></strong> · <?= $escape($period['label']) ?> · <?= $escape($period['start']) ?> to <?= $escape($period['end']) ?></p>
-	      <?php $combined = $summary['combined_progress']; $quizAverage = $combined['lms']['quiz_average'] ?? ($combined['previous']['quiz_average'] ?? null); ?>
+	      <?php $journey = $summary['learning_journey'] ?? []; $journeyPercent = $journey['percentage'] ?? null; $journeyTotal = (int) ($journey['total'] ?? 0); $journeyCompleted = (int) ($journey['completed'] ?? 0); ?>
 	      <section class="student-progress-primary" aria-label="Overall progress">
 	        <article class="student-progress-hero-card">
-	          <div class="student-progress-hero-top"><div><h2>Overall Progress</h2><strong class="student-progress-hero-percent"><?= $escape($progressLabel($combined['overall']['percent'])) ?></strong></div><span class="student-progress-hero-status"><?= $escape($progressStatus($combined)) ?></span></div>
-	          <div class="student-progress-hero-grid"><div><span>Homework</span><strong><?= (int) $combined['overall']['homework_completed'] ?> / <?= (int) $combined['overall']['homework_total'] ?></strong></div><div><span>Attendance</span><strong><?= (int) $combined['overall']['attendance_completed'] ?> / <?= (int) $combined['overall']['attendance_total'] ?></strong></div><?php if ($quizAverage !== null): ?><div><span>Quiz Average</span><strong><?= $formatQuizAverage($quizAverage) ?></strong></div><?php endif; ?></div>
+	          <div class="student-progress-hero-top"><div><h2>Learning Journey</h2><strong class="student-progress-hero-percent"><?= $escape($progressLabel($journeyPercent)) ?></strong></div><span class="student-progress-hero-status"><?= $journeyTotal > 0 && $journeyCompleted === $journeyTotal ? 'Complete' : ($journeyTotal > 0 ? 'Keep Going' : 'Progress will appear here') ?></span></div>
+	          <div class="student-progress-hero-grid"><div><span>Course items complete</span><strong><?= $journeyCompleted ?> / <?= $journeyTotal ?></strong></div><div><span>Live attendance</span><strong><?= (int) $summary['counts']['live_attended'] ?> / <?= (int) $summary['counts']['live_total'] ?></strong></div><div><span>Homework submitted</span><strong><?= (int) $summary['counts']['homework_submitted'] ?> / <?= (int) $summary['counts']['homework_total'] ?></strong></div></div>
 	        </article>
 	        <aside class="student-progress-journey" aria-label="Progress journey">
-	          <h2>Progress Journey</h2>
-	          <div class="student-progress-journey-step"><h3>Previous Learning</h3><p>Teacher record from learning before Math Mastery Hub.</p><div class="student-progress-journey-facts"><span>Homework <b><?= (int) $combined['previous']['homework_completed'] ?> / <?= (int) $combined['previous']['homework_total'] ?></b></span><span>Attendance <b><?= (int) $combined['previous']['attendance_completed'] ?> / <?= (int) $combined['previous']['attendance_total'] ?></b></span><?php if (!empty($combined['previous']['source'])): ?><span>Source <b><?= $escape($combined['previous']['source']) ?></b></span><?php endif; ?></div></div>
-	          <div class="student-progress-journey-step"><h3>Math Mastery Hub</h3><p>Currently tracked automatically in your LMS workspace.</p><div class="student-progress-journey-facts"><span>Homework <b><?= (int) $combined['lms']['homework_completed'] ?> / <?= (int) $combined['lms']['homework_total'] ?></b></span><span>Attendance <b><?= (int) $combined['lms']['attendance_completed'] ?> / <?= (int) $combined['lms']['attendance_total'] ?></b></span></div></div>
+	          <h2>Course timeline</h2>
+	          <?php foreach (array_slice($journey['sections'] ?? [], 0, 3) as $journeySection): ?><div class="student-progress-journey-step"><h3><?= $escape($journeySection['title']) ?></h3><p><?= count(array_filter($journeySection['items'] ?? [], static fn($item) => !empty($item['is_completed']))) ?> of <?= count($journeySection['items'] ?? []) ?> course items complete</p><div class="student-progress-journey-facts"><?php foreach (array_slice($journeySection['items'] ?? [], 0, 3) as $journeyItem): ?><span><?= $escape($journeyItem['item_title']) ?> <b><?= !empty($journeyItem['is_completed']) ? '✓' : '○' ?></b></span><?php endforeach; ?></div></div><?php endforeach; ?>
 	        </aside>
 	      </section>
-	      <?php if (trim((string) ($combined['previous']['teacher_comment'] ?? '')) !== ''): ?><section class="student-progress-note"><h2>Teacher's Note</h2><p>“<?= $escape($combined['previous']['teacher_comment']) ?>”</p></section><?php endif; ?>
 	      <section class="student-progress-overview" aria-label="Progress overview"><article class="student-progress-metric"><span>Live attendance</span><strong><?= (int) $summary['counts']['live_attended'] ?> / <?= (int) $summary['counts']['live_total'] ?></strong></article><article class="student-progress-metric"><span>Homework submitted</span><strong><?= (int) $summary['counts']['homework_submitted'] ?> / <?= (int) $summary['counts']['homework_total'] ?></strong></article><article class="student-progress-metric"><span>Recording opened</span><strong><?= (int) $summary['counts']['recording_opened'] + (int) $summary['counts']['recording_completed'] ?></strong></article><article class="student-progress-metric"><span>Average grade</span><strong><?= $summary['counts']['average_grade'] === null ? 'Not Available' : $escape($summary['counts']['average_grade']) . ' / 10' ?></strong></article></section>
       <?php if (!$summary['sections']): ?><div class="student-progress-empty">No published sections have activity in this period.</div><?php endif; ?>
       <?php foreach ($summary['sections'] as $section): ?><article class="student-progress-section"><header class="student-progress-section-header"><div><h2><?= $escape($section['title']) ?><?= !empty($section['is_workshop']) ? ' <small>(Workshop)</small>' : '' ?></h2></div><span class="student-progress-section-date"><?= $escape($section['date']) ?></span></header>
