@@ -156,7 +156,7 @@
 
 .public-course-hero-cta:hover { background: var(--primary-hover); color: var(--text-inverse); transform: translateY(-1px); }
 .public-course-hero-cta:focus-visible,
-.public-course-purchase-form button:focus-visible,
+.public-course-action-link:focus-visible,
 .public-preview-section summary:focus-visible { box-shadow: var(--shadow-focus); outline: 0; }
 
 .public-course-workspace { padding-top: clamp(2rem, 4vw, 3.6rem); }
@@ -225,9 +225,9 @@
 .public-course-price small { font-size: .75rem; font-weight: 740; }
 .public-course-old-price { color: var(--text-muted); font-size: .78rem; text-decoration: line-through; }
 .public-course-price-note { color: var(--text-muted); font-size: .77rem; line-height: 1.5; margin: 0 .15rem 1rem; }
-.public-course-purchase-form button { align-items: center; background: var(--primary); border: 0; border-radius: var(--radius-sm); color: var(--text-inverse); cursor: pointer; display: flex; font: inherit; font-size: .91rem; font-weight: 800; gap: .5rem; justify-content: center; min-height: 44px; padding: .68rem 1rem; transition: background-color var(--transition), transform var(--transition), box-shadow var(--transition); width: 100%; }
-.public-course-purchase-form button:hover { background: var(--primary-hover); box-shadow: var(--shadow-sm); transform: translateY(-1px); }
-.public-course-purchase-form button:active { transform: translateY(0); }
+.public-course-action-link { align-items: center; background: var(--primary); border-radius: var(--radius-sm); color: var(--text-inverse); display: flex; font-size: .91rem; font-weight: 800; gap: .5rem; justify-content: center; min-height: 44px; padding: .68rem 1rem; text-decoration: none; transition: background-color var(--transition), transform var(--transition), box-shadow var(--transition); width: 100%; }
+.public-course-action-link:hover { background: var(--primary-hover); box-shadow: var(--shadow-sm); color: var(--text-inverse); transform: translateY(-1px); }
+.public-course-action-link:active { transform: translateY(0); }
 .public-course-includes { border-top: 1px solid var(--border); display: grid; gap: .7rem; list-style: none; margin: 1rem 0 .2rem; padding: 1rem .15rem 0; }
 .public-course-includes li { color: var(--text-secondary); font-size: .78rem; gap: .6rem; }
 .public-course-includes i { color: var(--secondary); text-align: center; width: 1rem; }

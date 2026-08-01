@@ -8,6 +8,7 @@ require_once '__init.php';
 require_once 'inc/functions.php';
 require_once 'inc/FawaterkPayment.php';
 require_once 'inc/TransactionLog.php';
+require_once 'inc/PublicCourse.php';
 if ($_SERVER["REQUEST_METHOD"] !== "POST") {
     echo json_encode([
         'status' => 0,
@@ -38,7 +39,25 @@ if (!isset($_POST['course_id']) || empty($_POST['course_id'])) {
 $conn = db();
 $username = $_SESSION['username'];
 $user_id = getUserInfo($username)->user_id;
-$course_id = intval($_POST['course_id']);
+$course = mmh_public_course_find($conn, $_POST['course_id']);
+if (!$course || !is_numeric((string) ($course['course_id'] ?? ''))) {
+    echo json_encode([
+        'status' => 0,
+        'message' => 'Course not found',
+        'reason' => 'The selected course is no longer available.'
+    ]);
+    exit;
+}
+$course_id = (int) $course['course_id'];
+
+if (mmh_public_course_enrolled($conn, (int) $user_id, (string) $course['course_id'])) {
+    echo json_encode([
+        'status' => 0,
+        'message' => 'Already enrolled',
+        'reason' => 'This course is already in your learning workspace.'
+    ]);
+    exit;
+}
 
 // Check course price
 $courseResult = $conn->query("SELECT course_price, course_title FROM courses WHERE course_id = $course_id");

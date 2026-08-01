@@ -1,0 +1,49 @@
+.course-checkout-page { min-height: 100vh; }
+.course-checkout-shell { width: min(1120px, calc(100% - 2rem)); margin: 0 auto; padding: clamp(1.5rem, 4vw, 3.5rem) 0 4rem; }
+.course-checkout-breadcrumb { display: flex; flex-wrap: wrap; gap: .5rem; align-items: center; color: var(--text-muted); font-size: .82rem; margin-bottom: 1.25rem; }
+.course-checkout-breadcrumb a { color: var(--secondary); font-weight: 750; text-decoration: none; }
+.course-checkout-grid { display: grid; grid-template-columns: minmax(0, 1.05fr) minmax(330px, .95fr); gap: clamp(1rem, 3vw, 2rem); align-items: start; }
+.course-checkout-summary, .course-checkout-payments { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius-lg); box-shadow: var(--shadow-sm); overflow: hidden; }
+.course-checkout-thumbnail { aspect-ratio: 16 / 7; background: var(--surface-inset); overflow: hidden; }
+.course-checkout-thumbnail img { display: block; height: 100%; object-fit: cover; width: 100%; }
+.course-checkout-summary-body { padding: clamp(1.25rem, 3vw, 2rem); }
+.course-checkout-eyebrow { color: var(--secondary); font-size: .72rem; font-weight: 850; letter-spacing: .08em; margin: 0 0 .35rem; text-transform: uppercase; }
+.course-checkout-summary h1 { font-size: clamp(1.7rem, 4vw, 2.7rem); line-height: 1.08; margin: 0; }
+.course-checkout-teacher { align-items: center; color: var(--text-secondary); display: flex; font-size: .9rem; gap: .5rem; margin: .8rem 0 0; }
+.course-checkout-teacher span { color: var(--secondary); }
+.course-checkout-description { color: var(--text-secondary); line-height: 1.7; margin: 1.1rem 0 0; }
+.course-checkout-price { align-items: center; border-top: 1px solid var(--border); display: flex; justify-content: space-between; margin-top: 1.25rem; padding-top: 1rem; }
+.course-checkout-price span { color: var(--text-primary); font-size: 1.65rem; font-weight: 850; }
+.course-checkout-price small { color: var(--text-muted); font-size: .75rem; }
+.course-checkout-price a { color: var(--secondary); font-size: .82rem; font-weight: 750; text-decoration: none; }
+.course-checkout-included { border-top: 1px solid var(--border); padding: 1.25rem clamp(1.25rem, 3vw, 2rem) 1.5rem; }
+.course-checkout-included h2 { font-size: 1rem; margin: 0 0 .8rem; }
+.course-checkout-included ul { display: grid; gap: .65rem; grid-template-columns: repeat(2, minmax(0, 1fr)); list-style: none; margin: 0; padding: 0; }
+.course-checkout-included li { align-items: center; color: var(--text-secondary); display: flex; font-size: .82rem; gap: .55rem; }
+.course-checkout-included li span { color: var(--secondary); width: 1rem; }
+.course-checkout-payments { display: grid; gap: .8rem; padding: clamp(1.1rem, 3vw, 1.5rem); }
+.course-checkout-payment-heading { padding: .25rem .2rem .45rem; }
+.course-checkout-payment-heading h2 { font-size: 1.55rem; margin: 0; }
+.course-checkout-payment-heading > p:last-child { color: var(--text-secondary); font-size: .85rem; line-height: 1.6; margin: .45rem 0 0; }
+.course-payment-card { border: 1px solid var(--border); border-radius: var(--radius-md); padding: 1rem; }
+.course-payment-card-heading { align-items: center; display: flex; gap: .7rem; }
+.course-payment-card-heading h3 { font-size: 1rem; margin: 0; }
+.course-payment-card-heading p { color: var(--text-muted); font-size: .76rem; margin: .2rem 0 0; }
+.course-payment-icon { align-items: center; border-radius: .75rem; display: inline-flex; height: 2.3rem; justify-content: center; width: 2.3rem; }
+.course-payment-icon.instapay { background: color-mix(in srgb, #35a854 16%, var(--surface)); color: #27843e; }
+.course-payment-icon.vodafone { background: color-mix(in srgb, #e11d48 14%, var(--surface)); color: #c0193e; }
+.course-payment-icon.online { background: var(--secondary-soft); color: var(--secondary); }
+.course-payment-number { align-items: center; background: var(--surface-inset); border: 1px dashed var(--border-strong); border-radius: var(--radius-sm); display: flex; gap: .6rem; justify-content: space-between; margin-top: .9rem; padding: .65rem .75rem; }
+.course-payment-number > span { color: var(--text-primary); font-size: .95rem; font-weight: 800; letter-spacing: .03em; overflow-wrap: anywhere; }
+.course-copy-number { background: transparent; border: 0; color: var(--secondary); cursor: pointer; flex: 0 0 auto; font: inherit; font-size: .74rem; font-weight: 800; padding: .25rem; }
+.course-payment-whatsapp, .course-payment-online { align-items: center; border-radius: var(--radius-sm); display: flex; font-size: .84rem; font-weight: 800; gap: .5rem; justify-content: center; margin-top: .75rem; min-height: 42px; padding: .6rem .75rem; text-decoration: none; width: 100%; }
+.course-payment-whatsapp { background: #159447; color: #fff; }
+.course-payment-whatsapp:hover { background: #0f7838; color: #fff; }
+.course-payment-online { background: var(--primary); border: 0; color: var(--text-inverse); cursor: pointer; font: inherit; }
+.course-payment-online:hover { background: var(--primary-hover); color: var(--text-inverse); }
+.course-payment-online:disabled { cursor: wait; opacity: .65; }
+.course-payment-status, .course-payment-unavailable { color: var(--text-muted); font-size: .75rem; line-height: 1.5; margin: .55rem 0 0; }
+.course-checkout-login-note { color: var(--text-secondary); font-size: .78rem; line-height: 1.55; margin: .15rem .2rem 0; }
+.course-checkout-login-note a { color: var(--secondary); font-weight: 750; }
+@media (max-width: 780px) { .course-checkout-grid { grid-template-columns: 1fr; } }
+@media (max-width: 470px) { .course-checkout-shell { width: min(100% - 1rem, 1120px); } .course-checkout-included ul { grid-template-columns: 1fr; } .course-payment-number { align-items: flex-start; flex-direction: column; } }

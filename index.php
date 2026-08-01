@@ -287,6 +287,11 @@ $router->get('/category/{categoryId}', function($categoryId = null) {
     @include("views/public/category.php");
 });
 
+$router->get('/course/{courseId}/checkout', function($courseId = null) {
+    require_once '__init.php';
+    @include('views/public/checkout.php');
+});
+
 $router->get('/course/{courseId}', function($courseId = null) {
     require_once '__init.php';
     @include("views/public/course.php");

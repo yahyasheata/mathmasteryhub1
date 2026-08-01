@@ -4,6 +4,7 @@ require_once '__init.php';
 require_once 'inc/functions.php';
 require_once 'inc/learning_schema.php';
 require_once 'inc/PastPapers.php';
+require_once 'inc/PublicCourse.php';
 require_once 'views/partials/past-papers-list.php';
 $pageName = "courses";
 $username = $_SESSION['username'] ?? '';
@@ -12,8 +13,14 @@ $site_settings = getSiteSettings();
 $site_name = $site_settings["website_name"];
 
 $conn = db();
-$courseId = filter_var($courseId ?? null, FILTER_VALIDATE_INT, ['options' => ['min_range' => 1]]);
-if ($courseId === false) {
+$resolved_course = mmh_public_course_find($conn, $courseId ?? null);
+if (!$resolved_course) {
+  http_response_code(404);
+  exit('Course not found.');
+}
+$courseId = (int) ($resolved_course['id'] ?? 0);
+$canonicalCourseId = (string) ($resolved_course['course_id'] ?? '');
+if ($courseId <= 0 || $canonicalCourseId === '') {
   http_response_code(404);
   exit('Course not found.');
 }
@@ -48,7 +55,7 @@ if ($has_structured_preview) {
       LEFT JOIN course_sections ON course_items.section_id = course_sections.section_id
           AND course_sections.course_id = courses.course_id
           AND (course_sections.status IS NULL OR course_sections.status = '' OR course_sections.status = 'published')
-      WHERE courses.id={$courseId}
+      WHERE courses.course_id = ?
       ORDER BY
           CASE WHEN course_items.section_id IS NULL OR course_items.section_id = '' THEN 0 ELSE 1 END,
           course_sections.sort_order ASC,
@@ -70,10 +77,17 @@ if ($has_structured_preview) {
       FROM courses
       LEFT JOIN categories ON courses.course_category = categories.id
       LEFT JOIN course_items ON courses.course_id = course_items.course_id
-      WHERE courses.id={$courseId}
+      WHERE courses.course_id = ?
       ORDER BY course_items.page_order ASC, course_items.id ASC";
 }
-$coures_result = mysqli_query($conn,$courses_query);
+$courses_stmt = $conn->prepare($courses_query);
+if (!$courses_stmt) {
+  http_response_code(500);
+  exit('Course could not be loaded.');
+}
+$courses_stmt->bind_param('s', $canonicalCourseId);
+$courses_stmt->execute();
+$coures_result = $courses_stmt->get_result();
 
 $course = null;
 $course_sections = [];
@@ -249,6 +263,13 @@ if ($course !== null && !empty($course_public_id)) {
   $course_past_papers = mmh_past_course_preview_papers($conn, $course_public_id, 3);
   $course_past_resources = mmh_past_resources_for_papers($conn, array_column($course_past_papers, 'paper_id'), true);
 }
+$public_user_id = 0;
+$public_course_enrolled = false;
+if ($username !== '') {
+  $public_user = getUserInfo($username);
+  $public_user_id = (int) ($public_user->user_id ?? 0);
+  $public_course_enrolled = mmh_public_course_enrolled($conn, $public_user_id, (string) ($course['course_id'] ?? ''));
+}
 ?>
 <!DOCTYPE html>
 <html lang="en" dir="ltr">
@@ -323,6 +344,8 @@ if ($course !== null && !empty($course_public_id)) {
   $pre_discount = !empty($course['preDiscount_course_price']) ? htmlspecialchars($course['preDiscount_course_price'], ENT_QUOTES, 'UTF-8') . ' EGP' : '';
   $lesson_count = $course_summary['lessons'];
   $study_time = public_course_preview_duration($course_summary['duration_minutes']);
+  $course_checkout_url = htmlspecialchars(mmh_public_course_url($baseUrl, $course, '/checkout'), ENT_QUOTES, 'UTF-8');
+  $continue_course_url = htmlspecialchars(rtrim((string) $baseUrl, '/') . '/user/course/' . rawurlencode((string) ($course['course_id'] ?? '')), ENT_QUOTES, 'UTF-8');
 ?>
 <main class="public-course-preview">
   <section class="public-course-hero">
@@ -379,13 +402,12 @@ if ($course !== null && !empty($course_public_id)) {
             <span class="public-course-price"><?=$price?> <small>EGP</small></span>
             <?php if ($pre_discount !== ''): ?><span class="public-course-old-price"><?=$pre_discount?></span><?php endif; ?>
           </div>
-          <p class="public-course-price-note">Enroll to unlock the complete learning workspace.</p>
-          <form action="" method="POST" class="purchaseForm public-course-purchase-form">
-            <input type="hidden" name="course_id" value="<?=htmlspecialchars($course['course_id'] ?? '', ENT_QUOTES, 'UTF-8')?>">
-            <input type="hidden" name="course_title" value="<?=$course_title?>">
-            <input type="hidden" name="_method" value="POST">
-            <button type="submit"><i class="fas fa-arrow-right" aria-hidden="true"></i>Enroll now</button>
-          </form>
+          <p class="public-course-price-note"><?= $public_course_enrolled ? 'Your learning workspace is ready.' : 'Enroll to unlock the complete learning workspace.' ?></p>
+          <?php if ($public_course_enrolled): ?>
+            <a class="public-course-action-link" href="<?=$continue_course_url?>"><i class="fas fa-play" aria-hidden="true"></i>Continue Learning</a>
+          <?php else: ?>
+            <a class="public-course-action-link" href="<?=$course_checkout_url?>"><i class="fas fa-arrow-right" aria-hidden="true"></i>Enroll Now</a>
+          <?php endif; ?>
           <ul class="public-course-includes">
             <li><i class="fas fa-layer-group" aria-hidden="true"></i><span><?=$lesson_count?> <?=$lesson_count === 1 ? 'lesson' : 'lessons'?> included</span></li>
             <li><i class="fas fa-play-circle" aria-hidden="true"></i><span><?=$course_summary['recordings']?> <?=$course_summary['recordings'] === 1 ? 'recording' : 'recordings'?></span></li>
@@ -407,54 +429,5 @@ if ($course !== null && !empty($course_public_id)) {
 <?php endif; ?>
 
 <?php include $_SERVER['DOCUMENT_ROOT'].dirname($_SERVER['SCRIPT_NAME'])."/views/public/layouts/footer.php"; ?>
-
-<!-- JavaScript for accordion and purchase form -->
-<script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
-<script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
-<script>
-$(document).ready(function() {
-    // Purchase form
-    $(".purchaseForm").on("submit", function (e) {
-      e.preventDefault();
-      var course_title = $(this).find("[name='course_title']").val();
-      Swal.fire({
-        title: `You are about to subscribe to <strong class='text-info'>[${course_title}]</strong>`,
-        text: "Do you want to proceed with the purchase?",
-        icon: "warning",
-        showCancelButton: true,
-        confirmButtonColor: "var(--primary)",
-        cancelButtonColor: "var(--danger)",
-        confirmButtonText: "Yes, Subscribe!",
-        cancelButtonText: "Cancel",
-      }).then((result) => {
-        if (result.isConfirmed) {
-          $.ajax({
-            type: "POST",
-            url: "../requests/course/purchase",
-            data: new FormData(this),
-            dataType: "json",
-            contentType: false,
-            cache: false,
-            processData: false,
-            success: function (response) {
-              if (response.status == 1 && response.payment_url) {
-                window.location.href = response.payment_url;
-              } else {
-                Swal.fire({
-                  icon: "error",
-                  title: response.message,
-                  text: response.reason || response.error || '',
-                  showConfirmButton: true,
-                  timer: 10000,
-                  timerProgressBar: true,
-                });
-              }
-            },
-          });
-        }
-      });
-    });
-});
-</script>
 </body>
 </html>
