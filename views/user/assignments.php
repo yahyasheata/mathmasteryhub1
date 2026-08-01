@@ -3,6 +3,7 @@ require_once 'connection/config.php';
 require_once '__init.php';
 require_once 'inc/functions.php';
 require_once 'inc/learning_schema.php';
+require_once 'inc/LiveAssignmentRepair.php';
 
 // LiteSpeed installations may keep included PHP files in OPcache while the
 // deploy checkout is updated. Invalidate the small resolver cluster before
@@ -58,6 +59,7 @@ if ($userId > 0) {
 
 $assignmentRows = [];
 foreach ($courseRows as $course) {
+    mmh_live_assignment_repair($conn, (string) $course['course_id']);
     foreach (mmh_assignment_progress_load_course($conn, $userId, (string) $course['course_id']) as $assignment) {
         $assignment['course_title'] = $course['course_title'];
         $assignmentRows[] = $assignment;
