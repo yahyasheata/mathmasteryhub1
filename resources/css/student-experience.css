@@ -2101,8 +2101,6 @@ html[data-student-theme] body.body #body-overlay:not(.active) {
 }
 
 html[data-student-theme] body.body .public-site-header {
-  position: sticky;
-  top: 0;
   z-index: 1040;
 }
 
