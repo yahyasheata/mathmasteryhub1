@@ -7,6 +7,11 @@
 require_once dirname(__DIR__) . '/connection/config.php';
 require_once dirname(__DIR__) . '/inc/CourseAssignmentLinks.php';
 
+if (PHP_SAPI !== 'cli') {
+    http_response_code(404);
+    exit;
+}
+
 $options = getopt('', ['course:', 'apply']);
 $courseId = trim((string) ($options['course'] ?? ''));
 $apply = array_key_exists('apply', $options);
