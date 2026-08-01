@@ -120,6 +120,10 @@ function live_admin_html($value)
                                                         <input type="hidden" name="enabled" value="<?=((int)$schedule['enabled'] === 1 ? '0' : '1')?>">
                                                         <button class="btn btn-outline-secondary btn-sm" type="submit"><?=((int)$schedule['enabled'] === 1 ? 'Disable' : 'Enable')?></button>
                                                     </form>
+                                                    <form action="<?=live_admin_html($liveRequestBase)?>/delete-schedule" method="POST" class="live-admin-ajax d-inline-block">
+                                                        <input type="hidden" name="schedule_id" value="<?=live_admin_html($schedule['schedule_id'])?>">
+                                                        <button class="btn btn-outline-danger btn-sm" type="submit" data-confirm="Delete this recurring series? All future occurrences will disappear, while past sessions, attendance, and recordings remain.">Delete series</button>
+                                                    </form>
                                                     <form action="<?=live_admin_html($liveRequestBase)?>/save-schedule" method="POST" class="live-admin-ajax d-inline-block">
                                                         <?php foreach (['course_id','title','day_of_week','start_time','duration_minutes','timezone','teams_url','teams_meeting_ref','sort_order','admin_notes'] as $field): ?>
                                                             <input type="hidden" name="<?=$field?>" value="<?=live_admin_html($schedule[$field] ?? '')?>">
@@ -187,6 +191,10 @@ function live_admin_html($value)
                                                         <input class="form-control form-control-sm" type="url" name="replacement_url" placeholder="Replacement Teams URL" style="width: 210px">
                                                         <input class="form-control form-control-sm" name="change_note" placeholder="Note" style="width: 130px">
                                                         <button class="btn btn-outline-secondary btn-sm" type="submit">Update</button>
+                                                    </form>
+                                                    <form action="<?=live_admin_html($liveRequestBase)?>/delete-occurrence" method="POST" class="live-admin-ajax d-inline-block">
+                                                        <input type="hidden" name="occurrence_id" value="<?=live_admin_html($occurrence['occurrence_id'])?>">
+                                                        <button class="btn btn-outline-danger btn-sm" type="submit" data-confirm="Delete only this occurrence? Attendance and recording records will not be removed.">Delete occurrence</button>
                                                     </form>
                                                 </td>
                                             </tr>

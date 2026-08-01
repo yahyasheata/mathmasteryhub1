@@ -280,6 +280,60 @@ if (!function_exists('mmh_live_save_schedule')) {
 }
 
 if (!function_exists('mmh_live_generate_occurrences')) {
+    function mmh_live_occurrence_matches_schedule(array $schedule, array $occurrence)
+    {
+        try {
+            $timezone = mmh_live_timezone($schedule['timezone'] ?? 'Asia/Riyadh');
+            $start = new DateTimeImmutable((string) $occurrence['scheduled_start_at'], new DateTimeZone('UTC'));
+            $localStart = $start->setTimezone($timezone);
+        } catch (Throwable $exception) {
+            return false;
+        }
+
+        $effectiveStart = trim((string) ($schedule['effective_start_date'] ?? ''));
+        $effectiveEnd = trim((string) ($schedule['effective_end_date'] ?? ''));
+        $localDate = $localStart->format('Y-m-d');
+        $scheduledTime = substr((string) ($schedule['start_time'] ?? ''), 0, 8);
+
+        return (int) $localStart->format('w') === (int) ($schedule['day_of_week'] ?? -1)
+            && $localStart->format('H:i:s') === $scheduledTime
+            && ($effectiveStart === '' || $localDate >= $effectiveStart)
+            && ($effectiveEnd === '' || $localDate <= $effectiveEnd);
+    }
+
+    function mmh_live_reconcile_schedule_occurrences(mysqli $conn, array $schedule)
+    {
+        $scheduleId = trim((string) ($schedule['schedule_id'] ?? ''));
+        if ($scheduleId === '') {
+            return 0;
+        }
+
+        $stmt = $conn->prepare("SELECT occurrence_id, scheduled_start_at FROM live_session_occurrences WHERE schedule_id = ? AND status = 'scheduled' AND scheduled_start_at >= UTC_TIMESTAMP()");
+        if (!$stmt) {
+            return 0;
+        }
+        $stmt->bind_param('s', $scheduleId);
+        $stmt->execute();
+        $rows = $stmt->get_result()->fetch_all(MYSQLI_ASSOC);
+        $stmt->close();
+
+        $deleted = 0;
+        $delete = $conn->prepare("UPDATE live_session_occurrences SET status = 'deleted', change_note = 'Removed after recurring schedule changed' WHERE occurrence_id = ? AND status = 'scheduled'");
+        if (!$delete) {
+            return 0;
+        }
+        foreach ($rows as $row) {
+            if (mmh_live_occurrence_matches_schedule($schedule, $row)) {
+                continue;
+            }
+            $delete->bind_param('s', $row['occurrence_id']);
+            $delete->execute();
+            $deleted += $delete->affected_rows > 0 ? 1 : 0;
+        }
+        $delete->close();
+        return $deleted;
+    }
+
     function mmh_live_generate_occurrences(mysqli $conn, $fromDays = -3, $toDays = 45, $courseId = '')
     {
         mmh_live_ensure_schema($conn);
@@ -289,6 +343,7 @@ if (!function_exists('mmh_live_generate_occurrences')) {
         $inserted = 0;
 
         foreach ($schedules as $schedule) {
+            mmh_live_reconcile_schedule_occurrences($conn, $schedule);
             if ((int) $schedule['enabled'] !== 1) {
                 continue;
             }
@@ -342,7 +397,7 @@ if (!function_exists('mmh_live_occurrences')) {
         }
         $sql .= ' FROM live_session_occurrences AS o INNER JOIN course_live_schedules AS s ON s.schedule_id = o.schedule_id INNER JOIN courses AS c ON c.course_id = o.course_id';
         if ($onlyEnrolledUserId !== null) {
-            $sql .= ' INNER JOIN course_logs AS cl ON cl.course_id = o.course_id AND cl.user_id = ?';
+            $sql .= ' INNER JOIN (SELECT DISTINCT course_id FROM course_logs WHERE user_id = ?) AS cl ON cl.course_id = o.course_id';
             $types .= 'i';
             $params[] = (int) $onlyEnrolledUserId;
             $sql .= ' LEFT JOIN live_session_attendance AS a ON a.occurrence_id = o.occurrence_id AND a.user_id = ?';
@@ -353,6 +408,9 @@ if (!function_exists('mmh_live_occurrences')) {
         $types .= 'ss';
         $params[] = $from;
         $params[] = $to;
+        if ($onlyEnrolledUserId !== null) {
+            $sql .= " AND o.status NOT IN ('cancelled', 'deleted') AND (o.scheduled_start_at < UTC_TIMESTAMP() OR s.enabled = 1)";
+        }
         if ($courseId !== '') {
             $sql .= ' AND o.course_id = ?';
             $types .= 's';
@@ -368,6 +426,74 @@ if (!function_exists('mmh_live_occurrences')) {
         $rows = $stmt->get_result()->fetch_all(MYSQLI_ASSOC);
         $stmt->close();
         return $rows;
+    }
+}
+
+if (!function_exists('mmh_live_delete_occurrence')) {
+    function mmh_live_delete_occurrence(mysqli $conn, $occurrenceId)
+    {
+        mmh_live_ensure_schema($conn);
+        $occurrenceId = trim((string) $occurrenceId);
+        if ($occurrenceId === '') {
+            return [false, 'Occurrence not found.'];
+        }
+
+        $stmt = $conn->prepare("UPDATE live_session_occurrences SET status = 'deleted', change_note = 'Occurrence deleted by administrator' WHERE occurrence_id = ? AND scheduled_start_at >= UTC_TIMESTAMP() AND status NOT IN ('completed', 'deleted')");
+        if (!$stmt) {
+            return [false, 'Unable to prepare occurrence deletion.'];
+        }
+        $stmt->bind_param('s', $occurrenceId);
+        $ok = $stmt->execute();
+        $changed = $stmt->affected_rows > 0;
+        $stmt->close();
+        return [$ok && $changed, $changed ? 'Occurrence deleted successfully.' : 'Only an active future occurrence can be deleted.'];
+    }
+}
+
+if (!function_exists('mmh_live_delete_schedule')) {
+    function mmh_live_delete_schedule(mysqli $conn, $scheduleId)
+    {
+        mmh_live_ensure_schema($conn);
+        $scheduleId = trim((string) $scheduleId);
+        if ($scheduleId === '') {
+            return [false, 'Schedule not found.'];
+        }
+
+        $conn->begin_transaction();
+        try {
+            $schedule = $conn->prepare('UPDATE course_live_schedules SET enabled = 0 WHERE schedule_id = ?');
+            if (!$schedule) {
+                throw new RuntimeException('Unable to prepare schedule deletion.');
+            }
+            $schedule->bind_param('s', $scheduleId);
+            $schedule->execute();
+            $scheduleFound = $schedule->affected_rows > 0;
+            $schedule->close();
+
+            if (!$scheduleFound) {
+                $exists = $conn->prepare('SELECT id FROM course_live_schedules WHERE schedule_id = ? LIMIT 1');
+                $exists->bind_param('s', $scheduleId);
+                $exists->execute();
+                $scheduleFound = $exists->get_result()->num_rows > 0;
+                $exists->close();
+            }
+            if (!$scheduleFound) {
+                throw new RuntimeException('Schedule not found.');
+            }
+
+            $occurrences = $conn->prepare("UPDATE live_session_occurrences SET status = 'deleted', change_note = 'Recurring series deleted by administrator' WHERE schedule_id = ? AND scheduled_start_at >= UTC_TIMESTAMP() AND status NOT IN ('completed', 'deleted')");
+            if (!$occurrences) {
+                throw new RuntimeException('Unable to prepare future occurrence deletion.');
+            }
+            $occurrences->bind_param('s', $scheduleId);
+            $occurrences->execute();
+            $occurrences->close();
+            $conn->commit();
+            return [true, 'Recurring series deleted successfully. Past sessions and records were preserved.'];
+        } catch (Throwable $exception) {
+            $conn->rollback();
+            return [false, $exception->getMessage()];
+        }
     }
 }
 
@@ -421,8 +547,8 @@ if (!function_exists('mmh_live_join_state')) {
         $end = mmh_live_occurrence_timestamp($occurrence, 'scheduled_end_at');
         $target = mmh_live_sanitize_teams_url((string) (($occurrence['replacement_url'] ?? '') ?: ($occurrence['teams_url_snapshot'] ?? '')));
 
-        if ($status === 'cancelled') {
-            return ['active' => false, 'state' => 'cancelled', 'label' => 'Session Cancelled'];
+        if (in_array($status, ['cancelled', 'deleted'], true)) {
+            return ['active' => false, 'state' => $status, 'label' => $status === 'deleted' ? 'Session Removed' : 'Session Cancelled'];
         }
         if ($target === null) {
             return ['active' => false, 'state' => 'missing_link', 'label' => 'Meeting link not available'];

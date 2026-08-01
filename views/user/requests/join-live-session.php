@@ -17,7 +17,7 @@ if (!$studentId || $occurrenceId === null) {
 }
 
 $occurrence = mmh_live_occurrence($conn, $occurrenceId);
-if (!$occurrence || in_array($occurrence['status'], ['cancelled'], true)) {
+if (!$occurrence || in_array($occurrence['status'], ['cancelled', 'deleted'], true)) {
     http_response_code(404);
     echo 'Live session is unavailable.';
     exit;
