@@ -199,6 +199,17 @@ $router->mount('/admin', function() use ($router) {
 // =======================
 // User Routes
 // =======================
+$router->get('/resources/dashboard/notifications', function() {
+    global $baseUrl;
+    require_once '__init.php';
+    if (!isset($_SESSION['username'])) {
+        header("Location: {$baseUrl}/auth/login");
+        exit();
+    }
+    header("Location: {$baseUrl}/user/notifications", true, 302);
+    exit();
+});
+
 $router->post('/user/save-subscription/', function() {
     include('notification/save-subscription.php');
 });
