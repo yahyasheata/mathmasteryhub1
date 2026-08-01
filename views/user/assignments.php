@@ -3,6 +3,20 @@ require_once 'connection/config.php';
 require_once '__init.php';
 require_once 'inc/functions.php';
 require_once 'inc/learning_schema.php';
+
+// LiteSpeed installations may keep included PHP files in OPcache while the
+// deploy checkout is updated. Invalidate the small resolver cluster before
+// loading it so an authenticated request cannot run the previous six-item
+// resolver bytecode after a deployment.
+if (function_exists('opcache_invalidate')) {
+    foreach ([
+        __DIR__ . '/../../inc/AssignmentProgress.php',
+        __DIR__ . '/../../inc/CourseResourceResolver.php',
+        __DIR__ . '/../../inc/CourseAssignmentLinks.php',
+    ] as $resolverFile) {
+        @opcache_invalidate($resolverFile, true);
+    }
+}
 require_once 'inc/AssignmentProgress.php';
 
 // This page is user-specific and must never be served from a shared edge or
