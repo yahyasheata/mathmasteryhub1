@@ -1,4 +1,7 @@
 <?php
+require_once __DIR__ . '/inc/RequestPolicy.php';
+mmh_redirect_legacy_www_host();
+
 if (PHP_SAPI === 'cli-server') {
     error_reporting(E_ALL & ~E_DEPRECATED & ~E_USER_DEPRECATED);
     ini_set('display_errors', '1');
@@ -17,6 +20,11 @@ if (session_status() === PHP_SESSION_NONE) {
         'samesite' => 'Lax',
     ]);
     session_start();
+}
+
+$requestPath = parse_url($_SERVER['REQUEST_URI'] ?? '/', PHP_URL_PATH) ?: '/';
+if ($requestPath === '/user' || str_starts_with($requestPath, '/user/')) {
+    mmh_send_private_response_headers();
 }
 
 // Maintenance is a centralized public gate. Admin sessions always bypass it.
