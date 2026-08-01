@@ -7,7 +7,12 @@ require_once 'inc/PublicCourse.php';
 $conn = db();
 $site_settings = getSiteSettings();
 $site_name = (string) ($site_settings['website_name'] ?? 'Math Mastery Hub');
-$requested_identifier = mmh_public_course_identifier($courseId ?? null);
+$route_identifier = $courseId ?? null;
+if (trim((string) $route_identifier) === '') {
+    $path = (string) parse_url($_SERVER['REQUEST_URI'] ?? '', PHP_URL_PATH);
+    if (preg_match('#/course/([^/]+)/checkout/?$#', $path, $matches)) $route_identifier = rawurldecode($matches[1]);
+}
+$requested_identifier = mmh_public_course_identifier($route_identifier);
 $course = mmh_public_course_find($conn, $requested_identifier);
 if (!$course) {
     http_response_code(404);

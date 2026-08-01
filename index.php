@@ -289,11 +289,19 @@ $router->get('/category/{categoryId}', function($categoryId = null) {
 
 $router->get('/course/{courseId}/checkout', function($courseId = null) {
     require_once '__init.php';
+    if (function_exists('opcache_invalidate')) {
+        @opcache_invalidate(__DIR__ . '/views/public/checkout.php', true);
+        @opcache_invalidate(__DIR__ . '/inc/PublicCourse.php', true);
+    }
     @include('views/public/checkout.php');
 });
 
 $router->get('/course/{courseId}', function($courseId = null) {
     require_once '__init.php';
+    if (function_exists('opcache_invalidate')) {
+        @opcache_invalidate(__DIR__ . '/views/public/course.php', true);
+        @opcache_invalidate(__DIR__ . '/inc/PublicCourse.php', true);
+    }
     @include("views/public/course.php");
 });
 
