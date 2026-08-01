@@ -439,6 +439,7 @@ function item_generate_assignment_id(mysqli $conn)
 function item_save_classified_assignment(mysqli $conn, $course_id, $title, $description, $due_date, $file_path, array $academic_metadata, array $score_mode)
 {
     $assignment_id = item_post('existing_assignment_id');
+    $edited_item_id = item_post('item_id');
     $section_id = item_post('section_id');
     $section_id = $section_id === '__general__' ? '' : $section_id;
     $homework_type = item_post('assignment_homework_type', 'classified_assignment');
@@ -506,13 +507,19 @@ function item_save_classified_assignment(mysqli $conn, $course_id, $title, $desc
     ];
 
     if ($assignment_id !== '') {
-        $check_stmt = $conn->prepare('SELECT assignment_id FROM assignments WHERE assignment_id = ? AND course_id = ? LIMIT 1');
+        $check_stmt = $conn->prepare('SELECT assignment_id, item_id FROM assignments WHERE assignment_id = ? AND course_id = ? LIMIT 1');
         $check_stmt->bind_param('ss', $assignment_id, $course_id);
         $check_stmt->execute();
-        $exists = $check_stmt->get_result()->num_rows > 0;
+        $existing = $check_stmt->get_result()->fetch_assoc();
         $check_stmt->close();
 
-        if ($exists) {
+        // A duplicated lesson may still post the source lesson's assignment.
+        // Never move or overwrite that source assignment; create a new one.
+        $owned_by_this_item = !$existing
+            ? false
+            : trim((string) ($existing['item_id'] ?? '')) === ''
+                || ($edited_item_id !== '' && trim((string) $existing['item_id']) === $edited_item_id);
+        if ($owned_by_this_item) {
             $assignment_values[] = $assignment_id;
             $stmt = item_bind_and_execute(
                 $conn,

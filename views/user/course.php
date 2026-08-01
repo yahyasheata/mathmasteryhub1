@@ -351,13 +351,14 @@ if ($coures_result && mysqli_num_rows($coures_result) > 0) {
     $template_data = student_course_template_data($courses_data['template_data'] ?? '');
     $lesson_section_id = !empty($courses_data['section_sid']) ? (string) $courses_data['section_sid'] : '';
     $section_key = $lesson_section_id !== '' ? $lesson_section_id : '__general__';
-    $raw_lesson_assignment_id = trim((string) ($courses_data['assignment_id'] ?? ($template_data['assignment_id'] ?? '')));
+    $raw_lesson_assignment_id = mmh_course_assignment_id($courses_data);
     $lesson_assignment_progress = $raw_lesson_assignment_id !== '' ? ($assignment_progress_map[$raw_lesson_assignment_id] ?? null) : null;
     $lesson_requirement_state = mmh_assignment_progress_item_state($assignment_progress_map, (string) ($courses_data['item_id'] ?? ''), $lesson_section_id);
     $resource_resolution = mmh_course_resource_resolve([
       'item_type' => $courses_data['item_type'] ?? '',
       'template_type' => $template_type,
       'template_data' => $courses_data['template_data'] ?? '',
+      'assignment_id' => $courses_data['assignment_id'] ?? '',
       'item_description' => $courses_data['item_description'] ?? '',
       'item_title' => $courses_data['item_title'] ?? '',
       'metadata' => $courses_data['metadata'] ?? '',

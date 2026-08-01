@@ -1,5 +1,6 @@
 <?php
 require_once 'connection/config.php';
+require_once 'inc/CourseAssignmentLinks.php';
 
 header('Content-Type: application/json; charset=utf-8');
 
@@ -241,6 +242,13 @@ try {
             $insert->bind_param('sssssssisissisi', $new_item_id, $item_title, $item_description, $item_type, $section_id, $template_type, $template_data, $duration_minutes, $metadata, $assignment_id, $due_date, $status, $sort_order, $course_id, $page_order);
             if (!$insert->execute()) {
                 throw new RuntimeException($insert->error ?: $conn->error);
+            }
+            $source_assignment_id = mmh_course_assignment_id($lesson);
+            if ($source_assignment_id !== '') {
+                $new_assignment_id = mmh_course_assignment_clone_for_item($conn, $course_id, $source_assignment_id, $new_item_id, $section_id);
+                if ($new_assignment_id !== null) {
+                    mmh_course_assignment_relink_item($conn, $course_id, $new_item_id, $source_assignment_id, $new_assignment_id);
+                }
             }
             $created_ids[] = $new_item_id;
         }

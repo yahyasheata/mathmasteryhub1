@@ -8,6 +8,7 @@
  * same result instead of each inferring "complete" differently.
  */
 require_once __DIR__ . '/learning_schema.php';
+require_once __DIR__ . '/CourseResourceResolver.php';
 
 if (!function_exists('mmh_assignment_progress_id')) {
     function mmh_assignment_progress_id($value, $maxLength = 40)
@@ -198,8 +199,8 @@ if (!function_exists('mmh_assignment_progress_course_sources')) {
                 ON s.course_id = i.course_id
                AND s.section_id = i.section_id
              WHERE i.course_id = ?
-               AND i.status = 'published'
-               AND (i.section_id IS NULL OR i.section_id = '' OR s.status = 'published')
+               AND (i.status IS NULL OR i.status = '' OR i.status = 'published')
+               AND (i.section_id IS NULL OR i.section_id = '' OR s.status IS NULL OR s.status = '' OR s.status = 'published')
              ORDER BY COALESCE(i.page_order, i.sort_order, i.id) ASC, i.id ASC"
         );
         if (!$stmt) {
@@ -227,37 +228,18 @@ if (!function_exists('mmh_assignment_progress_course_sources')) {
                 ];
                 $items[$itemId] = $source;
 
-                $data = mmh_assignment_progress_decode_template_data($item['template_data'] ?? '');
                 $templateType = strtolower(trim((string) ($item['template_type'] ?? '')));
                 $itemType = strtolower(trim((string) ($item['item_type'] ?? '')));
-                $structuredIds = [];
-                foreach ([
-                    $item['assignment_id'] ?? '',
-                    $data['assignment_id'] ?? '',
-                    $data['assignment']['assignment_id'] ?? '',
-                ] as $candidate) {
-                    $assignmentId = mmh_assignment_progress_id($candidate);
-                    if ($assignmentId !== null) {
-                        $structuredIds[$assignmentId] = true;
-                    }
-                }
-
-                $legacyIds = mmh_assignment_progress_legacy_assignment_ids($item['item_description'] ?? '');
+                $assignmentLinks = mmh_course_assignment_links($item);
                 $isAssignmentItem = in_array($templateType, ['classified_assignment', 'assignment', 'homework', 'exam'], true)
                     || in_array($itemType, ['quiz', 'assignment', 'homework'], true)
-                    || !empty($structuredIds)
-                    || !empty($legacyIds);
+                    || !empty($assignmentLinks);
 
                 if (!$isAssignmentItem) {
                     continue;
                 }
 
-                foreach (array_keys($structuredIds) as $assignmentId) {
-                    if (!isset($assignmentSources[$assignmentId])) {
-                        $assignmentSources[$assignmentId] = $source;
-                    }
-                }
-                foreach ($legacyIds as $assignmentId) {
+                foreach (array_keys($assignmentLinks) as $assignmentId) {
                     if (!isset($assignmentSources[$assignmentId])) {
                         $assignmentSources[$assignmentId] = $source;
                     }

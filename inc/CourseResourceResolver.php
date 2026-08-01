@@ -94,6 +94,45 @@ if (!function_exists('mmh_course_resource_template_data')) {
     }
 }
 
+if (!function_exists('mmh_course_assignment_links')) {
+    /**
+     * Return every explicit, supported assignment relationship on a course
+     * item. Arbitrary numbers in prose are deliberately ignored.
+     */
+    function mmh_course_assignment_links(array $item): array
+    {
+        $data = mmh_course_resource_template_data($item['template_data'] ?? '');
+        $candidates = [
+            'course_items.assignment_id' => $item['assignment_id'] ?? '',
+            'template_data.assignment_id' => $data['assignment_id'] ?? '',
+            'template_data.assignment.assignment_id' => $data['assignment']['assignment_id'] ?? '',
+            'template_data.homework_resource.assignment_id' => $data['homework_resource']['assignment_id'] ?? '',
+            'template_data.resource.assignment_id' => $data['resource']['assignment_id'] ?? '',
+        ];
+        $links = [];
+        foreach ($candidates as $source => $candidate) {
+            $candidate = trim((string) $candidate);
+            if ($candidate !== '' && strlen($candidate) <= 40 && preg_match('/\A[A-Za-z0-9_-]+\z/', $candidate)) {
+                $links[$candidate][] = $source;
+            }
+        }
+        if (preg_match_all('/\bdata-assignment-id\s*=\s*(["\'])\s*([A-Za-z0-9_-]{1,40})\s*\1/i', (string) ($item['item_description'] ?? ''), $matches)) {
+            foreach ($matches[2] as $candidate) {
+                $links[(string) $candidate][] = 'legacy_html.data-assignment-id';
+            }
+        }
+        return $links;
+    }
+}
+
+if (!function_exists('mmh_course_assignment_id')) {
+    function mmh_course_assignment_id(array $item): string
+    {
+        $links = mmh_course_assignment_links($item);
+        return $links ? (string) array_key_first($links) : '';
+    }
+}
+
 if (!function_exists('mmh_course_item_is_notes')) {
     /**
      * Semantic Notes check shared by legacy and structured course-item views.
@@ -517,12 +556,9 @@ if (!function_exists('mmh_course_resource_resolve_core')) {
         // records already carry this relationship in structured fields; older
         // assignment cards are adapted conservatively without modifying their
         // original HTML or treating arbitrary quiz content as homework.
-        $assignmentId = trim((string) ($item['assignment_id'] ?? $data['assignment_id'] ?? ''));
+        $assignmentId = mmh_course_assignment_id($item);
         $homeworkData = is_array($data['homework_resource'] ?? null) ? $data['homework_resource'] : [];
         $homeworkUrl = mmh_course_resource_safe_url($homeworkData['url'] ?? $data['url'] ?? $data['assignment_drive_url'] ?? '');
-        if ($assignmentId === '' && preg_match('/\bdata-assignment-id\s*=\s*(["\'])\s*([A-Za-z0-9_-]{1,40})\s*\1/i', (string) ($item['item_description'] ?? ''), $assignmentMatch)) {
-            $assignmentId = (string) $assignmentMatch[2];
-        }
         if ($homeworkUrl === null && preg_match_all('/<a\b[^>]*\bhref\s*=\s*(["\'])(.*?)\1[^>]*>/is', (string) ($item['item_description'] ?? ''), $homeworkLinks)) {
             foreach ($homeworkLinks[2] as $candidate) {
                 $candidate = mmh_course_resource_safe_url(html_entity_decode((string) $candidate, ENT_QUOTES, 'UTF-8'));
