@@ -193,7 +193,9 @@ if (!function_exists('mmh_assignment_progress_course_sources')) {
 
         $stmt = $conn->prepare(
             "SELECT i.id, i.item_id, i.item_title, i.item_description, i.course_id, i.section_id, i.item_type,
-                    i.template_type, i.template_data, i.assignment_id, i.due_date, i.page_order, i.sort_order
+                    i.template_type, i.template_data, i.assignment_id, i.due_date, i.page_order, i.sort_order,
+                    s.title AS section_title, s.sort_order AS section_sort_order,
+                    i.sort_order AS item_sort_order
              FROM course_items AS i
              LEFT JOIN course_sections AS s
                 ON s.course_id = i.course_id
@@ -201,7 +203,9 @@ if (!function_exists('mmh_assignment_progress_course_sources')) {
              WHERE i.course_id = ?
                AND (i.status IS NULL OR i.status = '' OR i.status = 'published')
                AND (i.section_id IS NULL OR i.section_id = '' OR s.status IS NULL OR s.status = '' OR s.status = 'published')
-             ORDER BY COALESCE(i.page_order, i.sort_order, i.id) ASC, i.id ASC"
+             ORDER BY COALESCE(s.sort_order, 2147483647) ASC,
+                      COALESCE(i.sort_order, i.page_order, i.id) ASC,
+                      i.id ASC"
         );
         if (!$stmt) {
             return ['items' => [], 'assignments' => []];
@@ -222,8 +226,10 @@ if (!function_exists('mmh_assignment_progress_course_sources')) {
                     'item_id' => $itemId,
                     'section_id' => mmh_assignment_progress_section_id($item['section_id'] ?? '') ?? '',
                     'item_title' => (string) ($item['item_title'] ?? ''),
+                    'section_title' => (string) ($item['section_title'] ?? ''),
+                    'section_sort_order' => (int) ($item['section_sort_order'] ?? PHP_INT_MAX),
                     'due_date' => (string) ($item['due_date'] ?? ''),
-                    'page_order' => (int) ($item['page_order'] ?? $item['sort_order'] ?? $item['id'] ?? 0),
+                    'item_sort_order' => (int) ($item['item_sort_order'] ?? $item['sort_order'] ?? $item['page_order'] ?? $item['id'] ?? PHP_INT_MAX),
                     'row_id' => (int) ($item['id'] ?? 0),
                 ];
                 $items[$itemId] = $source;
@@ -422,7 +428,7 @@ if (!function_exists('mmh_assignment_progress_load_course')) {
                     a.require_teacher_verification, a.completion_requirement, a.completion_rule, a.minimum_score, a.id
              FROM assignments AS a
              WHERE a.course_id = ?
-             ORDER BY a.due_date ASC, a.id ASC"
+             ORDER BY a.id ASC"
         );
         if (!$stmt) {
             return [];
@@ -453,6 +459,10 @@ if (!function_exists('mmh_assignment_progress_load_course')) {
                 $row['_source_item_id'] = $source['item_id'];
                 $row['_source_section_id'] = $source['section_id'];
                 $row['_source_item_title'] = $source['item_title'];
+                $row['_source_section_title'] = $source['section_title'];
+                $row['_section_sort_order'] = $source['section_sort_order'];
+                $row['_item_sort_order'] = $source['item_sort_order'];
+                $row['_source_row_id'] = $source['row_id'];
                 unset($row['id']);
                 $assignments[$assignmentId] = $row;
             }
@@ -464,6 +474,16 @@ if (!function_exists('mmh_assignment_progress_load_course')) {
             $assignment['_state'] = mmh_assignment_progress_evaluate($assignment, $assignment['_submission']);
         }
         unset($assignment);
+        // The course structure is authoritative. Assignment state and due
+        // date must never change the pedagogical order of the list.
+        uksort($assignments, static function ($a, $b) use (&$assignments) {
+            $left = $assignments[$a];
+            $right = $assignments[$b];
+            return ((int) ($left['_section_sort_order'] ?? PHP_INT_MAX) <=> (int) ($right['_section_sort_order'] ?? PHP_INT_MAX))
+                ?: ((int) ($left['_item_sort_order'] ?? PHP_INT_MAX) <=> (int) ($right['_item_sort_order'] ?? PHP_INT_MAX))
+                ?: ((int) ($left['_source_row_id'] ?? PHP_INT_MAX) <=> (int) ($right['_source_row_id'] ?? PHP_INT_MAX))
+                ?: strcmp((string) $a, (string) $b);
+        });
         return $assignments;
     }
 }

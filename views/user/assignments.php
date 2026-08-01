@@ -5,6 +5,13 @@ require_once 'inc/functions.php';
 require_once 'inc/learning_schema.php';
 require_once 'inc/AssignmentProgress.php';
 
+// This page is user-specific and must never be served from a shared edge or
+// browser cache. A stale cached response can otherwise outlive repaired
+// course relationships and display an old assignment count.
+header('Cache-Control: private, no-store, no-cache, must-revalidate, max-age=0');
+header('Pragma: no-cache');
+header('Expires: 0');
+
 $pageName = 'assignments';
 $username = $_SESSION['username'] ?? '';
 $userInfo = getUserInfo($username);
@@ -42,13 +49,6 @@ foreach ($courseRows as $course) {
         $assignmentRows[] = $assignment;
     }
 }
-usort($assignmentRows, function ($a, $b) {
-    $priority = ['overdue' => 0, 'legacy_late' => 1, 'needs_revision' => 1, 'due_soon' => 2, 'awaiting_review' => 3, 'not_started' => 4, 'submitted' => 5, 'approved' => 6, 'optional_completed' => 7];
-    $aState = $a['_state']['state'] ?? 'not_started';
-    $bState = $b['_state']['state'] ?? 'not_started';
-    $compare = ($priority[$aState] ?? 99) <=> ($priority[$bState] ?? 99);
-    return $compare !== 0 ? $compare : strcmp((string) ($a['due_date'] ?? ''), (string) ($b['due_date'] ?? ''));
-});
 ?>
 <!doctype html>
 <html lang="en" dir="ltr">
@@ -106,6 +106,7 @@ usort($assignmentRows, function ($a, $b) {
                                             <?php if ((($assignment['_submission']['submission_source'] ?? '') === 'legacy_import')): ?><span class="assignment-progress-imported">Imported by Instructor</span><?php endif; ?>
                                         </div>
                                         <p class="assignment-progress-course"><?= student_assignments_html($assignment['course_title']); ?></p>
+                                        <p class="assignment-progress-section"><?= student_assignments_html($assignment['_source_section_title'] ?? 'General'); ?></p>
                                         <p class="assignment-progress-meta"><?= student_assignments_html(mmh_assignment_progress_requirement_label($assignment['completion_requirement'] ?? 'optional')); ?> · <?= student_assignments_html($state['completion_label'] ?? 'Submission required'); ?> · <?= student_assignments_due_label($assignment['due_date'] ?? ''); ?></p>
                                         <p class="assignment-progress-reason"><?= student_assignments_html($state['reason'] ?? ''); ?></p>
                                     </div>
