@@ -9,6 +9,7 @@
  */
 require_once __DIR__ . '/learning_schema.php';
 require_once __DIR__ . '/CourseResourceResolver.php';
+require_once __DIR__ . '/CourseAssignmentLinks.php';
 
 if (!function_exists('mmh_assignment_progress_id')) {
     function mmh_assignment_progress_id($value, $maxLength = 40)
@@ -184,6 +185,64 @@ if (!function_exists('mmh_assignment_progress_legacy_assignment_ids')) {
 }
 
 if (!function_exists('mmh_assignment_progress_course_sources')) {
+    function mmh_assignment_progress_repair_duplicate_sources(mysqli $conn, $courseId, array $items): void
+    {
+        $groups = [];
+        foreach ($items as $item) {
+            $assignmentId = mmh_course_assignment_id($item);
+            $templateType = strtolower(trim((string) ($item['template_type'] ?? '')));
+            $itemType = strtolower(trim((string) ($item['item_type'] ?? '')));
+            if ($assignmentId === '' || !(in_array($templateType, ['classified_assignment', 'assignment', 'homework'], true) || in_array($itemType, ['quiz', 'assignment', 'homework'], true))) {
+                continue;
+            }
+            $groups[$assignmentId][] = $item;
+        }
+        $duplicates = array_filter($groups, static fn(array $group): bool => count($group) > 1);
+        if (!$duplicates) {
+            return;
+        }
+
+        $conn->begin_transaction();
+        try {
+            foreach ($duplicates as $sourceAssignmentId => $group) {
+                $ownerStmt = $conn->prepare('SELECT item_id FROM assignments WHERE assignment_id = ? AND course_id = ? LIMIT 1 FOR UPDATE');
+                $ownerStmt->bind_param('ss', $sourceAssignmentId, $courseId);
+                $ownerStmt->execute();
+                $owner = trim((string) ($ownerStmt->get_result()->fetch_assoc()['item_id'] ?? ''));
+                $ownerStmt->close();
+                $ownerKept = false;
+                foreach ($group as $item) {
+                    $itemId = (string) ($item['item_id'] ?? '');
+                    if ($itemId === '') {
+                        continue;
+                    }
+                    $currentStmt = $conn->prepare('SELECT assignment_id FROM course_items WHERE course_id = ? AND item_id = ? LIMIT 1 FOR UPDATE');
+                    $currentStmt->bind_param('ss', $courseId, $itemId);
+                    $currentStmt->execute();
+                    $currentId = trim((string) ($currentStmt->get_result()->fetch_assoc()['assignment_id'] ?? ''));
+                    $currentStmt->close();
+                    if ($currentId !== $sourceAssignmentId) {
+                        continue;
+                    }
+                    if (($owner !== '' && $itemId === $owner) || ($owner === '' && !$ownerKept)) {
+                        $ownerKept = true;
+                        continue;
+                    }
+                    $sectionId = (string) ($item['section_id'] ?? '');
+                    $newId = mmh_course_assignment_clone_for_item($conn, (string) $courseId, $sourceAssignmentId, $itemId, $sectionId);
+                    if ($newId === null) {
+                        throw new RuntimeException('Unable to clone visible assignment ' . $sourceAssignmentId . '.');
+                    }
+                    mmh_course_assignment_relink_item($conn, (string) $courseId, $itemId, $sourceAssignmentId, $newId);
+                }
+            }
+            $conn->commit();
+        } catch (Throwable $exception) {
+            $conn->rollback();
+            throw $exception;
+        }
+    }
+
     function mmh_assignment_progress_course_sources(mysqli $conn, $courseId)
     {
         $courseId = mmh_assignment_progress_id($courseId);
@@ -213,10 +272,26 @@ if (!function_exists('mmh_assignment_progress_course_sources')) {
 
         $stmt->bind_param('s', $courseId);
         $items = [];
+        $visibleRows = [];
         $assignmentSources = [];
         if ($stmt->execute()) {
             $result = $stmt->get_result();
             while ($item = $result->fetch_assoc()) {
+                $itemId = mmh_assignment_progress_id($item['item_id'] ?? '');
+                if ($itemId === null) {
+                    continue;
+                }
+
+                $visibleRows[] = $item;
+            }
+        }
+        $stmt->close();
+
+        // Production courses may contain copied homework cards that still
+        // point at the source assignment. Repair those relationships from the
+        // visible course structure before building the student list.
+        mmh_assignment_progress_repair_duplicate_sources($conn, $courseId, $visibleRows);
+        foreach ($visibleRows as $item) {
                 $itemId = mmh_assignment_progress_id($item['item_id'] ?? '');
                 if ($itemId === null) {
                     continue;
@@ -250,9 +325,7 @@ if (!function_exists('mmh_assignment_progress_course_sources')) {
                         $assignmentSources[$assignmentId] = $source;
                     }
                 }
-            }
         }
-        $stmt->close();
 
         return ['items' => $items, 'assignments' => $assignmentSources];
     }
