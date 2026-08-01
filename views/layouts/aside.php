@@ -64,7 +64,7 @@
 </div>
                             </div>
                             <div class="col-12 d-flex border-top ds-border-top"> 
-                                <a href="<?=$baseUrl?>/resources/dashboard/notifications" class="d-block py-2 px-3 ">
+                                <a href="<?=$baseUrl?>/user/notifications" class="d-block py-2 px-3 ">
                                     <div class="col-12 align-items-center">
                                       <span class="fas fa-bell"></span> View All Notifications
                                     </div>
@@ -84,7 +84,7 @@
 
                                 <li><a class="dropdown-item font-1" href="<?=$baseUrl?>/resources/dashboard/profile/settings"><span class="fas fa-wrench font-1" style="width: 20px;"></span> Settings</a></li>
 
-                                <li><a class="dropdown-item font-1" href="<?=$baseUrl?>/resources/dashboard/notifications"><span class="fas fa-bell font-1" style="width: 20px;"></span> Notifications</a></li> 
+                                <li><a class="dropdown-item font-1" href="<?=$baseUrl?>/user/notifications"><span class="fas fa-bell font-1" style="width: 20px;"></span> Notifications</a></li>
                            
                                 <li><hr style="height: 1px;margin: 10px 0px 5px;"></li>
                                 <li><a class="dropdown-item font-1"  onclick="document.getElementById('logout-form').submit();" style="cursor:pointer;"><span class="fas fa-sign-out-alt font-1" style="width: 20px;"></span> Logout</a></li>
