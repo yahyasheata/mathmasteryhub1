@@ -42,7 +42,10 @@ if (!function_exists('mmh_public_course_enrolled')) {
 if (!function_exists('mmh_public_course_url')) {
     function mmh_public_course_url(string $baseUrl, array $course, string $suffix = ''): string
     {
-        $identifier = (string) ($course['id'] ?? $course['course_id'] ?? '');
+        // Public course previews join course_items/course_logs with SELECT *;
+        // their duplicate `id` columns can overwrite courses.id. Prefer the
+        // explicit courses.id alias emitted by that query.
+        $identifier = (string) ($course['cid'] ?? $course['id'] ?? $course['course_id'] ?? '');
         return rtrim($baseUrl, '/') . '/course/' . rawurlencode($identifier) . $suffix;
     }
 }

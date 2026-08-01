@@ -20,8 +20,8 @@ if (!function_exists('mmh_site_settings_defaults')) {
             'phone' => '',
             'phone2' => '',
             'whatsapp_phone' => '',
-            'instapay_number' => '',
-            'vodafone_cash_number' => '',
+            'instapay_number' => '01062688166',
+            'vodafone_cash_number' => '01062688166',
             'facebook_link' => '',
             'instagram_link' => '',
             'youtube_link' => '',
@@ -118,6 +118,9 @@ if (!function_exists('mmh_site_settings')) {
             if ($key !== '') {
                 $settings[$key] = (string) ($row['value'] ?? '');
             }
+        }
+        foreach (['instapay_number' => '01062688166', 'vodafone_cash_number' => '01062688166'] as $key => $default) {
+            if (trim((string) ($settings[$key] ?? '')) === '') $settings[$key] = $default;
         }
         return $settings;
     }
