@@ -248,6 +248,16 @@ $router->mount('/user', function() use ($router) {
         include('views/user/requests/open-course-resource.php');
     });
 
+    $router->get('/course/{courseId}/recovery-plan/{planId}', function($courseId, $planId) {
+        global $baseUrl;
+        require_once '__init.php';
+        if (!isset($_SESSION['username'])) {
+            header("Location: {$baseUrl}/auth/login");
+            exit();
+        }
+        include('views/user/recovery-plan.php');
+    });
+
     $router->get('/{pageName}/{courseId}?', function($pageName, $courseId = null) {
         global $baseUrl;
         require_once '__init.php';

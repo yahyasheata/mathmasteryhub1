@@ -26,6 +26,36 @@ if (!function_exists('mmh_recovery_plan_active_key')) {
     }
 }
 
+if (!function_exists('mmh_recovery_plan_coverage_available')) {
+    function mmh_recovery_plan_coverage_available(mysqli $conn): bool
+    {
+        static $available = null;
+        if ($available !== null) return $available;
+        $stmt = $conn->prepare("SELECT COUNT(*) AS total FROM INFORMATION_SCHEMA.TABLES WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'recovery_plan_item_coverage'");
+        if (!$stmt) return $available = false;
+        $stmt->execute();
+        $available = (int) (($stmt->get_result()->fetch_assoc()['total'] ?? 0)) > 0;
+        $stmt->close();
+        return $available;
+    }
+}
+
+if (!function_exists('mmh_recovery_plan_workspace_url')) {
+    function mmh_recovery_plan_workspace_url(string $baseUrl, string $courseId, int $planId, ?int $taskId = null): string
+    {
+        $url = rtrim($baseUrl, '/') . '/user/course/' . rawurlencode($courseId) . '/recovery-plan/' . $planId;
+        return $taskId !== null && $taskId > 0 ? $url . '?task=' . $taskId : $url;
+    }
+}
+
+if (!function_exists('mmh_recovery_plan_resource_url')) {
+    function mmh_recovery_plan_resource_url(string $baseUrl, string $courseId, string $itemId, int $planId, int $taskId): string
+    {
+        return rtrim($baseUrl, '/') . '/user/course/resource/' . rawurlencode($courseId) . '/' . rawurlencode($itemId)
+            . '?recovery_plan=' . $planId . '&recovery_task=' . $taskId;
+    }
+}
+
 if (!function_exists('mmh_recovery_plan_item_label')) {
     function mmh_recovery_plan_item_label(array $item): string
     {
@@ -63,6 +93,20 @@ if (!function_exists('mmh_recovery_plan_load')) {
         $itemStmt->execute();
         $plan['items'] = $itemStmt->get_result()->fetch_all(MYSQLI_ASSOC);
         $itemStmt->close();
+        foreach ($plan['items'] as &$planItem) {
+            $planItem['coverage'] = [];
+            if (mmh_recovery_plan_coverage_available($conn)) {
+                $coverageStmt = $conn->prepare('SELECT id, coverage_type, covered_item_id, covered_section_id, topic_label FROM recovery_plan_item_coverage WHERE plan_item_id = ? ORDER BY id ASC');
+                if ($coverageStmt) {
+                    $planItemId = (int) $planItem['id'];
+                    $coverageStmt->bind_param('i', $planItemId);
+                    $coverageStmt->execute();
+                    $planItem['coverage'] = $coverageStmt->get_result()->fetch_all(MYSQLI_ASSOC);
+                    $coverageStmt->close();
+                }
+            }
+        }
+        unset($planItem);
         return $plan;
     }
 }
@@ -88,6 +132,7 @@ if (!function_exists('mmh_recovery_plan_sync')) {
         $journeyByItem = [];
         foreach ($journey['items'] ?? [] as $item) $journeyByItem[(string) ($item['item_id'] ?? '')] = $item;
         $requiredTotal = 0; $requiredCompleted = 0; $total = count($plan['items'] ?? []); $completed = 0; $locked = false;
+        $coveredItems = []; $coveredSections = []; $coveredTopics = [];
         foreach ($plan['items'] as &$task) {
             $item = $journeyByItem[(string) ($task['item_id'] ?? '')] ?? null;
             $task['journey_item'] = $item;
@@ -95,11 +140,22 @@ if (!function_exists('mmh_recovery_plan_sync')) {
             $task['completion_source'] = (string) ($item['evidence_source'] ?? '');
             $task['is_locked'] = !empty($task['locked_until_previous']) && $locked;
             if ($task['is_completed']) $completed++;
+            $task['covered'] = [];
+            if ($task['is_completed']) {
+                foreach (($task['coverage'] ?? []) as $coverage) {
+                    $task['covered'][] = $coverage;
+                    if (($coverage['covered_item_id'] ?? '') !== '') $coveredItems[(string) $coverage['covered_item_id']] = true;
+                    if (($coverage['covered_section_id'] ?? '') !== '') $coveredSections[(string) $coverage['covered_section_id']] = true;
+                    if (($coverage['topic_label'] ?? '') !== '') $coveredTopics[(string) $coverage['topic_label']] = true;
+                }
+            }
             if (!empty($task['is_required'])) { $requiredTotal++; if ($task['is_completed']) $requiredCompleted++; }
             if (!$task['is_completed']) $locked = true;
         }
         unset($task);
         $plan['total'] = $total; $plan['completed'] = $completed; $plan['required_total'] = $requiredTotal; $plan['required_completed'] = $requiredCompleted;
+        $plan['covered_item_ids'] = array_keys($coveredItems); $plan['covered_section_ids'] = array_keys($coveredSections); $plan['covered_topics'] = array_keys($coveredTopics);
+        $plan['coverage_total'] = count($coveredItems) + count($coveredSections) + count($coveredTopics);
         if ($plan['status'] === 'active' && $requiredTotal > 0 && $requiredCompleted === $requiredTotal) {
             $planId = (int) $plan['id'];
             $stmt = $conn->prepare("UPDATE recovery_plans SET status = 'completed', active_key = NULL, completed_at = COALESCE(completed_at, CURRENT_TIMESTAMP), completion_notified_at = COALESCE(completion_notified_at, CURRENT_TIMESTAMP), updated_at = CURRENT_TIMESTAMP WHERE id = ? AND status = 'active' AND completion_notified_at IS NULL");
@@ -131,5 +187,31 @@ if (!function_exists('mmh_recovery_plan_resolve')) {
     {
         $plan = mmh_recovery_plan_load($conn, $studentId, $courseId);
         return $plan ? mmh_recovery_plan_sync($conn, $plan, $studentId, $courseId) : null;
+    }
+}
+
+if (!function_exists('mmh_recovery_plan_task_context')) {
+    function mmh_recovery_plan_task_context(array $plan, int $taskId): array
+    {
+        $items = array_values($plan['items'] ?? []);
+        $index = null;
+        foreach ($items as $i => $item) {
+            if ((int) ($item['id'] ?? 0) === $taskId) { $index = $i; break; }
+        }
+        if ($index === null) return ['current' => null, 'previous' => null, 'next' => null, 'position' => 0, 'total' => count($items), 'finish' => false];
+        $current = $items[$index];
+        $previous = $index > 0 ? $items[$index - 1] : null;
+        $lastRequired = -1; foreach ($items as $i => $candidate) if (!empty($candidate['is_required'])) $lastRequired = $i;
+        $next = ($lastRequired >= 0 && $index >= $lastRequired) ? null : ($index < count($items) - 1 ? $items[$index + 1] : null);
+        return ['current' => $current, 'previous' => $previous, 'next' => $next, 'position' => $index + 1, 'total' => count($items), 'finish' => $next === null && !empty($current['is_required'])];
+    }
+}
+
+if (!function_exists('mmh_recovery_plan_covers_item')) {
+    function mmh_recovery_plan_covers_item(?array $plan, string $itemId, string $sectionId = ''): bool
+    {
+        if (!$plan) return false;
+        if (in_array($itemId, array_map('strval', $plan['covered_item_ids'] ?? []), true)) return true;
+        return $sectionId !== '' && in_array($sectionId, array_map('strval', $plan['covered_section_ids'] ?? []), true);
     }
 }

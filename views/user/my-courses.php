@@ -135,6 +135,7 @@ foreach ($enrolledCourses as $course) {
     $journey = mmh_learning_journey_resolve($conn, $userId, $courseId);
     $recoveryPlan = mmh_recovery_plan_resolve($conn, $userId, $courseId);
     $assignmentMap = mmh_assignment_progress_load_course($conn, $userId, $courseId);
+    $recoveredItemIds = array_map('strval', is_array($recoveryPlan) ? ($recoveryPlan['covered_item_ids'] ?? []) : []);
     $journeyItems = $journey['items'] ?? [];
 
     $lessonItems = array_values(array_filter($journeyItems, static fn($item) => ($item['item_kind'] ?? '') === 'lesson'));
@@ -148,13 +149,15 @@ foreach ($enrolledCourses as $course) {
     foreach ($assignmentMap as $assignment) {
         $state = $assignment['_state'] ?? [];
         if (!empty($state['complete'])) $completedHomework++;
-        if ($unfinishedHomework === null && empty($state['complete'])) $unfinishedHomework = $assignment;
-        if (($state['state'] ?? '') === 'overdue' || !empty($state['overdue'])) $overdueHomework[] = $assignment;
+        $assignmentItemId = (string) ($assignment['item_id'] ?? ($assignment['_source_item_id'] ?? ''));
+        $coveredByPlan = in_array($assignmentItemId, $recoveredItemIds, true);
+        if ($unfinishedHomework === null && empty($state['complete']) && !$coveredByPlan) $unfinishedHomework = $assignment;
+        if (($state['state'] ?? '') === 'overdue' || !empty($state['overdue'])) if (!$coveredByPlan) $overdueHomework[] = $assignment;
     }
     if (!$assignmentMap && $homeworkItems) {
         $completedHomework = count(array_filter($homeworkItems, static fn($item) => !empty($item['is_completed'])));
         foreach ($homeworkItems as $homework) {
-            if (empty($homework['is_completed'])) {
+            if (empty($homework['is_completed']) && !mmh_recovery_plan_covers_item($recoveryPlan, (string) ($homework['item_id'] ?? ''), (string) ($homework['section_id'] ?? ''))) {
                 $unfinishedHomework = $homework;
                 break;
             }
@@ -179,7 +182,7 @@ foreach ($enrolledCourses as $course) {
     $progressPercent = $journey['percentage'] ?? null;
     $unfinishedHomeworkId = $unfinishedHomework['item_id'] ?? ($unfinishedHomework['_source_item_id'] ?? '');
     $liveToday = $nextSession && student_courses_local_date($nextSession) === (new DateTimeImmutable('now', mmh_live_timezone($nextSession['timezone'] ?? 'Asia/Riyadh')))->format('Y-m-d');
-    $recordingAvailable = (bool) array_filter($recordingItems, static fn($item) => empty($item['is_completed']));
+    $recordingAvailable = (bool) array_filter($recordingItems, static fn($item) => empty($item['is_completed']) && !mmh_recovery_plan_covers_item($recoveryPlan, (string) ($item['item_id'] ?? ''), (string) ($item['section_id'] ?? '')));
     $courseCards[] = [
         'course' => $course,
         'course_id' => $courseId,
@@ -278,7 +281,7 @@ foreach ($enrolledCourses as $course) {
                                             <div class="student-recovery-plan-complete"><span class="fas fa-check-circle" aria-hidden="true"></span><div><strong>Recovery Plan complete</strong><small>Recovered through Study Plan</small></div></div>
                                         <?php else: ?>
                                             <div class="student-recovery-plan-heading"><div><span class="fas fa-route" aria-hidden="true"></span><strong>Recovery Plan</strong></div><span><?= (int) ($recoveryPlan['completed'] ?? 0) ?> / <?= (int) ($recoveryPlan['total'] ?? 0) ?> tasks</span></div>
-                                            <?php if ($recoveryTask): ?><div class="student-recovery-plan-next"><div><strong><?= student_courses_html($recoveryTask['item_title'] ?? 'Next recovery task'); ?></strong><small><?= student_courses_html($recoveryTask['teacher_note'] ?? 'Priority task') ?></small></div><a class="student-dashboard-btn primary" href="<?= student_courses_html(rtrim((string) $baseUrl, '/') . '/user/course/resource/' . rawurlencode($card['course_id']) . '/' . rawurlencode((string) $recoveryTask['item_id'])); ?>">Continue</a></div><?php endif; ?>
+                                            <?php if ($recoveryTask): ?><div class="student-recovery-plan-next"><div><strong><?= student_courses_html($recoveryTask['item_title'] ?? 'Next recovery task'); ?></strong><small><?= student_courses_html($recoveryTask['teacher_note'] ?? 'Priority task') ?></small></div><a class="student-dashboard-btn primary" href="<?= student_courses_html(mmh_recovery_plan_workspace_url(rtrim((string) $baseUrl, '/'), (string) $card['course_id'], (int) ($recoveryPlan['id'] ?? 0), (int) ($recoveryTask['id'] ?? 0))); ?>">Continue</a></div><?php endif; ?>
                                         <?php endif; ?>
                                     </section>
                                 <?php endif; ?>

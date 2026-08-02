@@ -53,12 +53,18 @@ try {
         $newId = (int) $stmt->insert_id; $stmt->close();
         $insert = $conn->prepare('INSERT INTO recovery_plan_items (plan_id, course_id, item_id, assignment_id, sort_order, is_required, teacher_note, estimated_duration, weight, locked_until_previous) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)');
         if (!$insert) throw new RuntimeException('Unable to duplicate Recovery Plan items.');
+        $coverageInsert = mmh_recovery_plan_coverage_available($conn) ? $conn->prepare('INSERT INTO recovery_plan_item_coverage (plan_item_id, course_id, coverage_type, covered_item_id, covered_section_id, topic_label) VALUES (?, ?, ?, ?, ?, ?)') : null;
         foreach ($plan['items'] as $item) {
             $itemId = (string) $item['item_id']; $assignmentId = (string) ($item['assignment_id'] ?? ''); $sort = (int) $item['sort_order']; $required = (int) $item['is_required']; $note = (string) ($item['teacher_note'] ?? ''); $duration = $item['estimated_duration'] === null ? null : (int) $item['estimated_duration']; $weight = $item['weight'] === null ? null : (float) $item['weight']; $locked = (int) $item['locked_until_previous'];
             $insert->bind_param('isssiisidi', $newId, $courseId, $itemId, $assignmentId, $sort, $required, $note, $duration, $weight, $locked);
             if (!$insert->execute()) throw new RuntimeException('Unable to duplicate Recovery Plan item.');
+            $newItemId = (int) $conn->insert_id;
+            if ($coverageInsert) foreach (($item['coverage'] ?? []) as $coverage) {
+                $type = (string) ($coverage['coverage_type'] ?? 'item'); $coveredItem = ($coverage['covered_item_id'] ?? '') !== '' ? (string) $coverage['covered_item_id'] : null; $coveredSection = ($coverage['covered_section_id'] ?? '') !== '' ? (string) $coverage['covered_section_id'] : null; $topic = ($coverage['topic_label'] ?? '') !== '' ? (string) $coverage['topic_label'] : null;
+                $coverageInsert->bind_param('isssss', $newItemId, $courseId, $type, $coveredItem, $coveredSection, $topic); if (!$coverageInsert->execute()) throw new RuntimeException('Unable to duplicate Recovery Plan coverage.');
+            }
         }
-        $insert->close(); $conn->commit(); $flash(true, 'Recovery Plan duplicated as a draft.', $newId);
+        $insert->close(); if ($coverageInsert) $coverageInsert->close(); $conn->commit(); $flash(true, 'Recovery Plan duplicated as a draft.', $newId);
     }
     if ($action === 'activate' || $action === 'reopen') {
         $conn->begin_transaction(); $activeKey = mmh_recovery_plan_active_key($studentId, $courseId);
@@ -69,6 +75,24 @@ try {
         if (!$stmt) throw new RuntimeException('Unable to activate Recovery Plan.');
         $stmt->bind_param('siis', $activeKey, $planId, $studentId, $courseId); if (!$stmt->execute()) throw new RuntimeException('Unable to activate Recovery Plan.');
         $stmt->close(); $conn->commit(); $flash(true, 'Recovery Plan is active.', $planId);
+    }
+    if ($action === 'save_coverage') {
+        if (!mmh_recovery_plan_coverage_available($conn)) throw new RuntimeException('Coverage migration is not available yet.');
+        $coverage = $_POST['coverage'] ?? []; if (!is_array($coverage)) $coverage = [];
+        $allowedSections = []; foreach ($items as $item) { $sid = trim((string) ($item['section_id'] ?? '')); if ($sid !== '') $allowedSections[$sid] = true; }
+        $conn->begin_transaction();
+        $deleteCoverage = $conn->prepare('DELETE FROM recovery_plan_item_coverage WHERE plan_item_id IN (SELECT id FROM recovery_plan_items WHERE plan_id = ?)'); if (!$deleteCoverage) throw new RuntimeException('Unable to replace coverage mappings.'); $deleteCoverage->bind_param('i', $planId); $deleteCoverage->execute(); $deleteCoverage->close();
+        $coverageInsert = $conn->prepare('INSERT INTO recovery_plan_item_coverage (plan_item_id, course_id, coverage_type, covered_item_id, covered_section_id, topic_label) VALUES (?, ?, ?, ?, ?, ?)'); if (!$coverageInsert) throw new RuntimeException('Unable to save coverage mappings.');
+        $taskIds = []; foreach ($plan['items'] as $planItem) $taskIds[(int) $planItem['id']] = true;
+        foreach ($coverage as $taskIdRaw => $mapping) {
+            $taskId = (int) $taskIdRaw; if (!$taskId || !isset($taskIds[$taskId]) || !is_array($mapping)) continue;
+            $insertCoverage = static function($type, $itemId, $sectionId, $topic) use ($coverageInsert, $taskId, $courseId): void { $type = (string) $type; $itemId = $itemId !== '' ? (string) $itemId : null; $sectionId = $sectionId !== '' ? (string) $sectionId : null; $topic = $topic !== '' ? mb_substr((string) $topic, 0, 255) : null; $coverageInsert->bind_param('isssss', $taskId, $courseId, $type, $itemId, $sectionId, $topic); if (!$coverageInsert->execute()) throw new RuntimeException('Unable to save coverage mapping.'); };
+            foreach ((array) ($mapping['items'] ?? []) as $targetItem) { $targetItem = trim((string) $targetItem); if ($targetItem !== '' && isset($allowed[$targetItem])) $insertCoverage('item', $targetItem, '', ''); }
+            foreach ((array) ($mapping['sections'] ?? []) as $targetSection) { $targetSection = trim((string) $targetSection); if ($targetSection !== '' && isset($allowedSections[$targetSection])) $insertCoverage('section', '', $targetSection, ''); }
+            foreach ((array) ($mapping['types'] ?? []) as $type) if (in_array($type, ['homework_requirement','recording_requirement'], true)) $insertCoverage($type, '', '', '');
+            $topic = trim((string) ($mapping['topic'] ?? '')); if ($topic !== '') $insertCoverage('topic', '', '', $topic);
+        }
+        $coverageInsert->close(); $conn->commit(); $flash(true, 'Learning coverage mappings saved.', $planId);
     }
     if ($action !== 'save') throw new InvalidArgumentException('Unsupported Recovery Plan action.');
     if ($plan['status'] === 'archived') throw new InvalidArgumentException('Archived plans cannot be edited. Duplicate or reopen the plan first.');
