@@ -192,6 +192,13 @@ function isActive($page)
                 </div>
             </a>
 
+            <a href="recovery-plan" class="col-12 px-0 <?= (($subPageName ?? '') == 'recovery_plan') ? 'active' : ''; ?>">
+                <div class="col-12 item-container px-0 d-flex <?= (($subPageName ?? '') == 'recovery_plan') ? 'active' : ''; ?>">
+                    <div style="width: 50px" class="px-3 text-center"><span class="fas fa-route font-2 ds-nav-icon" aria-hidden="true"></span></div>
+                    <div style="width: calc(100% - 50px)" class="px-2 item-container-title">Recovery Plans</div>
+                </div>
+            </a>
+
             <a href="settings" class="col-12 px-0 <?= ($pageName == 'settings') ? 'active' : ''; ?>">
                 <div class="col-12 item-container px-0 d-flex <?= ($pageName == 'settings') ? 'active' : ''; ?>">
                     <div style="width: 50px" class="px-3 text-center">

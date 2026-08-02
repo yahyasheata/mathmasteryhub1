@@ -6,6 +6,7 @@ require_once 'inc/LiveSessions.php';
 require_once 'inc/StudentCourseAccess.php';
 require_once 'inc/AssignmentProgress.php';
 require_once 'inc/StudentLearningJourney.php';
+require_once 'inc/RecoveryPlan.php';
 
 $pageName = 'mycourses';
 $username = (string) ($_SESSION['username'] ?? '');
@@ -132,6 +133,7 @@ foreach ($enrolledCourses as $course) {
     if ($courseId === '') continue;
 
     $journey = mmh_learning_journey_resolve($conn, $userId, $courseId);
+    $recoveryPlan = mmh_recovery_plan_resolve($conn, $userId, $courseId);
     $assignmentMap = mmh_assignment_progress_load_course($conn, $userId, $courseId);
     $journeyItems = $journey['items'] ?? [];
 
@@ -184,6 +186,7 @@ foreach ($enrolledCourses as $course) {
         'course_route_id' => $courseRouteId,
         'course_image' => $courseImage,
         'journey' => $journey,
+        'recovery_plan' => $recoveryPlan,
         'assignment_map' => $assignmentMap,
         'lesson_total' => count($lessonItems),
         'lesson_completed' => $completedLessons,
@@ -243,6 +246,11 @@ foreach ($enrolledCourses as $course) {
                         $nextLearning = $card['next_learning'];
                         $continueLink = student_courses_item_link($baseUrl, $card['course_route_id'], $nextLearning['item_id'] ?? '');
                         $homeworkLink = student_courses_item_link($baseUrl, $card['course_route_id'], $card['unfinished_homework_id']);
+                        $recoveryPlan = $card['recovery_plan'];
+                        $recoveryTask = null;
+                        foreach (($recoveryPlan['items'] ?? []) as $candidateTask) {
+                            if (empty($candidateTask['is_completed']) && empty($candidateTask['is_locked'])) { $recoveryTask = $candidateTask; break; }
+                        }
                         $progressText = $card['progress_percent'] === null ? 'No progress data yet' : $card['progress_percent'] . '% complete';
                         $nextLessonLabel = $card['next_lesson']['item_title'] ?? ($card['lesson_total'] > 0 ? 'All available lessons complete' : 'No lessons available');
                         ?>
@@ -263,6 +271,16 @@ foreach ($enrolledCourses as $course) {
                                         <?php if ($card['live_today']): ?><span class="student-course-badge is-live"><span class="fas fa-video" aria-hidden="true"></span> Live Today</span><?php endif; ?>
                                         <?php if ($card['recording_available']): ?><span class="student-course-badge is-recording"><span class="fas fa-play-circle" aria-hidden="true"></span> Recording Available</span><?php endif; ?>
                                     </div>
+                                <?php endif; ?>
+                                <?php if ($recoveryPlan): ?>
+                                    <section class="student-recovery-plan-card" aria-label="Recovery Plan">
+                                        <?php if (($recoveryPlan['status'] ?? '') === 'completed'): ?>
+                                            <div class="student-recovery-plan-complete"><span class="fas fa-check-circle" aria-hidden="true"></span><div><strong>Recovery Plan complete</strong><small>Recovered through Study Plan</small></div></div>
+                                        <?php else: ?>
+                                            <div class="student-recovery-plan-heading"><div><span class="fas fa-route" aria-hidden="true"></span><strong>Recovery Plan</strong></div><span><?= (int) ($recoveryPlan['completed'] ?? 0) ?> / <?= (int) ($recoveryPlan['total'] ?? 0) ?> tasks</span></div>
+                                            <?php if ($recoveryTask): ?><div class="student-recovery-plan-next"><div><strong><?= student_courses_html($recoveryTask['item_title'] ?? 'Next recovery task'); ?></strong><small><?= student_courses_html($recoveryTask['teacher_note'] ?? 'Priority task') ?></small></div><a class="student-dashboard-btn primary" href="<?= student_courses_html(rtrim((string) $baseUrl, '/') . '/user/course/resource/' . rawurlencode($card['course_id']) . '/' . rawurlencode((string) $recoveryTask['item_id'])); ?>">Continue</a></div><?php endif; ?>
+                                        <?php endif; ?>
+                                    </section>
                                 <?php endif; ?>
                                 <div class="student-course-progress-heading"><span>Overall progress</span><strong><?= student_courses_html($progressText); ?></strong></div>
                                 <div class="student-course-progress" role="progressbar" aria-label="Overall course progress" aria-valuemin="0" aria-valuemax="100" aria-valuenow="<?= (int) ($card['progress_percent'] ?? 0); ?>" style="--student-course-progress:<?= (int) ($card['progress_percent'] ?? 0); ?>%"><span></span></div>

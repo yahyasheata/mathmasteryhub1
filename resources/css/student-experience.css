@@ -666,6 +666,70 @@ html[data-student-theme] body.student-my-courses-page .student-course-statuses {
   margin-top: var(--space-3);
 }
 
+html[data-student-theme] body.student-my-courses-page .student-recovery-plan-card {
+  margin-top: var(--space-3);
+  padding: .75rem;
+  border: 1px solid color-mix(in srgb, var(--primary) 30%, var(--border));
+  border-radius: var(--radius-md);
+  background: color-mix(in srgb, var(--primary) 6%, var(--surface));
+}
+
+html[data-student-theme] body.student-my-courses-page .student-recovery-plan-heading,
+html[data-student-theme] body.student-my-courses-page .student-recovery-plan-next,
+html[data-student-theme] body.student-my-courses-page .student-recovery-plan-complete {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: .65rem;
+}
+
+html[data-student-theme] body.student-my-courses-page .student-recovery-plan-heading {
+  color: var(--primary);
+  font-size: .78rem;
+  font-weight: 850;
+}
+
+html[data-student-theme] body.student-my-courses-page .student-recovery-plan-heading div {
+  display: inline-flex;
+  align-items: center;
+  gap: .4rem;
+}
+
+html[data-student-theme] body.student-my-courses-page .student-recovery-plan-heading > span {
+  color: var(--text-muted);
+  font-size: .72rem;
+}
+
+html[data-student-theme] body.student-my-courses-page .student-recovery-plan-next {
+  align-items: flex-end;
+  margin-top: .6rem;
+}
+
+html[data-student-theme] body.student-my-courses-page .student-recovery-plan-next div,
+html[data-student-theme] body.student-my-courses-page .student-recovery-plan-complete div {
+  min-width: 0;
+  display: grid;
+  gap: .15rem;
+}
+
+html[data-student-theme] body.student-my-courses-page .student-recovery-plan-next strong,
+html[data-student-theme] body.student-my-courses-page .student-recovery-plan-complete strong {
+  overflow-wrap: anywhere;
+  color: var(--text-primary);
+  font-size: .8rem;
+}
+
+html[data-student-theme] body.student-my-courses-page .student-recovery-plan-next small,
+html[data-student-theme] body.student-my-courses-page .student-recovery-plan-complete small {
+  color: var(--text-muted);
+  font-size: .7rem;
+}
+
+html[data-student-theme] body.student-my-courses-page .student-recovery-plan-complete {
+  justify-content: flex-start;
+  color: var(--success);
+}
+
 html[data-student-theme] body.student-my-courses-page .student-course-badge {
   display: inline-flex;
   align-items: center;
