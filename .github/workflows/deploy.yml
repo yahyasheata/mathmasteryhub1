@@ -22,5 +22,6 @@ jobs:
             git fetch origin main
             git reset --hard origin/main
             php database/migrations/20260801_create_student_learning_evidence.php
+            php database/migrations/20260802_create_recovery_plans.php
             php database/migrations/verify_student_learning_evidence.php
             php -l index.php
