@@ -244,6 +244,7 @@ foreach ($enrolledCourses as $course) {
                         $continueLink = student_courses_item_link($baseUrl, $card['course_route_id'], $nextLearning['item_id'] ?? '');
                         $homeworkLink = student_courses_item_link($baseUrl, $card['course_route_id'], $card['unfinished_homework_id']);
                         $progressText = $card['progress_percent'] === null ? 'No progress data yet' : $card['progress_percent'] . '% complete';
+                        $nextLessonLabel = $card['next_lesson']['item_title'] ?? ($card['lesson_total'] > 0 ? 'All available lessons complete' : 'No lessons available');
                         ?>
                         <article class="student-course-card student-course-dashboard-card">
                             <a href="<?= student_courses_html($courseLink); ?>" class="student-course-image">
@@ -270,7 +271,7 @@ foreach ($enrolledCourses as $course) {
                                     <div><span>Homework</span><strong><?= (int) $card['homework_completed']; ?> / <?= (int) $card['homework_total']; ?></strong></div>
                                 </div>
                                 <dl class="student-course-context">
-                                    <div><dt>Next lesson</dt><dd><?= student_courses_html($card['next_lesson']['item_title'] ?? 'All available lessons complete'); ?></dd></div>
+                                    <div><dt>Next lesson</dt><dd><?= student_courses_html($nextLessonLabel); ?></dd></div>
                                     <div><dt>Next live session</dt><dd><?= $card['next_session'] ? student_courses_html(mmh_live_display_time($card['next_session'])) : 'No upcoming session'; ?></dd></div>
                                     <div><dt>Current section</dt><dd><?= student_courses_html($card['current_section']); ?></dd></div>
                                     <div><dt>Last activity</dt><dd><?= student_courses_html(student_courses_relative_time($card['last_activity'])); ?></dd></div>
