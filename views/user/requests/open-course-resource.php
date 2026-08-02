@@ -319,6 +319,9 @@ if ($requestedPlanId > 0 && $requestedTaskId > 0) {
         course_resource_notice(403, 'Recovery task unavailable', 'This Recovery Plan task is not available for your account.', $course['course_id']);
     }
 }
+// Keep every downstream renderer on the strict array contract, including the
+// normal course path where no Recovery Plan context is present.
+$course_resource_plan_context = is_array($course_resource_plan_context) ? $course_resource_plan_context : [];
 $sectionId = student_course_access_normalize_section_id($item['section_id'] ?? '');
 if ($sectionId === null) {
     course_resource_notice(404, 'Resource unavailable', 'This learning resource is unavailable.', $course['course_id']);
