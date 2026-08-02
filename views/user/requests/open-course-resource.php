@@ -33,6 +33,34 @@ function course_resource_plan_url($baseUrl, $courseId, $itemId, array $planConte
     return course_resource_url($baseUrl, $courseId, $itemId);
 }
 
+/**
+ * Resolve Recovery Plan context once at the protected route boundary. Every
+ * downstream renderer receives a non-null, validated array; normal course
+ * resources continue to use the empty array context.
+ */
+function course_resource_recovery_context(mysqli $conn, int $userId, array $course, int $planId, int $taskId, string $itemId): array
+{
+    if ($planId <= 0 || $taskId <= 0 || $itemId === '') return ['valid' => false];
+    $plan = mmh_recovery_plan_load($conn, $userId, (string) $course['course_id'], $planId);
+    if (!$plan || !in_array((string) ($plan['status'] ?? ''), ['active', 'completed'], true)) return ['valid' => false];
+    $plan = mmh_recovery_plan_sync($conn, $plan, $userId, (string) $course['course_id']);
+    $task = null;
+    foreach (($plan['items'] ?? []) as $candidate) {
+        if ((int) ($candidate['id'] ?? 0) === $taskId && (string) ($candidate['item_id'] ?? '') === $itemId) {
+            $task = $candidate;
+            break;
+        }
+    }
+    if (!$task || (!empty($task['is_locked']) && empty($task['is_completed']))) return ['valid' => false];
+    return [
+        'valid' => true,
+        'plan' => $plan,
+        'task' => $task,
+        'ordered_tasks' => array_values($plan['items'] ?? []),
+        'navigation' => mmh_recovery_plan_task_context($plan, $taskId),
+    ];
+}
+
 function course_resource_notice($statusCode, $title, $message, $courseId = '')
 {
     global $baseUrl;
@@ -69,7 +97,7 @@ function course_resource_record_open(mysqli $conn, $userId, array $course, $sect
 function course_resource_navigation(mysqli $conn, array $course, $userId, $itemId, array $planContext = [])
 {
     if (!empty($planContext['plan']['items'])) {
-        $items = $planContext['plan']['items']; $current = null;
+        $items = $planContext['ordered_tasks'] ?? $planContext['plan']['items']; $current = null;
         foreach ($items as $index => $candidate) if ((string) ($candidate['item_id'] ?? '') === (string) $itemId) { $current = $index; break; }
         $previous = null; $next = null;
         if ($current !== null) { for ($i = $current - 1; $i >= 0; $i--) if (empty($items[$i]['is_locked']) || !empty($items[$i]['is_completed'])) { $previous = $items[$i]; break; } for ($i = $current + 1; $i < count($items); $i++) if (empty($items[$i]['is_locked']) || !empty($items[$i]['is_completed'])) { $next = $items[$i]; break; } }
@@ -277,22 +305,19 @@ if (!$course || !student_course_access_enrolled($conn, $userId, $course['course_
 $course_resource_plan_context = [];
 $requestedPlanId = (int) ($_GET['recovery_plan'] ?? 0);
 $requestedTaskId = (int) ($_GET['recovery_task'] ?? 0);
-if ($requestedPlanId > 0 && $requestedTaskId > 0) {
-    $requestedPlan = mmh_recovery_plan_load($conn, (int) $userId, (string) $course['course_id'], $requestedPlanId);
-    if (!$requestedPlan || !in_array((string) ($requestedPlan['status'] ?? ''), ['active', 'completed'], true)) {
-        course_resource_notice(403, 'Recovery Plan unavailable', 'This Recovery Plan is not available for your account.', $course['course_id']);
-    }
-    $requestedPlan = mmh_recovery_plan_sync($conn, $requestedPlan, (int) $userId, (string) $course['course_id']);
-    $requestedTask = null;
-    foreach (($requestedPlan['items'] ?? []) as $candidateTask) if ((int) ($candidateTask['id'] ?? 0) === $requestedTaskId && (string) ($candidateTask['item_id'] ?? '') === (string) $itemId) { $requestedTask = $candidateTask; break; }
-    if (!$requestedTask) course_resource_notice(403, 'Recovery task unavailable', 'This item is not part of the selected Recovery Plan.', $course['course_id']);
-    if (!empty($requestedTask['is_locked']) && empty($requestedTask['is_completed'])) course_resource_notice(403, 'Recovery task locked', 'Complete the previous Recovery Plan task first.', $course['course_id']);
-    $course_resource_plan_context = ['plan' => $requestedPlan, 'task' => $requestedTask];
+if (($requestedPlanId > 0) !== ($requestedTaskId > 0)) {
+    course_resource_notice(403, 'Recovery Plan unavailable', 'The Recovery Plan context is incomplete.', $course['course_id']);
 }
 
 $item = student_course_access_item($conn, $course['course_id'], $itemId);
 if (!$item) {
     course_resource_notice(404, 'Resource unavailable', 'This learning resource is no longer available.', $course['course_id']);
+}
+if ($requestedPlanId > 0 && $requestedTaskId > 0) {
+    $course_resource_plan_context = course_resource_recovery_context($conn, (int) $userId, $course, $requestedPlanId, $requestedTaskId, (string) $itemId);
+    if (empty($course_resource_plan_context['valid'])) {
+        course_resource_notice(403, 'Recovery task unavailable', 'This Recovery Plan task is not available for your account.', $course['course_id']);
+    }
 }
 $sectionId = student_course_access_normalize_section_id($item['section_id'] ?? '');
 if ($sectionId === null) {
