@@ -19,7 +19,13 @@
     document.documentElement.lang = 'en';
     document.documentElement.dir = 'ltr';
 </script>
-<?php $userBrandSettings = isset($site_settings) && is_array($site_settings) ? $site_settings : getSiteSettings(); $userFaviconUrl = mmh_site_settings_asset_url($userBrandSettings, 'website_icon', 'resources/images/default/favicon.png'); ?>
+<?php
+// Recovery Plan opens this shared shell directly, so load the same legacy
+// bootstrap that defines getSiteSettings() for every other student view.
+require_once dirname(__DIR__, 4) . '/inc/functions.php';
+$userBrandSettings = isset($site_settings) && is_array($site_settings) ? $site_settings : getSiteSettings();
+$userFaviconUrl = mmh_site_settings_asset_url($userBrandSettings, 'website_icon', 'resources/images/default/favicon.png');
+?>
 <link rel="stylesheet" href="<?=mmh_site_public_url('resources/css/design-system.css')?>" data-design-system="mathhub" />
 <script src="<?=mmh_site_public_url('resources/js/student-theme.js')?>" defer></script>
     <?=$metatags."\n"?>
