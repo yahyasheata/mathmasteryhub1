@@ -169,7 +169,7 @@ if (!function_exists('mmh_homework_part')) {
 }
 
 if (!function_exists('mmh_homework_render')) {
-    function mmh_homework_render(mysqli $conn, $baseUrl, $userId, array $course, array $selection, $itemId, array $resource)
+    function mmh_homework_render(mysqli $conn, $baseUrl, $userId, array $course, array $selection, $itemId, array $resource, array $planContext = [])
     {
         $item = $selection['item'];
         $assignmentId = trim((string) ($resource['assignment_id'] ?? ''));
@@ -179,21 +179,22 @@ if (!function_exists('mmh_homework_render')) {
         $submission = $submissions[$assignmentId] ?? null;
         $status = mmh_homework_status($assignment, $submission);
         $due = mmh_homework_due($assignment['due_date'] ?? '');
-        $navigation = course_resource_navigation($conn, $course, $userId, $itemId);
+        $navigation = course_resource_navigation($conn, $course, $userId, $itemId, $planContext);
         $section = $selection['section_state']['section'] ?? [];
         $sectionTitle = trim((string) ($section['title'] ?? 'General')) ?: 'General';
         $title = trim((string) ($item['item_title'] ?? $assignment['assignment_title'] ?? 'Homework')) ?: 'Homework';
         $courseUrl = student_course_access_course_url($baseUrl, $course['course_id']);
-        $returnUrl = student_course_access_course_url($baseUrl, $course['course_id'], $itemId, true);
-        $previousUrl = !empty($navigation['previous']) ? course_resource_url($baseUrl, $course['course_id'], $navigation['previous']['item_id']) : '';
-        $nextUrl = !empty($navigation['next']) ? course_resource_url($baseUrl, $course['course_id'], $navigation['next']['item_id']) : '';
+        $returnUrl = !empty($planContext['plan']['id']) ? mmh_recovery_plan_workspace_url($baseUrl, (string) $course['course_id'], (int) $planContext['plan']['id'], (int) ($planContext['task']['id'] ?? 0)) : student_course_access_course_url($baseUrl, $course['course_id'], $itemId, true);
+        $previousUrl = !empty($navigation['previous']) ? course_resource_plan_url($baseUrl, $course['course_id'], $navigation['previous']['item_id'], $planContext, (int) ($navigation['previous']['id'] ?? 0)) : '';
+        $nextUrl = !empty($navigation['next']) ? course_resource_plan_url($baseUrl, $course['course_id'], $navigation['next']['item_id'], $planContext, (int) ($navigation['next']['id'] ?? 0)) : '';
         $description = trim(strip_tags((string) ($resource['description'] ?? $assignment['assignment_description'] ?? '')));
         if ($description === '' || strtolower($description) === strtolower($title)) $description = 'This homework has been prepared to help you review the lecture.';
         $homework = mmh_homework_part($conn, $course, $selection, $resource, $assignment, $submission, 'homework');
         $model = mmh_homework_model_answer_resource($conn, $course, $selection, $resource);
         $modelRelease = mmh_homework_release_state($model, $assignment, $submission);
-        $modelUrl = $modelRelease['available'] ? course_resource_url($baseUrl, $course['course_id'], $itemId) . '?part=model-answer' : '';
-        $homeworkUrl = $homework ? course_resource_url($baseUrl, $course['course_id'], $itemId) . '?part=homework' : '';
+        $partSeparator = !empty($planContext['plan']['id']) ? '&' : '?';
+        $modelUrl = $modelRelease['available'] ? course_resource_plan_url($baseUrl, $course['course_id'], $itemId, $planContext, (int) ($planContext['task']['id'] ?? 0)) . $partSeparator . 'part=model-answer' : '';
+        $homeworkUrl = $homework ? course_resource_plan_url($baseUrl, $course['course_id'], $itemId, $planContext, (int) ($planContext['task']['id'] ?? 0)) . $partSeparator . 'part=homework' : '';
         $uploadAllowed = $status['class'] !== 'is-overdue';
         $submittedAt = $submission && !empty($submission['submitted_at']) ? strtotime((string) $submission['submitted_at']) : false;
         course_resource_record_open($conn, $userId, $course, (string) ($selection['section_id'] ?? ''), $itemId, $resource);

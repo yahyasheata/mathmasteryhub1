@@ -317,7 +317,7 @@ if (($resource['action'] ?? '') === 'homework') {
         }
         course_resource_open_homework_part($conn, $baseUrl, $userId, $course, $selection, $itemId, $resource, $part);
     }
-    mmh_homework_render($conn, $baseUrl, $userId, $course, $selection, $itemId, $resource);
+    mmh_homework_render($conn, $baseUrl, $userId, $course, $selection, $itemId, $resource, $course_resource_plan_context);
 }
 if (($resource['action'] ?? '') === 'embed' && !empty($resource['embed_url'])) {
     course_resource_render_viewer($conn, $baseUrl, $userId, $course, $selection, $itemId, $resource);
