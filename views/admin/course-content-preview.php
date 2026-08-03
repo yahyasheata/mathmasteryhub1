@@ -11,6 +11,7 @@ require_once 'connection/config.php';
 require_once '__init.php';
 require_once 'inc/functions.php';
 require_once 'inc/CourseResourceResolver.php';
+require_once 'inc/TimedExam.php';
 
 $pageName = 'courses';
 $subPageName = 'courses';
@@ -85,6 +86,7 @@ $modelPreviewUrl = mmh_course_resource_safe_url($modelPreview['url'] ?? '');
 $modelPreviewType = (string) ($modelPreview['resource_type'] ?? mmh_course_resource_type_for_url($modelPreviewUrl, 'external_link'));
 $modelPreviewEmbed = $modelPreviewUrl ? mmh_course_resource_embed_details($modelPreviewUrl, $modelPreviewType) : null;
 $modelPreviewRelease = (string) ($modelPreview['release'] ?? 'hidden');
+$timedExamPreview = $action === 'timed_exam' ? mmh_timed_exam_load_for_item($conn, $courseId, $itemId, true) : null;
 ?>
 <!doctype html>
 <html lang="en">
@@ -129,6 +131,8 @@ $modelPreviewRelease = (string) ($modelPreview['release'] ?? 'hidden');
                         <p>The provider does not support a safe in-site preview. The student’s protected resource flow remains unchanged.</p>
                         <a class="btn btn-primary" href="<?= admin_content_preview_escape($openUrl); ?>" target="_blank" rel="noopener noreferrer">Open external resource <i class="fas fa-arrow-up ds-icon ds-icon-sm" aria-hidden="true"></i></a>
                     </div>
+                <?php elseif ($action === 'timed_exam'): ?>
+                    <div class="course-content-preview-external"><i class="fas fa-stopwatch ds-icon ds-icon-lg" aria-hidden="true"></i><h2>Fixed Window Timed Exam</h2><p>Students open a dedicated protected workspace at the scheduled time. This preview does not create an attempt or expose the paper.</p><?php if ($timedExamPreview): ?><p>Opens: <?= admin_content_preview_escape($timedExamPreview['scheduled_start_at_utc'] ?? 'Not scheduled'); ?> UTC · Duration: <?= (int) ($timedExamPreview['duration_minutes'] ?? 0); ?> minutes</p><a class="btn btn-primary" href="<?= admin_content_preview_escape($base . '/admin/timed-exam-submissions/' . rawurlencode($courseId) . '/' . (int) $timedExamPreview['id']); ?>">View submissions</a><?php endif; ?></div>
                 <?php elseif ($action === 'homework'): ?>
                     <div class="course-content-preview-external course-content-preview-homework">
                         <i class="fas fa-clipboard-list ds-icon ds-icon-lg" aria-hidden="true"></i>

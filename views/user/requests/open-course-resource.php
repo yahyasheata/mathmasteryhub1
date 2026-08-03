@@ -306,6 +306,14 @@ if (!$selection) {
 }
 
 $resource = mmh_course_resource_resolve($selection['item']);
+if (($resource['action'] ?? '') === 'timed_exam' || strtolower((string) ($selection['item']['template_type'] ?? '')) === 'timed_exam') {
+    require_once 'inc/TimedExam.php';
+    $timedExam = mmh_timed_exam_load_for_item($conn, (string) $course['course_id'], (string) $itemId, false);
+    if (!$timedExam) course_resource_notice(404, 'Timed Exam unavailable', 'This Timed Exam is not currently published.', $course['course_id']);
+    $target = rtrim((string) $baseUrl, '/') . '/user/course/' . rawurlencode((string) $course['course_id']) . '/exam/' . (int) $timedExam['id'];
+    if ($requestedPlanId > 0 && $requestedTaskId > 0) $target .= '?recovery_plan=' . $requestedPlanId . '&recovery_task=' . $requestedTaskId;
+    header('Location: ' . $target, true, 302); exit;
+}
 if (($resource['action'] ?? '') === 'homework') {
     // The old homework_open flag remains a protected compatibility alias. New
     // links use a clear part name and always resolve through this endpoint.

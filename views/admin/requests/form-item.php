@@ -3,6 +3,7 @@ require_once 'connection/config.php';
 require_once 'inc/functions.php';
 require_once 'inc/AcademicMetadata.php';
 require_once 'inc/CourseResourceResolver.php';
+require_once 'inc/TimedExam.php';
 
 header('Content-Type: application/json; charset=utf-8');
 
@@ -236,7 +237,7 @@ if (!empty($item['metadata'])) {
     }
 }
 
-$teacher_templates = ['recording', 'notes', 'classified_assignment', 'custom_lesson'];
+$teacher_templates = ['recording', 'notes', 'classified_assignment', 'custom_lesson', 'timed_exam'];
 // Structured Resource remains an internal editor type and supports the new
 // Notes translation. Legacy Assignment Model Answer records remain editable.
 $creation_templates = array_merge($teacher_templates, ['resource']);
@@ -391,6 +392,7 @@ $template_cards = [
     'notes' => ['far fa-file-alt', 'Notes', 'Add a structured Notes resource for the LMS viewer.'],
     'classified_assignment' => ['fas fa-clipboard-list', 'Classified Assignment', 'Create one Homework lesson with resources and upload workflow.'],
     'custom_lesson' => ['fas fa-puzzle-piece', 'Custom Lesson', 'Build any flexible lesson with a label, icon, and content.'],
+    'timed_exam' => ['fas fa-stopwatch', 'Timed Exam', 'Fixed Window exam with protected paper, secure answers, and grading.'],
 ];
 
 $cards_html = '';
@@ -448,6 +450,23 @@ $assignment_homework_type = $template_type === 'classified_assignment' ? (string
 $assignment_score_mode = $template_type === 'classified_assignment' && $is_edit
     ? mmh_academic_score_mode_from_flags($assignment_allow_self_score, $assignment_require_teacher_verification)
     : 'inherit';
+
+$timed_exam_config = $template_type === 'timed_exam' ? mmh_timed_exam_load_for_item($conn, $course_id, (string) ($item['item_id'] ?? ''), true) : null;
+$timed_exam_start = mmh_timed_exam_datetime_for_input($timed_exam_config['scheduled_start_at_utc'] ?? '');
+$timed_exam_duration = (string) ($timed_exam_config['duration_minutes'] ?? 60);
+$timed_exam_grace = (string) ($timed_exam_config['grace_minutes'] ?? 0);
+$timed_exam_max_attempts = (string) ($timed_exam_config['max_attempts'] ?? 1);
+$timed_exam_allowed_types = (string) ($timed_exam_config['allowed_answer_types'] ?? 'pdf,jpg,jpeg,png');
+$timed_exam_max_size_mb = (string) max(1, (int) round(((int) ($timed_exam_config['max_file_size_bytes'] ?? 10485760)) / 1048576));
+$timed_exam_view_allowed = !array_key_exists('paper_view_allowed', (array) $timed_exam_config) || !empty($timed_exam_config['paper_view_allowed']);
+$timed_exam_download_allowed = !array_key_exists('paper_download_allowed', (array) $timed_exam_config) || !empty($timed_exam_config['paper_download_allowed']);
+$timed_exam_late_allowed = !array_key_exists('late_submission_allowed', (array) $timed_exam_config) || !empty($timed_exam_config['late_submission_allowed']);
+$timed_exam_max_marks = (string) ($timed_exam_config['max_marks'] ?? '');
+$timed_exam_results_release = mmh_timed_exam_datetime_for_input($timed_exam_config['results_release_at_utc'] ?? '');
+$timed_exam_recovery_start = mmh_timed_exam_datetime_for_input($timed_exam_config['recovery_window_start_at_utc'] ?? '');
+$timed_exam_recovery_end = mmh_timed_exam_datetime_for_input($timed_exam_config['recovery_window_end_at_utc'] ?? '');
+$timed_exam_recovery_allowed = !empty($timed_exam_config['recovery_allowed']);
+$timed_exam_admin_link = $timed_exam_config ? rtrim((string) ($baseUrl ?? ''), '/') . '/admin/timed-exam-submissions/' . rawurlencode($course_id) . '/' . (int) $timed_exam_config['id'] : '';
 
 $academic_source = $template_type === 'classified_assignment' ? array_merge($item_metadata, $assignment_record) : $item_metadata;
 $academic_primary_topic_id = (int) ($academic_source['topic_id'] ?? $academic_source['primary_topic_id'] ?? 0);
@@ -933,6 +952,26 @@ $html_response = "
               </div>
             </div>
 
+            <div class='{$pane_class['timed_exam']}' data-template-pane='timed_exam'>
+              <div class='alert alert-info'>Timing mode: <strong>Fixed Window</strong>. All enrolled students share the same opening and closing times.</div>
+              <div class='row'>
+                <div class='col-12 p-2'><label class='form-label'>Instructions</label><textarea class='form-control' name='timed_exam_instructions' rows='5' placeholder='Explain the exam clearly'>" . form_item_textarea_value($template_type === 'timed_exam' ? ($timed_exam_config['instructions'] ?? '') : '') . "</textarea></div>
+                <div class='col-12 col-lg-6 p-2'><label class='form-label'>Scheduled start</label><input type='datetime-local' class='form-control' name='timed_exam_scheduled_start' value='" . htmlspecialchars($timed_exam_start, ENT_QUOTES, 'UTF-8') . "'></div>
+                <div class='col-12 col-lg-3 p-2'><label class='form-label'>Duration (minutes)</label><input type='number' class='form-control' name='timed_exam_duration' min='1' max='1440' value='" . htmlspecialchars($timed_exam_duration, ENT_QUOTES, 'UTF-8') . "'></div>
+                <div class='col-12 col-lg-3 p-2'><label class='form-label'>Grace period (minutes)</label><input type='number' class='form-control' name='timed_exam_grace' min='0' max='1440' value='" . htmlspecialchars($timed_exam_grace, ENT_QUOTES, 'UTF-8') . "'></div>
+                <div class='col-12 col-lg-4 p-2'><label class='form-label'>Maximum upload attempts</label><input type='number' class='form-control' name='timed_exam_max_attempts' min='1' max='20' value='" . htmlspecialchars($timed_exam_max_attempts, ENT_QUOTES, 'UTF-8') . "'></div>
+                <div class='col-12 col-lg-4 p-2'><label class='form-label'>Allowed answer types</label><input type='text' class='form-control' name='timed_exam_allowed_types' value='" . htmlspecialchars($timed_exam_allowed_types, ENT_QUOTES, 'UTF-8') . "' placeholder='PDF, JPG, PNG'></div>
+                <div class='col-12 col-lg-4 p-2'><label class='form-label'>Maximum file size (MB)</label><input type='number' class='form-control' name='timed_exam_max_size_mb' min='1' max='500' value='" . htmlspecialchars($timed_exam_max_size_mb, ENT_QUOTES, 'UTF-8') . "'></div>
+                <div class='col-12 p-2'><label class='form-label'>Exam paper (PDF, optional when editing)</label><input type='file' class='form-control' name='timed_exam_paper' accept='.pdf,application/pdf'><small class='text-muted'>" . ($timed_exam_config && !empty($timed_exam_config['paper_original_name']) ? 'Current paper: ' . htmlspecialchars((string) $timed_exam_config['paper_original_name'], ENT_QUOTES, 'UTF-8') : 'Upload a protected PDF paper.') . "</small></div>
+                <div class='col-12 col-lg-4 p-2'><label class='form-check'><input class='form-check-input' type='checkbox' name='timed_exam_view_allowed' value='1'" . ($timed_exam_view_allowed ? ' checked' : '') . "><span class='form-check-label'>Allow in-browser viewing</span></label></div>
+                <div class='col-12 col-lg-4 p-2'><label class='form-check'><input class='form-check-input' type='checkbox' name='timed_exam_download_allowed' value='1'" . ($timed_exam_download_allowed ? ' checked' : '') . "><span class='form-check-label'>Allow paper download</span></label></div>
+                <div class='col-12 col-lg-4 p-2'><label class='form-check'><input class='form-check-input' type='checkbox' name='timed_exam_late_allowed' value='1'" . ($timed_exam_late_allowed ? ' checked' : '') . "><span class='form-check-label'>Allow grace-period submissions</span></label></div>
+                <div class='col-12 col-lg-4 p-2'><label class='form-label'>Total marks <small class='text-muted'>(optional)</small></label><input type='number' min='0' step='0.01' class='form-control' name='timed_exam_max_marks' value='" . htmlspecialchars($timed_exam_max_marks, ENT_QUOTES, 'UTF-8') . "'></div>
+                <div class='col-12 col-lg-4 p-2'><label class='form-label'>Release results at <small class='text-muted'>(optional)</small></label><input type='datetime-local' class='form-control' name='timed_exam_results_release' value='" . htmlspecialchars($timed_exam_results_release, ENT_QUOTES, 'UTF-8') . "'></div>
+                <div class='col-12 p-2'><div class='border rounded p-3'><strong>Recovery Plan eligibility</strong><p class='small text-muted mb-2'>A Timed Exam is never reopened by Recovery Plan unless a separate recovery window is configured.</p><label class='form-check mb-2'><input class='form-check-input' type='checkbox' name='timed_exam_recovery_allowed' value='1'" . ($timed_exam_recovery_allowed ? ' checked' : '') . "><span class='form-check-label'>Allow this exam as a Recovery Plan task</span></label><div class='row'><div class='col-12 col-lg-6'><label class='form-label'>Recovery window starts</label><input type='datetime-local' class='form-control' name='timed_exam_recovery_start' value='" . htmlspecialchars($timed_exam_recovery_start, ENT_QUOTES, 'UTF-8') . "'></div><div class='col-12 col-lg-6'><label class='form-label'>Recovery window ends</label><input type='datetime-local' class='form-control' name='timed_exam_recovery_end' value='" . htmlspecialchars($timed_exam_recovery_end, ENT_QUOTES, 'UTF-8') . "'></div></div></div></div>
+              </div>
+            </div>
+
             <div class='{$pane_class['assignment_model_answer']}' data-template-pane='assignment_model_answer'>
               <div class='row'>
                 <div class='col-12 p-2'>
@@ -983,6 +1022,7 @@ $html_response = "
           <input type='hidden' name='_method' value='{$form_method}' />
           <div class='modal-footer p-2'>
             <button type='button' class='btn btn-outline-danger' data-bs-dismiss='modal'>Cancel</button>
+            " . ($timed_exam_admin_link !== '' ? "<a class='btn btn-outline-secondary' href='" . htmlspecialchars($timed_exam_admin_link, ENT_QUOTES, 'UTF-8') . "' target='_blank' rel='noopener'>View submissions</a>" : '') . "
             <button type='submit' class='btn btn-outline-primary submitBtn'>{$submit_label}</button>
           </div>
         </form>

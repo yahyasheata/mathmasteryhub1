@@ -3,6 +3,7 @@ require_once 'connection/config.php';
 require_once '__init.php';
 require_once 'inc/StudentCourseAccess.php';
 require_once 'inc/RecoveryPlan.php';
+require_once 'inc/TimedExam.php';
 
 global $baseUrl;
 $conn = db();
@@ -22,7 +23,13 @@ $current = $context['current'];
 $base = rtrim((string) $baseUrl, '/');
 $esc = static fn($v): string => htmlspecialchars((string) $v, ENT_QUOTES, 'UTF-8');
 $workspace = mmh_recovery_plan_workspace_url($base, (string) $course['course_id'], (int) $plan['id']);
-$taskUrl = static fn(array $task): string => mmh_recovery_plan_resource_url($base, (string) $course['course_id'], (string) $task['item_id'], (int) $plan['id'], (int) $task['id']);
+$taskUrl = static function (array $task) use ($conn, $base, $course, $plan): string {
+    if (strtolower((string) ($task['template_type'] ?? '')) === 'timed_exam') {
+        $timedExam = mmh_timed_exam_load_for_item($conn, (string) $course['course_id'], (string) $task['item_id'], false);
+        if ($timedExam) return $base . '/user/course/' . rawurlencode((string) $course['course_id']) . '/exam/' . (int) $timedExam['id'] . '?recovery_plan=' . (int) $plan['id'] . '&recovery_task=' . (int) $task['id'];
+    }
+    return mmh_recovery_plan_resource_url($base, (string) $course['course_id'], (string) $task['item_id'], (int) $plan['id'], (int) $task['id']);
+};
 // Reuse the authenticated student shell: it owns the fixed public header,
 // theme initialization, shared design tokens, and mobile navigation.
 $metatags = $metatags ?? '';

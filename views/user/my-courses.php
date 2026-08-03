@@ -7,6 +7,7 @@ require_once 'inc/StudentCourseAccess.php';
 require_once 'inc/AssignmentProgress.php';
 require_once 'inc/StudentLearningJourney.php';
 require_once 'inc/RecoveryPlan.php';
+require_once 'inc/TimedExam.php';
 
 $pageName = 'mycourses';
 $username = (string) ($_SESSION['username'] ?? '');
@@ -135,12 +136,14 @@ foreach ($enrolledCourses as $course) {
     $journey = mmh_learning_journey_resolve($conn, $userId, $courseId);
     $recoveryPlan = mmh_recovery_plan_resolve($conn, $userId, $courseId);
     $assignmentMap = mmh_assignment_progress_load_course($conn, $userId, $courseId);
+    $timedExamStates = mmh_timed_exam_course_states($conn, $userId, $courseId);
     $recoveredItemIds = array_map('strval', is_array($recoveryPlan) ? ($recoveryPlan['covered_item_ids'] ?? []) : []);
     $journeyItems = $journey['items'] ?? [];
 
     $lessonItems = array_values(array_filter($journeyItems, static fn($item) => ($item['item_kind'] ?? '') === 'lesson'));
     $recordingItems = array_values(array_filter($journeyItems, static fn($item) => ($item['item_kind'] ?? '') === 'recording'));
     $homeworkItems = array_values(array_filter($journeyItems, static fn($item) => ($item['item_kind'] ?? '') === 'homework'));
+    $timedExamItems = array_values(array_filter($journeyItems, static fn($item) => ($item['item_kind'] ?? '') === 'timed_exam'));
 
     $completedLessons = count(array_filter($lessonItems, static fn($item) => !empty($item['is_completed'])));
     $completedHomework = 0;
@@ -183,6 +186,11 @@ foreach ($enrolledCourses as $course) {
     $unfinishedHomeworkId = $unfinishedHomework['item_id'] ?? ($unfinishedHomework['_source_item_id'] ?? '');
     $liveToday = $nextSession && student_courses_local_date($nextSession) === (new DateTimeImmutable('now', mmh_live_timezone($nextSession['timezone'] ?? 'Asia/Riyadh')))->format('Y-m-d');
     $recordingAvailable = (bool) array_filter($recordingItems, static fn($item) => empty($item['is_completed']) && !mmh_recovery_plan_covers_item($recoveryPlan, (string) ($item['item_id'] ?? ''), (string) ($item['section_id'] ?? '')));
+    $nextTimedExam = null;
+    foreach ($timedExamItems as $timedExamItem) {
+        $timedState = $timedExamStates[(string) ($timedExamItem['item_id'] ?? '')] ?? null;
+        if ($timedState && !in_array((string) ($timedState['state_key'] ?? ''), ['submitted', 'auto_submitted', 'graded', 'no_submission'], true)) { $nextTimedExam = ['item' => $timedExamItem, 'state' => $timedState]; break; }
+    }
     $courseCards[] = [
         'course' => $course,
         'course_id' => $courseId,
@@ -205,6 +213,7 @@ foreach ($enrolledCourses as $course) {
         'overdue_homework' => $overdueHomework,
         'live_today' => $liveToday,
         'recording_available' => $recordingAvailable,
+        'timed_exam' => $nextTimedExam,
         'progress_percent' => $progressPercent === null ? null : max(0, min(100, (int) $progressPercent)),
     ];
 }
@@ -254,6 +263,16 @@ foreach ($enrolledCourses as $course) {
                         foreach (($recoveryPlan['items'] ?? []) as $candidateTask) {
                             if (empty($candidateTask['is_completed']) && empty($candidateTask['is_locked'])) { $recoveryTask = $candidateTask; break; }
                         }
+                        $timedExam = $card['timed_exam'];
+                        $timedExamLink = '';
+                        $timedExamLabel = '';
+                        if ($timedExam) {
+                            $timedExamId = (int) ($timedExam['state']['id'] ?? 0);
+                            if ($timedExamId > 0) $timedExamLink = rtrim((string) $baseUrl, '/') . '/user/course/' . rawurlencode((string) $card['course_id']) . '/exam/' . $timedExamId;
+                            $timedExamLabel = match ((string) ($timedExam['state']['state_key'] ?? '')) {
+                                'before' => 'Exam upcoming', 'open' => 'Exam active now', 'grace' => 'Grace period active', 'expired' => 'Submission required', default => 'Exam available'
+                            };
+                        }
                         $progressText = $card['progress_percent'] === null ? 'No progress data yet' : $card['progress_percent'] . '% complete';
                         $nextLessonLabel = $card['next_lesson']['item_title'] ?? ($card['lesson_total'] > 0 ? 'All available lessons complete' : 'No lessons available');
                         ?>
@@ -268,11 +287,12 @@ foreach ($enrolledCourses as $course) {
                                         <h2><a href="<?= student_courses_html($courseLink); ?>"><?= student_courses_html($courseTitle); ?></a></h2>
                                     </div>
                                 </div>
-                                <?php if ($card['overdue_homework'] || $card['live_today'] || $card['recording_available']): ?>
+                                <?php if ($card['overdue_homework'] || $card['live_today'] || $card['recording_available'] || $timedExam): ?>
                                     <div class="student-course-statuses" aria-label="Course alerts">
                                         <?php if ($card['overdue_homework']): ?><span class="student-course-badge is-warning"><span class="fas fa-exclamation-circle" aria-hidden="true"></span> Overdue homework</span><?php endif; ?>
                                         <?php if ($card['live_today']): ?><span class="student-course-badge is-live"><span class="fas fa-video" aria-hidden="true"></span> Live Today</span><?php endif; ?>
                                         <?php if ($card['recording_available']): ?><span class="student-course-badge is-recording"><span class="fas fa-play-circle" aria-hidden="true"></span> Recording Available</span><?php endif; ?>
+                                        <?php if ($timedExam && $timedExamLink): ?><a class="student-course-badge is-live" href="<?= student_courses_html($timedExamLink); ?>"><span class="fas fa-stopwatch" aria-hidden="true"></span> <?= student_courses_html($timedExamLabel); ?></a><?php endif; ?>
                                     </div>
                                 <?php endif; ?>
                                 <?php if ($recoveryPlan): ?>
@@ -296,6 +316,7 @@ foreach ($enrolledCourses as $course) {
                                     <div><dt>Next live session</dt><dd><?= $card['next_session'] ? student_courses_html(mmh_live_display_time($card['next_session'])) : 'No upcoming session'; ?></dd></div>
                                     <div><dt>Current section</dt><dd><?= student_courses_html($card['current_section']); ?></dd></div>
                                     <div><dt>Last activity</dt><dd><?= student_courses_html(student_courses_relative_time($card['last_activity'])); ?></dd></div>
+                                    <?php if ($timedExam && $timedExamLink): ?><div><dt>Timed exam</dt><dd><a href="<?= student_courses_html($timedExamLink); ?>"><?= student_courses_html($timedExam['item']['item_title'] ?? 'Open exam'); ?></a></dd></div><?php endif; ?>
                                 </dl>
                                 <?php if ($card['overdue_homework']): ?><div class="student-course-warning"><span class="fas fa-exclamation-triangle" aria-hidden="true"></span> <?= count($card['overdue_homework']) === 1 ? '1 homework task is overdue' : count($card['overdue_homework']) . ' homework tasks are overdue'; ?></div><?php endif; ?>
                                 <div class="student-course-actions">

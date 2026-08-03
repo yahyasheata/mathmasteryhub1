@@ -10,6 +10,7 @@ require_once __DIR__ . '/StudentCourseAccess.php';
 require_once __DIR__ . '/StudentCourseProgress.php';
 require_once __DIR__ . '/AssignmentProgress.php';
 require_once __DIR__ . '/CourseResourceResolver.php';
+require_once __DIR__ . '/TimedExam.php';
 
 function mmh_learning_journey_schema_available(mysqli $conn): bool
 {
@@ -41,6 +42,7 @@ function mmh_learning_journey_item_kind(array $item): string
     $assignmentId = mmh_learning_journey_item_assignment_id($item);
     $type = strtolower(trim((string) ($item['template_type'] ?? $item['item_type'] ?? '')));
     if ($assignmentId !== '' || in_array($type, ['assignment', 'homework', 'classified_assignment'], true)) { return 'homework'; }
+    if ($type === 'timed_exam') { return 'timed_exam'; }
     if (in_array($type, ['recording', 'video', 'lecture_recording'], true)) { return 'recording'; }
     return 'lesson';
 }
@@ -109,6 +111,7 @@ function mmh_learning_journey_item_records(mysqli $conn, int $userId, string $co
     $items = mmh_learning_journey_visible_items($conn, $courseId);
     $progress = student_course_progress_load($conn, $userId, $courseId);
     $assignments = mmh_assignment_progress_load_course($conn, $userId, $courseId);
+    $timedExams = mmh_timed_exam_course_states($conn, $userId, $courseId);
     $evidence = mmh_learning_journey_load_evidence($conn, $userId, $courseId);
     $records = [];
     foreach ($items as $item) {
@@ -124,6 +127,12 @@ function mmh_learning_journey_item_records(mysqli $conn, int $userId, string $co
             $state = $assignments[$assignmentId]['_state'];
             if (!empty($state['complete'])) { $lmsComplete = true; $lmsState = 'completed'; }
             elseif (!empty($state['submitted'])) { $lmsState = 'submitted'; }
+        }
+        $timedExam = $kind === 'timed_exam' ? ($timedExams[$itemId] ?? null) : null;
+        if ($timedExam) {
+            $timedState = (string) ($timedExam['state_key'] ?? 'not_completed');
+            if (in_array($timedState, ['submitted', 'auto_submitted', 'graded'], true)) { $lmsComplete = true; $lmsState = 'completed'; }
+            elseif ($timedState === 'in_progress' || $timedState === 'open' || $timedState === 'grace') { $lmsState = 'in_progress'; }
         }
         $historical = $evidence[$key] ?? ($assignmentId !== '' ? ($evidence['assignment:' . $assignmentId] ?? null) : null);
         $complete = $lmsComplete;
@@ -190,7 +199,7 @@ function mmh_learning_journey_resume(array $journey, array $accessibleItems = []
 
 function mmh_learning_journey_validate_state(string $kind, string $state): string
 {
-    $allowed = ['lesson' => ['completed', 'not_completed'], 'recording' => ['watched', 'not_watched'], 'homework' => ['completed', 'not_completed'], 'live_session' => ['present', 'absent'], 'exam' => ['completed', 'not_completed']];
+    $allowed = ['lesson' => ['completed', 'not_completed'], 'recording' => ['watched', 'not_watched'], 'homework' => ['completed', 'not_completed'], 'live_session' => ['present', 'absent'], 'exam' => ['completed', 'not_completed'], 'timed_exam' => ['completed', 'not_completed']];
     if (!in_array($state, $allowed[$kind] ?? ['completed', 'not_completed'], true)) { throw new InvalidArgumentException('Invalid Learning Journey state.'); }
     return $state;
 }
@@ -199,6 +208,7 @@ function mmh_learning_journey_save_evidence(mysqli $conn, int $userId, string $c
 {
     if (!mmh_learning_journey_schema_available($conn)) { throw new RuntimeException('Run the student learning evidence migration before saving progress.'); }
     $kind = trim((string) ($entity['item_kind'] ?? 'lesson'));
+    if ($kind === 'timed_exam') { throw new InvalidArgumentException('Timed Exams are completed by a valid exam submission, not manual evidence.'); }
     $state = mmh_learning_journey_validate_state($kind, trim($state));
     $source = strtolower(trim($source));
     if (!in_array($source, ['whatsapp', 'manual'], true)) { throw new InvalidArgumentException('Source must be WhatsApp or Manual.'); }

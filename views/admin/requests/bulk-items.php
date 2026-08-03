@@ -201,6 +201,13 @@ try {
         $update->close();
         $message = $action === 'publish' ? 'Selected lessons published.' : 'Selected lessons moved to draft.';
     } elseif ($action === 'delete') {
+        $archiveExam = $conn->prepare("UPDATE timed_exams SET deleted_at = COALESCE(deleted_at, UTC_TIMESTAMP()), status = 'archived' WHERE course_id = ? AND item_id IN ({$placeholders})");
+        if ($archiveExam) {
+            $archiveParams = array_merge([$course_id], $item_ids);
+            bulk_items_bind($archiveExam, str_repeat('s', count($archiveParams)), $archiveParams);
+            $archiveExam->execute();
+            $archiveExam->close();
+        }
         $delete = $conn->prepare("DELETE FROM course_items WHERE course_id = ? AND item_id IN ({$placeholders})");
         if (!$delete) {
             throw new RuntimeException($conn->error);
@@ -242,6 +249,10 @@ try {
             $insert->bind_param('sssssssisissisi', $new_item_id, $item_title, $item_description, $item_type, $section_id, $template_type, $template_data, $duration_minutes, $metadata, $assignment_id, $due_date, $status, $sort_order, $course_id, $page_order);
             if (!$insert->execute()) {
                 throw new RuntimeException($insert->error ?: $conn->error);
+            }
+            if ($template_type === 'timed_exam') {
+                $copyExam = $conn->prepare("INSERT INTO timed_exams (course_id, item_id, title, instructions, status, timing_mode, scheduled_start_at_utc, duration_minutes, grace_minutes, max_attempts, allowed_answer_types, max_file_size_bytes, paper_storage_key, paper_original_name, paper_mime, paper_size_bytes, paper_view_allowed, paper_download_allowed, late_submission_allowed, expiry_policy, max_marks, results_release_at_utc, recovery_window_start_at_utc, recovery_window_end_at_utc, recovery_allowed, created_by, updated_by) SELECT course_id, ?, CONCAT(title, ' (Copy)'), instructions, 'draft', timing_mode, scheduled_start_at_utc, duration_minutes, grace_minutes, max_attempts, allowed_answer_types, max_file_size_bytes, paper_storage_key, paper_original_name, paper_mime, paper_size_bytes, paper_view_allowed, paper_download_allowed, late_submission_allowed, expiry_policy, max_marks, results_release_at_utc, recovery_window_start_at_utc, recovery_window_end_at_utc, recovery_allowed, created_by, updated_by FROM timed_exams WHERE course_id = ? AND item_id = ? AND deleted_at IS NULL LIMIT 1");
+                if ($copyExam) { $copyExam->bind_param('sss', $new_item_id, $course_id, $lesson['item_id']); $copyExam->execute(); $copyExam->close(); }
             }
             $source_assignment_id = mmh_course_assignment_id($lesson);
             if ($source_assignment_id !== '') {

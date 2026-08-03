@@ -319,6 +319,7 @@ if (!function_exists('mmh_course_resource_meta')) {
             'assignment' => ['Assignment', 'fas fa-clipboard-list'],
             'quiz' => ['Assignment', 'fas fa-edit'],
             'exam' => ['Exam', 'fas fa-clipboard-list'],
+            'timed_exam' => ['Timed Exam', 'fas fa-stopwatch'],
             'assignment_model_answer' => ['Model Answer', 'fas fa-graduation-cap'],
             'model_answer' => ['Model Answer', 'fas fa-graduation-cap'],
             'worksheet' => ['Worksheet', 'fas fa-file-alt'],
@@ -605,6 +606,9 @@ if (!function_exists('mmh_course_resource_resolve_core')) {
             ];
         }
 
+        if ($effectiveType === 'timed_exam') {
+            return ['action' => 'timed_exam', 'label' => 'Timed Exam', 'icon' => 'fas fa-stopwatch', 'reason' => 'This lesson opens in the protected Timed Exam workspace.'];
+        }
         $richTypes = ['classified_assignment', 'assignment', 'exam', 'custom_lesson', 'custom_html', 'embed'];
         if (in_array($effectiveType, $richTypes, true)) {
             return ['action' => 'render', 'label' => $label, 'icon' => $icon, 'reason' => 'This lesson contains interactive or rich content.'];

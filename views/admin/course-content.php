@@ -366,6 +366,7 @@ $admin_base = rtrim((string) $baseUrl, '/') . '/admin/';
   function itemTypeForTemplate(template, $form) {
     if (template === 'recording' || template === 'video') { return 'video'; }
     if (template === 'classified_assignment' || template === 'assignment' || template === 'exam') { return 'quiz'; }
+    if (template === 'timed_exam') { return 'timed_exam'; }
     if ((template === 'custom_html' || template === 'resource') && $form.find('[name="_method"]').val() === 'UPDATE') { return $form.find('[name="item_type"]').data('originalItemType') || 'file'; }
     return 'file';
   }

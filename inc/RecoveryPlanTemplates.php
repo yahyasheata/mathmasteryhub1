@@ -91,6 +91,12 @@ if (!function_exists('mmh_recovery_template_normalize_items')) {
             $itemId = trim((string) ($row['item_id'] ?? ''));
             if ($itemId === '') continue;
             if (!isset($allowed[$itemId])) throw new InvalidArgumentException('Every template task must be a published course item.');
+            if (strtolower((string) ($allowed[$itemId]['template_type'] ?? '')) === 'timed_exam') {
+                $timedExam = mmh_timed_exam_load_for_item($conn, $courseId, $itemId, true);
+                if (!$timedExam || empty($timedExam['recovery_allowed']) || empty($timedExam['recovery_window_start_at_utc']) || empty($timedExam['recovery_window_end_at_utc'])) {
+                    throw new InvalidArgumentException('This Timed Exam needs an explicit Recovery Plan exam window before it can be selected.');
+                }
+            }
             if (isset($seen[$itemId])) throw new InvalidArgumentException('A template cannot contain the same course item twice.');
             $seen[$itemId] = true;
             $duration = trim((string) ($row['estimated_duration'] ?? '')); $weight = trim((string) ($row['weight'] ?? ''));

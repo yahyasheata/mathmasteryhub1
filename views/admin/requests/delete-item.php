@@ -31,6 +31,10 @@ $course_id = isset($_POST['course_id']) ? trim($_POST['course_id']) : '';
 
 try {
     if ($course_id !== '') {
+        $archiveExam = $conn->prepare("UPDATE timed_exams SET deleted_at = COALESCE(deleted_at, UTC_TIMESTAMP()), status = 'archived' WHERE course_id = ? AND item_id = ?");
+        if ($archiveExam) { $archiveExam->bind_param('ss', $course_id, $item_id); $archiveExam->execute(); $archiveExam->close(); }
+    }
+    if ($course_id !== '') {
         $stmt = $conn->prepare('DELETE FROM course_items WHERE item_id = ? AND course_id = ? LIMIT 1');
         $stmt->bind_param('ss', $item_id, $course_id);
     } else {

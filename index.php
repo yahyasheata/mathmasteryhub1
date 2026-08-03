@@ -151,6 +151,18 @@ $router->mount('/admin', function() use ($router) {
         @include('views/admin/requests/search-resource-free-learning.php');
     });
 
+    $router->get('/timed-exam-submissions/{courseId}/{examId}', function($courseId, $examId) {
+        require_once '__init.php';
+        if (!isset($_SESSION['admin'])) { http_response_code(403); exit(); }
+        @include('views/admin/timed-exam-submissions.php');
+    });
+
+    $router->get('/timed-exam-answer/{versionId}', function($versionId) {
+        require_once '__init.php';
+        if (!isset($_SESSION['admin'])) { http_response_code(403); exit(); }
+        @include('views/admin/requests/download-timed-exam-answer.php');
+    });
+
     // Parent Reports renders and processes the same page so Preview, comments,
     // and PDF output retain the existing Admin form workflow.
     $router->post('/parent-reports', function() {
@@ -246,6 +258,34 @@ $router->mount('/user', function() use ($router) {
             exit();
         }
         include('views/user/requests/open-course-resource.php');
+    });
+
+    $router->get('/course/{courseId}/exam/{examId}', function($courseId, $examId) {
+        global $baseUrl;
+        require_once '__init.php';
+        if (!isset($_SESSION['username'])) {
+            header("Location: {$baseUrl}/auth/login");
+            exit();
+        }
+        include('views/user/timed-exam.php');
+    });
+
+    $router->get('/course/{courseId}/exam/{examId}/paper', function($courseId, $examId) {
+        require_once '__init.php';
+        if (!isset($_SESSION['username'])) { http_response_code(401); exit('Sign in required.'); }
+        include('views/user/requests/open-timed-exam-paper.php');
+    });
+
+    $router->post('/course/{courseId}/exam/{examId}/upload', function($courseId, $examId) {
+        require_once '__init.php';
+        if (!isset($_SESSION['username'])) { http_response_code(401); exit('Sign in required.'); }
+        include('views/user/requests/upload-timed-exam.php');
+    });
+
+    $router->post('/course/{courseId}/exam/{examId}/submit', function($courseId, $examId) {
+        require_once '__init.php';
+        if (!isset($_SESSION['username'])) { http_response_code(401); exit('Sign in required.'); }
+        include('views/user/requests/submit-timed-exam.php');
     });
 
     $router->get('/course/{courseId}/recovery-plan/{planId}', function($courseId, $planId) {

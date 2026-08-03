@@ -170,6 +170,9 @@ function items_item_icon($row)
     if ($template_type === 'custom_lesson') {
         return "<i class='fas fa-puzzle-piece ds-icon ds-icon-md' aria-hidden='true'></i>";
     }
+    if ($template_type === 'timed_exam') {
+        return "<i class='fas fa-stopwatch ds-icon ds-icon-md' aria-hidden='true'></i>";
+    }
     if (($row['item_type'] ?? '') === 'quiz') {
         return "<i class='fas fa-edit ds-icon ds-icon-md' aria-hidden='true'></i>";
     }

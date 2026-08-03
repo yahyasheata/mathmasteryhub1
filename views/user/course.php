@@ -11,6 +11,7 @@ require_once 'inc/StudentLearningJourney.php';
 require_once 'inc/AssignmentProgress.php';
 require_once 'inc/CourseResourceResolver.php';
 require_once 'inc/CourseHomeworkRenderer.php';
+require_once 'inc/TimedExam.php';
 $pageName = "course";
 $username = $_SESSION['username'] ?? '';
 $conn = db();
@@ -386,9 +387,14 @@ if ($coures_result && mysqli_num_rows($coures_result) > 0) {
     if ($is_related_model_answer) {
       continue;
     }
-    $resource_direct = in_array($resource_action, ['embed', 'redirect', 'unavailable', 'homework'], true);
+    $resource_direct = in_array($resource_action, ['embed', 'redirect', 'unavailable', 'homework', 'timed_exam'], true);
     $resource_external = $resource_action === 'redirect' && !empty($resource_resolution['open_in_new_tab']);
-    $resource_open_url = rtrim((string) $baseUrl, '/') . '/user/course/resource/' . rawurlencode($course_id) . '/' . rawurlencode((string) ($courses_data['item_id'] ?? ''));
+    $timed_exam_for_item = $template_type === 'timed_exam'
+      ? mmh_timed_exam_load_for_item($conn, $course_id, (string) ($courses_data['item_id'] ?? ''), false)
+      : null;
+    $resource_open_url = $timed_exam_for_item
+      ? rtrim((string) $baseUrl, '/') . '/user/course/' . rawurlencode($course_id) . '/exam/' . (int) $timed_exam_for_item['id']
+      : rtrim((string) $baseUrl, '/') . '/user/course/resource/' . rawurlencode($course_id) . '/' . rawurlencode((string) ($courses_data['item_id'] ?? ''));
     $lesson_type = trim((string) ($resource_resolution['label'] ?? ''));
     if ($lesson_type === '') {
       [$lesson_type] = mmh_course_resource_meta($template_type ?: ($courses_data['item_type'] ?? ''));

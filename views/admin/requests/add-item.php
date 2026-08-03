@@ -5,6 +5,7 @@ require_once 'inc/functions.php';
 require_once 'inc/learning_schema.php';
 require_once 'inc/AcademicMetadata.php';
 require_once 'inc/CourseResourceResolver.php';
+require_once 'inc/TimedExam.php';
 
 header('Content-Type: application/json; charset=utf-8');
 
@@ -700,6 +701,9 @@ function item_type_for_template($template_type)
     if (in_array($template_type, ['classified_assignment', 'assignment', 'exam'], true)) {
         return 'quiz';
     }
+    if ($template_type === 'timed_exam') {
+        return 'timed_exam';
+    }
     return 'file';
 }
 
@@ -986,6 +990,14 @@ function item_build_template(mysqli $conn, $template_type, $course_id, $item_tit
             $html .= '<button class="btn btn-sm show-exam" data-exam-id="' . item_html($exam_id) . '" data-due-date="' . item_html($due_date_value) . '"><span class="fas fa-file-signature"></span> ' . item_html($exam['exam_title']) . '</button>';
             break;
 
+        case 'timed_exam':
+            $template_data = array_merge($template_data, [
+                'timing_mode' => 'fixed_window',
+                'instructions' => item_post_raw('timed_exam_instructions'),
+            ]);
+            $html = '';
+            break;
+
         case 'external_link':
             $url = item_post('external_url');
             if ($url === '' || !filter_var($url, FILTER_VALIDATE_URL)) {
@@ -1102,7 +1114,7 @@ $conn = db();
 $item_homework_transaction = false;
 mmh_ensure_learning_schema($conn);
 $method = $_POST['_method'] ?? 'POST';
-$allowed_templates = ['recording', 'notes', 'classified_assignment', 'assignment_model_answer', 'custom_lesson', 'resource', 'video', 'pdf', 'assignment', 'exam', 'external_link', 'download', 'embed', 'google_drive', 'onedrive', 'custom_html'];
+$allowed_templates = ['recording', 'notes', 'classified_assignment', 'assignment_model_answer', 'custom_lesson', 'timed_exam', 'resource', 'video', 'pdf', 'assignment', 'exam', 'external_link', 'download', 'embed', 'google_drive', 'onedrive', 'custom_html'];
 
 if (!isset($_POST['item_title'], $_POST['course_id']) || trim($_POST['item_title']) === '' || trim($_POST['course_id']) === '') {
     item_response(false, 'Validation failed. Please fill in all required lesson fields.');
@@ -1115,7 +1127,7 @@ if (!in_array($template_type, $allowed_templates, true)) {
     $template_type = 'custom_html';
 }
 
-$allowed_item_types = ['video', 'file', 'quiz'];
+$allowed_item_types = ['video', 'file', 'quiz', 'timed_exam'];
 $posted_item_type = isset($_POST['item_type']) && in_array($_POST['item_type'], $allowed_item_types, true) ? $_POST['item_type'] : '';
 $item_type = (in_array($template_type, ['custom_html', 'resource'], true) && $posted_item_type !== '') ? $posted_item_type : item_type_for_template($template_type);
 $existing_resource_item = [];
@@ -1140,6 +1152,11 @@ $template_data_json = item_json($built['data']);
 $item_metadata_json = item_json($built['metadata'] ?? []);
 $status = item_normalize_status($_POST['status'] ?? 'published');
 $page_order = (isset($_POST['page_order']) && is_numeric($_POST['page_order'])) ? max(1, (int) $_POST['page_order']) : null;
+
+if ($template_type === 'timed_exam' && !$item_homework_transaction) {
+    if (!$conn->begin_transaction()) item_response(false, 'Unable to begin the Timed Exam save. Please try again.');
+    $item_homework_transaction = true;
+}
 
 $has_template_type = item_column_exists($conn, 'template_type');
 $has_template_data = item_column_exists($conn, 'template_data');
@@ -1267,11 +1284,36 @@ try {
 
         $sql = 'UPDATE course_items SET ' . implode(', ', $sets) . ' WHERE item_id = ? AND course_id = ? LIMIT 1';
         item_bind_and_execute($conn, $sql, $types, $params);
+        if ($template_type === 'timed_exam') {
+            mmh_timed_exam_save_config($conn, $course_id, $item_id, [
+                'title' => $item_title,
+                'instructions' => item_post_raw('timed_exam_instructions'),
+                'status' => $status,
+                'scheduled_start_at' => item_post('timed_exam_scheduled_start'),
+                'duration_minutes' => item_post('timed_exam_duration', '60'),
+                'grace_minutes' => item_post('timed_exam_grace', '0'),
+                'max_attempts' => item_post('timed_exam_max_attempts', '1'),
+                'allowed_answer_types' => item_post('timed_exam_allowed_types', 'pdf,jpg,jpeg,png'),
+                'max_file_size_bytes' => max(1, (int) item_post('timed_exam_max_size_mb', '10')) * 1048576,
+                'paper_view_allowed' => item_is_checked('timed_exam_view_allowed'),
+                'paper_download_allowed' => item_is_checked('timed_exam_download_allowed'),
+                'late_submission_allowed' => item_is_checked('timed_exam_late_allowed'),
+                'max_marks' => item_post('timed_exam_max_marks'),
+                'results_release_at' => item_post('timed_exam_results_release'),
+                'recovery_allowed' => item_is_checked('timed_exam_recovery_allowed'),
+                'recovery_window_start_at' => item_post('timed_exam_recovery_start'),
+                'recovery_window_end_at' => item_post('timed_exam_recovery_end'),
+            ], $_FILES['timed_exam_paper'] ?? null, null);
+        }
         if ($template_type === 'classified_assignment') {
             item_update_assignment_context($conn, $course_id, (string) ($built['data']['assignment_id'] ?? ''), $item_id, $section_id);
         }
         if ($template_type === 'classified_assignment') {
             if (!$conn->commit()) { throw new RuntimeException('Unable to commit the Homework update.'); }
+            $item_homework_transaction = false;
+        }
+        if ($template_type === 'timed_exam') {
+            if (!$conn->commit()) { throw new RuntimeException('Unable to commit the Timed Exam update.'); }
             $item_homework_transaction = false;
         }
 
@@ -1360,10 +1402,31 @@ try {
 
     $sql = 'INSERT INTO course_items (' . implode(', ', $columns) . ') VALUES (' . implode(', ', $placeholders) . ')';
     item_bind_and_execute($conn, $sql, $types, $params);
+    if ($template_type === 'timed_exam') {
+        mmh_timed_exam_save_config($conn, $course_id, $item_id, [
+            'title' => $item_title,
+            'instructions' => item_post_raw('timed_exam_instructions'),
+            'status' => $status,
+            'scheduled_start_at' => item_post('timed_exam_scheduled_start'),
+            'duration_minutes' => item_post('timed_exam_duration', '60'),
+            'grace_minutes' => item_post('timed_exam_grace', '0'),
+            'max_attempts' => item_post('timed_exam_max_attempts', '1'),
+            'allowed_answer_types' => item_post('timed_exam_allowed_types', 'pdf,jpg,jpeg,png'),
+            'max_file_size_bytes' => max(1, (int) item_post('timed_exam_max_size_mb', '10')) * 1048576,
+            'paper_view_allowed' => item_is_checked('timed_exam_view_allowed'),
+            'paper_download_allowed' => item_is_checked('timed_exam_download_allowed'),
+            'late_submission_allowed' => item_is_checked('timed_exam_late_allowed'),
+            'max_marks' => item_post('timed_exam_max_marks'),
+            'results_release_at' => item_post('timed_exam_results_release'),
+            'recovery_allowed' => item_is_checked('timed_exam_recovery_allowed'),
+            'recovery_window_start_at' => item_post('timed_exam_recovery_start'),
+            'recovery_window_end_at' => item_post('timed_exam_recovery_end'),
+        ], $_FILES['timed_exam_paper'] ?? null, null);
+    }
     if ($template_type === 'classified_assignment') {
         item_update_assignment_context($conn, $course_id, (string) ($built['data']['assignment_id'] ?? ''), $item_id, $section_id);
     }
-    if ($template_type === 'classified_assignment') {
+    if ($template_type === 'classified_assignment' || $template_type === 'timed_exam') {
         if (!$conn->commit()) { throw new RuntimeException('Unable to commit the Homework save.'); }
         $item_homework_transaction = false;
     }
@@ -1374,7 +1437,7 @@ try {
         'template_type' => $template_type,
     ]);
 } catch (Throwable $e) {
-    if ($item_homework_transaction || $template_type === 'classified_assignment') { $conn->rollback(); $item_homework_transaction = false; }
+    if ($item_homework_transaction || $template_type === 'classified_assignment' || $template_type === 'timed_exam') { $conn->rollback(); $item_homework_transaction = false; }
     item_response(false, 'Unexpected server error while saving the lesson.', ['reason' => $e->getMessage()]);
 }
 ?>

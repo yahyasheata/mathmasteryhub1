@@ -62,6 +62,7 @@ if (!function_exists('mmh_recovery_plan_item_label')) {
         $kind = mmh_learning_journey_item_kind($item);
         if ($kind === 'homework') return 'Homework / Assignment';
         if ($kind === 'recording') return 'Recording / Video';
+        if ($kind === 'timed_exam') return 'Timed Exam';
         $type = strtolower(trim((string) ($item['template_type'] ?? $item['item_type'] ?? '')));
         if (str_contains($type, 'pdf') || str_contains($type, 'note')) return 'Notes / PDF';
         if (str_contains($type, 'quiz')) return 'Quiz';

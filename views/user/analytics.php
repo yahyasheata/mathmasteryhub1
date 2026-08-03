@@ -5,6 +5,7 @@ require_once 'inc/functions.php';
 require_once 'inc/ParentWeeklyReport.php';
 require_once 'inc/StudentCourseAccess.php';
 require_once 'inc/RecoveryPlan.php';
+require_once 'inc/TimedExam.php';
 
 $pageName = 'analytics';
 $username = (string) ($_SESSION['username'] ?? '');
@@ -48,7 +49,9 @@ $studentRecoveryPlan = null;
 if ($selectedCourse) {
     $studentRecoveryPlan = mmh_recovery_plan_resolve($conn, $userId, $selectedCourseId);
 }
-$resourceUrl = static function (string $courseId, string $itemId) use ($base): string {
+ $resourceUrl = static function (string $courseId, string $itemId) use ($base, $conn): string {
+    $exam = mmh_timed_exam_load_for_item($conn, $courseId, $itemId, false);
+    if ($exam) return $base . '/user/course/' . rawurlencode($courseId) . '/exam/' . (int) $exam['id'];
     return $base . '/user/course/resource/' . rawurlencode($courseId) . '/' . rawurlencode($itemId);
 };
 $statusClass = static function (string $key): string {
