@@ -453,11 +453,17 @@ if (!function_exists('mmh_timed_exam_remove_latest_upload')) {
             if (!$delete) throw new RuntimeException('Unable to remove uploaded answer.');
             $delete->bind_param('ii', $versionId, $id); if (!$delete->execute() || $delete->affected_rows !== 1) throw new RuntimeException('The uploaded answer could not be removed.'); $delete->close();
             $previous = mmh_timed_exam_latest_version($conn, $id, true);
-            $latestId = $previous ? (int) $previous['id'] : null;
-            $update = $conn->prepare('UPDATE timed_exam_attempts SET latest_version_id = ?, is_late = ? WHERE id = ?');
-            if (!$update) throw new RuntimeException('Unable to update exam attempt.');
-            $late = $previous ? (int) ($previous['is_late'] ?? 0) : 0;
-            $update->bind_param('iii', $latestId, $late, $id); if (!$update->execute()) throw new RuntimeException($update->error); $update->close();
+            if ($previous) {
+                $latestId = (int) $previous['id']; $late = (int) ($previous['is_late'] ?? 0);
+                $update = $conn->prepare('UPDATE timed_exam_attempts SET latest_version_id = ?, is_late = ? WHERE id = ?');
+                if (!$update) throw new RuntimeException('Unable to update exam attempt.');
+                $update->bind_param('iii', $latestId, $late, $id);
+            } else {
+                $update = $conn->prepare('UPDATE timed_exam_attempts SET latest_version_id = NULL, is_late = 0 WHERE id = ?');
+                if (!$update) throw new RuntimeException('Unable to update exam attempt.');
+                $update->bind_param('i', $id);
+            }
+            if (!$update->execute()) throw new RuntimeException($update->error); $update->close();
             $conn->commit();
             $path = dirname(__DIR__) . '/' . ltrim((string) ($version['storage_key'] ?? ''), '/');
             if ($path !== dirname(__DIR__) . '/' && is_file($path)) @unlink($path);
