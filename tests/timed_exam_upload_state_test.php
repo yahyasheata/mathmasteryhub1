@@ -19,7 +19,7 @@ $graded = mmh_timed_exam_state($exam, ['state' => 'graded'], new DateTimeImmutab
 if (($submitted['key'] ?? '') !== 'submitted' || ($graded['key'] ?? '') !== 'graded') throw new RuntimeException('Submitted and graded states are not preserved.');
 
 $view = file_get_contents(dirname(__DIR__) . '/views/user/timed-exam.php');
-if (!is_string($view) || !str_contains($view, 'data-dropzone') || !str_contains($view, 'data-confirm-submit') || !str_contains($view, 'data-remove-upload') || !str_contains($view, 'Time Ended') || str_contains($view, 'height:100%') || str_contains($view, 'min-height:100vh')) {
+if (!is_string($view) || !str_contains($view, 'data-dropzone') || !str_contains($view, 'data-remove-selection') || !str_contains($view, 'data-confirm-submit') || !str_contains($view, 'data-remove-upload') || !str_contains($view, 'Time Ended') || str_contains($view, 'height:100%') || str_contains($view, 'min-height:100vh')) {
     throw new RuntimeException('Compact Timed Exam uploader/state UX contract is missing.');
 }
 
