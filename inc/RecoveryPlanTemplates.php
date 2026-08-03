@@ -125,6 +125,7 @@ if (!function_exists('mmh_recovery_template_copy_to_student')) {
     function mmh_recovery_template_copy_to_student(mysqli $conn, array $template, int $studentId, int $adminId): int
     {
         $courseId = (string) $template['course_id'];
+        if (empty($template['items'])) throw new InvalidArgumentException('Add at least one course item before assigning this template.');
         if (!student_course_access_enrolled($conn, $studentId, $courseId)) throw new InvalidArgumentException('Student is not enrolled in this course.');
         $activeKey = mmh_recovery_plan_active_key($studentId, $courseId);
         $check = $conn->prepare('SELECT id FROM recovery_plans WHERE active_key = ? LIMIT 1');
