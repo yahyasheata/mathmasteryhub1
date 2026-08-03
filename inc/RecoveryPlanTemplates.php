@@ -174,6 +174,21 @@ if (!function_exists('mmh_recovery_template_sync_assigned_plan')) {
         if (!$plan) return;
         $existing = [];
         foreach (($plan['items'] ?? []) as $item) $existing[(string) $item['item_id']] = $item;
+        $templateItemIds = [];
+        foreach (($template['items'] ?? []) as $row) $templateItemIds[(string) $row['item_id']] = true;
+        $removeCoverage = mmh_recovery_plan_coverage_available($conn) ? $conn->prepare('DELETE FROM recovery_plan_item_coverage WHERE plan_item_id = ?') : null;
+        $removeItem = $conn->prepare('DELETE FROM recovery_plan_items WHERE id = ? AND plan_id = ?');
+        if (!$removeItem) throw new RuntimeException('Unable to update assigned Recovery Plan.');
+        foreach (($plan['items'] ?? []) as $oldItem) {
+            $oldItemId = (string) ($oldItem['item_id'] ?? '');
+            if ($oldItemId !== '' && !isset($templateItemIds[$oldItemId]) && empty($oldItem['is_completed'])) {
+                $oldPlanItemId = (int) ($oldItem['id'] ?? 0);
+                if ($removeCoverage) { $removeCoverage->bind_param('i', $oldPlanItemId); $removeCoverage->execute(); }
+                $removeItem->bind_param('ii', $oldPlanItemId, $planId); $removeItem->execute();
+            }
+        }
+        if ($removeCoverage) $removeCoverage->close();
+        $removeItem->close();
         $update = $conn->prepare('UPDATE recovery_plan_items SET assignment_id = ?, sort_order = ?, is_required = ?, teacher_note = ?, estimated_duration = ?, weight = ?, locked_until_previous = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?');
         $insert = $conn->prepare('INSERT INTO recovery_plan_items (plan_id, course_id, item_id, assignment_id, sort_order, is_required, teacher_note, estimated_duration, weight, locked_until_previous) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)');
         if (!$update || !$insert) throw new RuntimeException('Unable to update assigned Recovery Plan.');
