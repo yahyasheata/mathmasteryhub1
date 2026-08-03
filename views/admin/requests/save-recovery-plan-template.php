@@ -29,6 +29,21 @@ try {
     }
     $template = mmh_recovery_template_load($conn, $templateId);
     if (!$template) throw new InvalidArgumentException('Template not found.');
+    if ($action === 'delete') {
+        $check = $conn->prepare('SELECT COUNT(*) AS total FROM recovery_plan_assignments WHERE template_id = ?');
+        if (!$check) throw new RuntimeException('Unable to check template usage.');
+        $check->bind_param('i', $templateId); $check->execute(); $assignedCount = (int) (($check->get_result()->fetch_assoc()['total'] ?? 0)); $check->close();
+        if ($assignedCount > 0) throw new InvalidArgumentException('Templates with assigned students can only be archived.');
+        $conn->begin_transaction();
+        $delete = $conn->prepare('DELETE FROM recovery_plan_template_coverage WHERE template_item_id IN (SELECT id FROM recovery_plan_template_items WHERE template_id = ?)');
+        if ($delete) { $delete->bind_param('i', $templateId); $delete->execute(); $delete->close(); }
+        $delete = $conn->prepare('DELETE FROM recovery_plan_template_items WHERE template_id = ?');
+        if ($delete) { $delete->bind_param('i', $templateId); $delete->execute(); $delete->close(); }
+        $delete = $conn->prepare('DELETE FROM recovery_plan_templates WHERE id = ?');
+        if (!$delete) throw new RuntimeException('Unable to delete template.');
+        $delete->bind_param('i', $templateId); if (!$delete->execute()) throw new RuntimeException('Unable to delete template.'); $delete->close();
+        $conn->commit(); $flash(true, 'Unused template deleted.');
+    }
     if ($action === 'archive') {
         $stmt = $conn->prepare("UPDATE recovery_plan_templates SET status = 'archived', archived_at = CURRENT_TIMESTAMP, updated_at = CURRENT_TIMESTAMP WHERE id = ?"); $stmt->bind_param('i', $templateId); $stmt->execute(); $stmt->close(); $flash(true, 'Template archived. Existing student plans were preserved.');
     }

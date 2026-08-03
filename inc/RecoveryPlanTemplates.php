@@ -21,7 +21,7 @@ if (!function_exists('mmh_recovery_template_list')) {
     function mmh_recovery_template_list(mysqli $conn, string $courseId = '', bool $includeArchived = false): array
     {
         if (!mmh_recovery_template_schema_available($conn)) return [];
-        $sql = 'SELECT t.id, t.course_id, t.title, t.description, t.status, t.created_by, t.created_at, t.updated_at, c.course_title, COUNT(DISTINCT a.id) AS assigned_count, SUM(a.status = \'assigned\') AS not_started_count, SUM(a.status = \'in_progress\') AS in_progress_count, SUM(a.status = \'completed\') AS completed_count, AVG(CASE WHEN a.completed_at IS NOT NULL THEN TIMESTAMPDIFF(MINUTE, a.assigned_at, a.completed_at) END) AS average_completion_minutes FROM recovery_plan_templates t LEFT JOIN courses c ON c.course_id = t.course_id LEFT JOIN recovery_plan_assignments a ON a.template_id = t.id';
+        $sql = 'SELECT t.id, t.course_id, t.title, t.description, t.status, t.created_by, t.created_at, t.updated_at, c.course_title, COUNT(DISTINCT ti.id) AS task_count, COUNT(DISTINCT a.id) AS assigned_count, SUM(a.status = \'assigned\') AS not_started_count, SUM(a.status = \'in_progress\') AS in_progress_count, SUM(a.status = \'completed\') AS completed_count, AVG(CASE WHEN a.completed_at IS NOT NULL THEN TIMESTAMPDIFF(MINUTE, a.assigned_at, a.completed_at) END) AS average_completion_minutes FROM recovery_plan_templates t LEFT JOIN courses c ON c.course_id = t.course_id LEFT JOIN recovery_plan_template_items ti ON ti.template_id = t.id LEFT JOIN recovery_plan_assignments a ON a.template_id = t.id';
         $params = [];
         $types = '';
         $where = [];
