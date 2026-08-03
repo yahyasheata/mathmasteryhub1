@@ -14,6 +14,7 @@ require_once 'inc/RecoveryPlan.php';
 require_once 'inc/StudentLearningJourney.php';
 require_once 'inc/CourseResourceResolver.php';
 require_once 'inc/CourseHomeworkRenderer.php';
+require_once 'inc/CourseResourceNavigation.php';
 
 function course_resource_escape($value)
 {
@@ -94,47 +95,20 @@ function course_resource_record_open(mysqli $conn, $userId, array $course, $sect
     }
 }
 
-function course_resource_navigation(mysqli $conn, array $course, $userId, $itemId, array $planContext = [])
+function course_resource_render_viewer(mysqli $conn, $baseUrl, $userId, array $course, array $selection, $itemId, array $resource, array $planContext = [])
 {
-    if (!empty($planContext['plan']['items'])) {
-        $items = $planContext['ordered_tasks'] ?? $planContext['plan']['items']; $current = null;
-        foreach ($items as $index => $candidate) if ((string) ($candidate['item_id'] ?? '') === (string) $itemId) { $current = $index; break; }
-        $previous = null; $next = null;
-        if ($current !== null) { for ($i = $current - 1; $i >= 0; $i--) if (empty($items[$i]['is_locked']) || !empty($items[$i]['is_completed'])) { $previous = $items[$i]; break; } for ($i = $current + 1; $i < count($items); $i++) if (empty($items[$i]['is_locked']) || !empty($items[$i]['is_completed'])) { $next = $items[$i]; break; } }
-        return ['previous' => $previous, 'next' => $next, 'position' => $current !== null ? $current + 1 : 0, 'total' => count($items), 'plan' => true];
-    }
-    $items = student_course_access_ordered_items($conn, $course, $userId);
-    $current = null;
-    foreach ($items as $index => $candidate) {
-        if ((string) ($candidate['item_id'] ?? '') !== (string) $itemId) {
-            continue;
-        }
-        $current = $index;
-        break;
-    }
-    return [
-        'previous' => $current !== null && $current > 0 ? $items[$current - 1] : null,
-        'next' => $current !== null && $current < count($items) - 1 ? $items[$current + 1] : null,
-        'position' => $current !== null ? $current + 1 : 0,
-        'total' => count($items),
-    ];
-}
-
-function course_resource_render_viewer(mysqli $conn, $baseUrl, $userId, array $course, array $selection, $itemId, array $resource)
-{
-    global $course_resource_plan_context;
     $item = $selection['item'];
     $section = $selection['section_state']['section'] ?? null;
     $sectionTitle = $section ? trim((string) ($section['title'] ?? '')) : 'General';
     $sectionTitle = $sectionTitle !== '' ? $sectionTitle : 'General';
     $title = trim((string) ($item['item_title'] ?? '')) ?: 'Learning resource';
     $courseUrl = student_course_access_course_url($baseUrl, $course['course_id']);
-    $returnUrl = !empty($course_resource_plan_context['plan']['id']) ? mmh_recovery_plan_workspace_url($baseUrl, (string) $course['course_id'], (int) $course_resource_plan_context['plan']['id'], (int) ($course_resource_plan_context['task']['id'] ?? 0)) : student_course_access_course_url($baseUrl, $course['course_id'], $itemId, true);
-    $navigation = course_resource_navigation($conn, $course, $userId, $itemId, $course_resource_plan_context);
+    $returnUrl = !empty($planContext['plan']['id']) ? mmh_recovery_plan_workspace_url($baseUrl, (string) $course['course_id'], (int) $planContext['plan']['id'], (int) ($planContext['task']['id'] ?? 0)) : student_course_access_course_url($baseUrl, $course['course_id'], $itemId, true);
+    $navigation = course_resource_navigation($conn, $course, $userId, $itemId, $planContext);
     $previous = $navigation['previous'];
     $next = $navigation['next'];
-    $previousUrl = $previous ? course_resource_plan_url($baseUrl, $course['course_id'], $previous['item_id'], $course_resource_plan_context, (int) ($previous['id'] ?? 0)) : '';
-    $nextUrl = $next ? course_resource_plan_url($baseUrl, $course['course_id'], $next['item_id'], $course_resource_plan_context, (int) ($next['id'] ?? 0)) : '';
+    $previousUrl = $previous ? course_resource_plan_url($baseUrl, $course['course_id'], $previous['item_id'], $planContext, (int) ($previous['id'] ?? 0)) : '';
+    $nextUrl = $next ? course_resource_plan_url($baseUrl, $course['course_id'], $next['item_id'], $planContext, (int) ($next['id'] ?? 0)) : '';
     $description = trim(strip_tags((string) ($resource['description'] ?? '')));
     $embedUrl = (string) ($resource['embed_url'] ?? '');
     $openUrl = (string) ($resource['open_url'] ?? '');
@@ -234,7 +208,7 @@ function course_resource_render_viewer(mysqli $conn, $baseUrl, $userId, array $c
 
     <nav class="course-resource-viewer-navigation" aria-label="Lesson navigation">
         <div><?php if ($previousUrl !== ''): ?><a class="course-resource-viewer-nav-link" href="<?= course_resource_escape($previousUrl); ?>"><span class="fas fa-arrow-left" aria-hidden="true"></span> Previous resource</a><?php endif; ?></div>
-        <div><?php if (!empty($course_resource_plan_context['plan']['id']) && !empty($navigation['plan']) && empty($next) && (string) ($course_resource_plan_context['plan']['status'] ?? '') === 'completed'): ?><a class="course-resource-viewer-nav-link" href="<?= course_resource_escape(mmh_recovery_plan_workspace_url($baseUrl, (string) $course['course_id'], (int) $course_resource_plan_context['plan']['id'])); ?>">Finish Recovery Plan <span class="fas fa-check" aria-hidden="true"></span></a><?php elseif ($nextUrl !== ''): ?><a class="course-resource-viewer-nav-link" href="<?= course_resource_escape($nextUrl); ?>">Next task <span class="fas fa-arrow-right" aria-hidden="true"></span></a><?php elseif (!empty($course_resource_plan_context['plan']['id'])): ?><a class="course-resource-viewer-nav-link" href="<?= course_resource_escape(mmh_recovery_plan_workspace_url($baseUrl, (string) $course['course_id'], (int) $course_resource_plan_context['plan']['id'])); ?>">Back to Recovery Plan <span class="fas fa-arrow-right" aria-hidden="true"></span></a><?php else: ?><a class="course-resource-viewer-nav-link" href="<?= course_resource_escape($courseUrl); ?>">Continue learning <span class="fas fa-arrow-right" aria-hidden="true"></span></a><?php endif; ?></div>
+        <div><?php if (!empty($planContext['plan']['id']) && !empty($navigation['plan']) && empty($next) && (string) ($planContext['plan']['status'] ?? '') === 'completed'): ?><a class="course-resource-viewer-nav-link" href="<?= course_resource_escape(mmh_recovery_plan_workspace_url($baseUrl, (string) $course['course_id'], (int) $planContext['plan']['id'])); ?>">Finish Recovery Plan <span class="fas fa-check" aria-hidden="true"></span></a><?php elseif ($nextUrl !== ''): ?><a class="course-resource-viewer-nav-link" href="<?= course_resource_escape($nextUrl); ?>">Next task <span class="fas fa-arrow-right" aria-hidden="true"></span></a><?php elseif (!empty($planContext['plan']['id'])): ?><a class="course-resource-viewer-nav-link" href="<?= course_resource_escape(mmh_recovery_plan_workspace_url($baseUrl, (string) $course['course_id'], (int) $planContext['plan']['id'])); ?>">Back to Recovery Plan <span class="fas fa-arrow-right" aria-hidden="true"></span></a><?php else: ?><a class="course-resource-viewer-nav-link" href="<?= course_resource_escape($courseUrl); ?>">Continue learning <span class="fas fa-arrow-right" aria-hidden="true"></span></a><?php endif; ?></div>
     </nav>
 </main>
 <script src="<?= course_resource_escape(rtrim((string) $baseUrl, '/') . '/resources/js/course-resource-viewer.js'); ?>" defer></script>
@@ -245,7 +219,7 @@ function course_resource_render_viewer(mysqli $conn, $baseUrl, $userId, array $c
     exit;
 }
 
-function course_resource_open_homework_part(mysqli $conn, $baseUrl, $userId, array $course, array $selection, $itemId, array $resource, $part)
+function course_resource_open_homework_part(mysqli $conn, $baseUrl, $userId, array $course, array $selection, $itemId, array $resource, $part, array $planContext = [])
 {
     $assignmentId = trim((string) ($resource['assignment_id'] ?? ''));
     $assignment = mmh_homework_assignment($conn, $assignmentId, (string) $course['course_id']);
@@ -283,7 +257,7 @@ function course_resource_open_homework_part(mysqli $conn, $baseUrl, $userId, arr
             'download_url' => $details['download_url'],
             'embed_kind' => $details['kind'],
         ]);
-        course_resource_render_viewer($conn, $baseUrl, $userId, $course, $viewerSelection, $itemId, $viewerResource);
+        course_resource_render_viewer($conn, $baseUrl, $userId, $course, $viewerSelection, $itemId, $viewerResource, $planContext);
     }
     course_resource_record_open($conn, $userId, $course, (string) ($selection['section_id'] ?? ''), $itemId, $viewerResource);
     header('Location: ' . $target, true, 302);
@@ -343,12 +317,12 @@ if (($resource['action'] ?? '') === 'homework') {
         if (!in_array($part, ['homework', 'model-answer'], true)) {
             course_resource_notice(404, 'Resource unavailable', 'This Homework resource could not be found.', $course['course_id']);
         }
-        course_resource_open_homework_part($conn, $baseUrl, $userId, $course, $selection, $itemId, $resource, $part);
+        course_resource_open_homework_part($conn, $baseUrl, $userId, $course, $selection, $itemId, $resource, $part, $course_resource_plan_context);
     }
     mmh_homework_render($conn, $baseUrl, $userId, $course, $selection, $itemId, $resource, $course_resource_plan_context);
 }
 if (($resource['action'] ?? '') === 'embed' && !empty($resource['embed_url'])) {
-    course_resource_render_viewer($conn, $baseUrl, $userId, $course, $selection, $itemId, $resource);
+    course_resource_render_viewer($conn, $baseUrl, $userId, $course, $selection, $itemId, $resource, $course_resource_plan_context);
 }
 if (($resource['action'] ?? '') === 'redirect' && !empty($resource['url'])) {
     course_resource_record_open($conn, $userId, $course, $sectionId, $itemId, $resource);
