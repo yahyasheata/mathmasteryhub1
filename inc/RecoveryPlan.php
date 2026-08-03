@@ -74,11 +74,11 @@ if (!function_exists('mmh_recovery_plan_load')) {
     {
         if ($studentId <= 0 || $courseId === '' || !mmh_recovery_plan_schema_available($conn)) return null;
         if ($planId !== null && $planId > 0) {
-            $stmt = $conn->prepare("SELECT id, user_id, course_id, title, status, created_by, created_at, updated_at, completed_at, completion_notified_at FROM recovery_plans WHERE id = ? AND user_id = ? AND course_id = ? LIMIT 1");
+            $stmt = $conn->prepare("SELECT id, user_id, course_id, title, status, created_by, template_id, assignment_id, template_version, created_at, updated_at, completed_at, completion_notified_at FROM recovery_plans WHERE id = ? AND user_id = ? AND course_id = ? LIMIT 1");
             if (!$stmt) return null;
             $stmt->bind_param('iis', $planId, $studentId, $courseId);
         } else {
-            $stmt = $conn->prepare("SELECT id, user_id, course_id, title, status, created_by, created_at, updated_at, completed_at, completion_notified_at FROM recovery_plans WHERE user_id = ? AND course_id = ? AND status IN ('active','completed') ORDER BY CASE WHEN status = 'active' THEN 0 ELSE 1 END, updated_at DESC, id DESC LIMIT 1");
+            $stmt = $conn->prepare("SELECT id, user_id, course_id, title, status, created_by, template_id, assignment_id, template_version, created_at, updated_at, completed_at, completion_notified_at FROM recovery_plans WHERE user_id = ? AND course_id = ? AND status IN ('active','completed') ORDER BY CASE WHEN status = 'active' THEN 0 ELSE 1 END, updated_at DESC, id DESC LIMIT 1");
             if (!$stmt) return null;
             $stmt->bind_param('is', $studentId, $courseId);
         }
@@ -154,6 +154,11 @@ if (!function_exists('mmh_recovery_plan_sync')) {
         }
         unset($task);
         $plan['total'] = $total; $plan['completed'] = $completed; $plan['required_total'] = $requiredTotal; $plan['required_completed'] = $requiredCompleted;
+        if (!empty($plan['assignment_id'])) {
+            $assignmentStatus = ($plan['status'] === 'completed' || ($requiredTotal > 0 && $requiredCompleted === $requiredTotal)) ? 'completed' : ($completed > 0 ? 'in_progress' : 'assigned');
+            $assignmentUpdate = $conn->prepare("UPDATE recovery_plan_assignments SET status = ?, started_at = CASE WHEN ? = 'in_progress' THEN COALESCE(started_at, CURRENT_TIMESTAMP) ELSE started_at END, completed_at = CASE WHEN ? = 'completed' THEN COALESCE(completed_at, CURRENT_TIMESTAMP) ELSE completed_at END, updated_at = CURRENT_TIMESTAMP WHERE id = ?");
+            if ($assignmentUpdate) { $assignmentId = (int) $plan['assignment_id']; $assignmentUpdate->bind_param('sssi', $assignmentStatus, $assignmentStatus, $assignmentStatus, $assignmentId); $assignmentUpdate->execute(); $assignmentUpdate->close(); }
+        }
         $plan['covered_item_ids'] = array_keys($coveredItems); $plan['covered_section_ids'] = array_keys($coveredSections); $plan['covered_topics'] = array_keys($coveredTopics);
         $plan['coverage_total'] = count($coveredItems) + count($coveredSections) + count($coveredTopics);
         if ($plan['status'] === 'active' && $requiredTotal > 0 && $requiredCompleted === $requiredTotal) {
