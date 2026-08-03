@@ -152,6 +152,7 @@ $admin_base = rtrim((string) $baseUrl, '/') . '/admin/';
                     <button type="button" class="course-manager-template" data-template="recording"><i class="fas fa-play-circle ds-icon" aria-hidden="true"></i><span>Recording</span><small>Paste a SharePoint recording link.</small></button>
                     <button type="button" class="course-manager-template" data-template="notes"><i class="far fa-file-alt ds-icon" aria-hidden="true"></i><span>Notes</span><small>Add a structured Notes resource for the LMS viewer.</small></button>
                     <button type="button" class="course-manager-template" data-template="classified_assignment"><i class="fas fa-clipboard-list ds-icon" aria-hidden="true"></i><span>Classified Assignment</span><small>Create the existing homework workflow.</small></button>
+                    <button type="button" class="course-manager-template" data-template="timed_exam"><i class="fas fa-stopwatch ds-icon" aria-hidden="true"></i><span>Timed Exam</span><small>Fixed Window exam with a protected paper and secure submissions.</small></button>
                     <button type="button" class="course-manager-template" data-template="custom_lesson"><i class="fas fa-puzzle-piece ds-icon" aria-hidden="true"></i><span>Custom Lesson</span><small>Create flexible teacher content.</small></button>
                 </div>
             </section>
@@ -252,7 +253,7 @@ $admin_base = rtrim((string) $baseUrl, '/') . '/admin/';
       var type = String($(this).data('template') || 'legacy');
       seen[type] = true;
     });
-    var label = { recording: 'Recording', notes: 'Notes', classified_assignment: 'Classified Assignment', assignment_model_answer: 'Assignment Model Answer', custom_lesson: 'Custom Lesson', custom_html: 'Legacy Lesson', resource: 'Structured Resource', legacy: 'Legacy Lesson', video: 'Video', file: 'File', quiz: 'Quiz' };
+    var label = { recording: 'Recording', notes: 'Notes', classified_assignment: 'Classified Assignment', timed_exam: 'Timed Exam', assignment_model_answer: 'Assignment Model Answer', custom_lesson: 'Custom Lesson', custom_html: 'Legacy Lesson', resource: 'Structured Resource', legacy: 'Legacy Lesson', video: 'Video', file: 'File', quiz: 'Quiz' };
     var html = '<option value="">All lesson types</option>';
     Object.keys(seen).sort().forEach(function(type) { html += '<option value="' + escapeHtml(type) + '">' + escapeHtml(label[type] || type.replace(/_/g, ' ')) + '</option>'; });
     $('#lesson-manager-type').html(html).val(current);
