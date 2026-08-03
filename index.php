@@ -282,6 +282,12 @@ $router->mount('/user', function() use ($router) {
         include('views/user/requests/upload-timed-exam.php');
     });
 
+    $router->post('/course/{courseId}/exam/{examId}/remove-upload', function($courseId, $examId) {
+        require_once '__init.php';
+        if (!isset($_SESSION['username'])) { http_response_code(401); exit('Sign in required.'); }
+        include('views/user/requests/remove-timed-exam-upload.php');
+    });
+
     $router->post('/course/{courseId}/exam/{examId}/submit', function($courseId, $examId) {
         require_once '__init.php';
         if (!isset($_SESSION['username'])) { http_response_code(401); exit('Sign in required.'); }

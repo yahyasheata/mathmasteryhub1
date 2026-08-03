@@ -428,6 +428,47 @@ if (!function_exists('mmh_timed_exam_submit')) {
     }
 }
 
+if (!function_exists('mmh_timed_exam_remove_latest_upload')) {
+    /** Remove only the current replaceable upload; finalized submissions are immutable. */
+    function mmh_timed_exam_remove_latest_upload(mysqli $conn, array $exam, int $studentId): array
+    {
+        $context = mmh_timed_exam_student_context($conn, $exam, $studentId);
+        $attempt = $context['attempt'] ?? null;
+        if (!$attempt) return [false, 'There is no uploaded answer to remove.'];
+        try {
+            $conn->begin_transaction();
+            $id = (int) ($attempt['id'] ?? 0);
+            $lock = $conn->prepare('SELECT * FROM timed_exam_attempts WHERE id = ? AND student_id = ? AND timed_exam_id = ? FOR UPDATE');
+            if (!$lock) throw new RuntimeException('Unable to lock exam attempt.');
+            $examId = (int) ($exam['id'] ?? 0);
+            $lock->bind_param('iii', $id, $studentId, $examId); $lock->execute();
+            $fresh = $lock->get_result()->fetch_assoc() ?: null; $lock->close();
+            if (!$fresh) throw new RuntimeException('Exam attempt not found.');
+            $state = mmh_timed_exam_state($exam, $fresh);
+            if (!in_array($state['key'], ['open', 'grace'], true)) throw new RuntimeException('Uploaded answers can only be removed before final submission.');
+            $version = mmh_timed_exam_latest_version($conn, $id, true);
+            if (!$version || (string) ($version['status'] ?? '') !== 'uploaded') throw new RuntimeException('There is no replaceable uploaded answer.');
+            $versionId = (int) $version['id'];
+            $delete = $conn->prepare("DELETE FROM timed_exam_submission_versions WHERE id = ? AND attempt_id = ? AND status = 'uploaded'");
+            if (!$delete) throw new RuntimeException('Unable to remove uploaded answer.');
+            $delete->bind_param('ii', $versionId, $id); if (!$delete->execute() || $delete->affected_rows !== 1) throw new RuntimeException('The uploaded answer could not be removed.'); $delete->close();
+            $previous = mmh_timed_exam_latest_version($conn, $id, true);
+            $latestId = $previous ? (int) $previous['id'] : null;
+            $update = $conn->prepare('UPDATE timed_exam_attempts SET latest_version_id = ?, is_late = ? WHERE id = ?');
+            if (!$update) throw new RuntimeException('Unable to update exam attempt.');
+            $late = $previous ? (int) ($previous['is_late'] ?? 0) : 0;
+            $update->bind_param('iii', $latestId, $late, $id); if (!$update->execute()) throw new RuntimeException($update->error); $update->close();
+            $conn->commit();
+            $path = dirname(__DIR__) . '/' . ltrim((string) ($version['storage_key'] ?? ''), '/');
+            if ($path !== dirname(__DIR__) . '/' && is_file($path)) @unlink($path);
+            return [true, 'Uploaded answer removed.'];
+        } catch (Throwable $e) {
+            $conn->rollback();
+            return [false, $e->getMessage() ?: 'The uploaded answer could not be removed.'];
+        }
+    }
+}
+
 if (!function_exists('mmh_timed_exam_download')) {
     function mmh_timed_exam_download(mysqli $conn, array $exam, bool $download = false): void
     {
