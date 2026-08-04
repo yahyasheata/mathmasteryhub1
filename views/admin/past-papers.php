@@ -114,7 +114,7 @@ $unlockRules = [
     <link rel="stylesheet" href="<?=rtrim((string)$baseUrl, '/')?>/resources/css/past-papers-admin.css">
 </head>
 <body class="dash ds-bg-primary">
-<form method="POST" action="<?=$baseUrl?>/resources/logout" id="logout-form" class="d-none"></form>
+<form method="POST" action="<?=$baseUrl?>/admin/logout" id="logout-form" class="d-none"><input type="hidden" name="mmh_csrf_token" value="<?=htmlspecialchars(mmh_admin_csrf_token(), ENT_QUOTES, 'UTF-8')?>"></form>
 <div class="col-12 d-flex">
     <?php include 'layouts/admin/aside.php'; ?>
     <div class="main-content in-active" style="overflow: hidden">

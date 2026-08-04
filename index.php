@@ -1,5 +1,6 @@
 <?php
 require_once __DIR__ . '/inc/RequestPolicy.php';
+require_once __DIR__ . '/inc/AdminSecurity.php';
 mmh_redirect_legacy_www_host();
 
 if (PHP_SAPI === 'cli-server') {
@@ -25,6 +26,9 @@ if (session_status() === PHP_SESSION_NONE) {
 $requestPath = parse_url($_SERVER['REQUEST_URI'] ?? '/', PHP_URL_PATH) ?: '/';
 if ($requestPath === '/user' || str_starts_with($requestPath, '/user/')) {
     mmh_send_private_response_headers();
+}
+if ($requestPath === '/admin' || str_starts_with($requestPath, '/admin/')) {
+    mmh_admin_response_headers();
 }
 
 // Maintenance is a centralized public gate. Admin sessions always bypass it.
@@ -118,8 +122,17 @@ $router->post('/auth/{authPage}', function($authPage) {
 // =======================
 $router->mount('/admin', function() use ($router) {
 
+    $router->post('/logout', function() {
+        mmh_admin_require_mutation();
+        require __DIR__ . '/views/auth/logout.php';
+    });
+
     $router->get('/logout', function() {
-        include('views/auth/logout.php');
+        mmh_admin_require_admin();
+        http_response_code(405);
+        header('Allow: POST');
+        echo 'Use the administrator logout form.';
+        exit;
     });
 
     $router->get('/', function() {
@@ -130,59 +143,51 @@ $router->mount('/admin', function() use ($router) {
 
     $router->get('/courses/{courseId}/content', function($courseId) {
         require_once '__init.php';
-        if (!isset($_SESSION['admin'])) {
-            header('Location: ' . mmh_current_request_base_url() . '/auth/login');
-            exit();
-        }
-        @include('views/admin/course-content.php');
+        mmh_admin_require_admin();
+        require __DIR__ . '/views/admin/course-content.php';
     });
 
     $router->get('/courses/{courseId}/content/{itemId}/preview', function($courseId, $itemId) {
         require_once '__init.php';
-        if (!isset($_SESSION['admin'])) {
-            header('Location: ' . mmh_current_request_base_url() . '/auth/login');
-            exit();
-        }
-        @include('views/admin/course-content-preview.php');
+        mmh_admin_require_admin();
+        require __DIR__ . '/views/admin/course-content-preview.php';
     });
 
     $router->get('/free-learning/resource-search', function() {
         require_once '__init.php';
-        if (empty($_SESSION['admin'])) { http_response_code(403); exit(); }
-        @include('views/admin/requests/search-resource-free-learning.php');
+        mmh_admin_require_admin(false);
+        require __DIR__ . '/views/admin/requests/search-resource-free-learning.php';
     });
 
     $router->get('/timed-exam-submissions/{courseId}/{examId}', function($courseId, $examId) {
         require_once '__init.php';
-        if (!isset($_SESSION['admin'])) { http_response_code(403); exit(); }
-        @include('views/admin/timed-exam-submissions.php');
+        mmh_admin_require_admin(false);
+        require __DIR__ . '/views/admin/timed-exam-submissions.php';
     });
 
     $router->get('/timed-exam-answer/{versionId}', function($versionId) {
         require_once '__init.php';
-        if (!isset($_SESSION['admin'])) { http_response_code(403); exit(); }
-        @include('views/admin/requests/download-timed-exam-answer.php');
+        mmh_admin_require_admin(false);
+        require __DIR__ . '/views/admin/requests/download-timed-exam-answer.php';
     });
 
     // Parent Reports renders and processes the same page so Preview, comments,
     // and PDF output retain the existing Admin form workflow.
     $router->post('/parent-reports', function() {
         require_once '__init.php';
-        if (!isset($_SESSION['admin'])) {
-            header('Location: ' . mmh_current_request_base_url() . '/auth/login');
-            exit();
-        }
-        @include('views/admin/parent-reports.php');
+        mmh_admin_require_mutation();
+        require __DIR__ . '/views/admin/parent-reports.php';
     });
 
     $router->get('/{pageName}', function($pageName) {
         require_once '__init.php';
-        if (!isset($_SESSION['admin'])) {
-            header('Location: ' . mmh_current_request_base_url() . '/auth/login');
-            exit();
-        } else {
-            @include("views/admin/$pageName.php");
+        mmh_admin_require_admin();
+        if (!mmh_admin_allowed_page((string) $pageName)) {
+            http_response_code(404);
+            echo 'Not found.';
+            return;
         }
+        require __DIR__ . '/views/admin/' . $pageName . '.php';
     });
 
     // Course Content bulk actions use the existing plural handler name. Keep
@@ -190,21 +195,20 @@ $router->mount('/admin', function() use ($router) {
     // endpoint explicitly.
     $router->post('/requests/item/bulk', function() {
         require_once '__init.php';
-        if (!isset($_SESSION['admin'])) {
-            header('Location: ' . mmh_current_request_base_url() . '/auth/login');
-            exit();
-        }
-        @include('views/admin/requests/bulk-items.php');
+        mmh_admin_require_mutation();
+        require __DIR__ . '/views/admin/requests/bulk-items.php';
     });
 
     $router->post('/requests/{page}/{action}', function($page, $action) {
         require_once '__init.php';
-        if (!isset($_SESSION['admin'])) {
-            header('Location: ' . mmh_current_request_base_url() . '/auth/login');
-            exit();
-        } else {
-            @include("views/admin/requests/$action-$page.php");
+        $handler = mmh_admin_allowed_handler((string) $page, (string) $action);
+        if ($handler === null) {
+            http_response_code(404);
+            echo 'Not found.';
+            return;
         }
+        mmh_admin_require_mutation();
+        require __DIR__ . '/views/admin/requests/' . $handler;
     });
 
 });
@@ -337,7 +341,7 @@ $router->mount('/user', function() use ($router) {
 // =======================
 $router->post('/payment/webhook_json', function() {
     require_once '__init.php';
-    @include("views/public/payment/webhook_json.php");
+    require __DIR__ . '/views/public/payment/webhook_json.php';
 });
 
 // =======================

@@ -14,7 +14,7 @@ if (!function_exists('mmh_public_course_find')) {
     {
         $identifier = mmh_public_course_identifier($identifier);
         if ($identifier === null) return null;
-        $stmt = $conn->prepare('SELECT * FROM courses WHERE course_id = ? OR CAST(id AS CHAR) = ? LIMIT 1');
+        $stmt = $conn->prepare('SELECT * FROM courses WHERE archived_at IS NULL AND (course_id = ? OR CAST(id AS CHAR) = ?) LIMIT 1');
         if (!$stmt) return null;
         $stmt->bind_param('ss', $identifier, $identifier);
         $stmt->execute();

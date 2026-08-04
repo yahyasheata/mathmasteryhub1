@@ -24,18 +24,24 @@ class FawaterkPayment
     public function payForCourse($user_id, $course_id)
     {
         // Fetch user info
-        $userResult = $this->conn->query("SELECT * FROM users WHERE user_id = $user_id");
-        if ($userResult->num_rows == 0) {
+        $userStmt = $this->conn->prepare('SELECT * FROM users WHERE user_id = ? LIMIT 1');
+        $userStmt->bind_param('i', $user_id);
+        $userStmt->execute();
+        $user = $userStmt->get_result()->fetch_assoc();
+        $userStmt->close();
+        if (!$user) {
             return ['status' => 0, 'message' => 'User not found'];
         }
-        $user = $userResult->fetch_assoc();
 
         // Fetch course info
-        $courseResult = $this->conn->query("SELECT * FROM courses WHERE course_id = $course_id");
-        if ($courseResult->num_rows == 0) {
+        $courseStmt = $this->conn->prepare('SELECT * FROM courses WHERE course_id = ? LIMIT 1');
+        $courseStmt->bind_param('i', $course_id);
+        $courseStmt->execute();
+        $course = $courseStmt->get_result()->fetch_assoc();
+        $courseStmt->close();
+        if (!$course) {
             return ['status' => 0, 'message' => 'Course not found'];
         }
-        $course = $courseResult->fetch_assoc();
 
         // Prepare invoice data
         $invoiceData = [

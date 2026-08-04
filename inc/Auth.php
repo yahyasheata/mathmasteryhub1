@@ -68,6 +68,9 @@ if (!function_exists('mmh_auth_regenerate_session')) {
     {
         if (session_status() === PHP_SESSION_ACTIVE) {
             session_regenerate_id(true);
+            // A session-id rotation must never carry an old administrator
+            // mutation token into the new authenticated session.
+            unset($_SESSION['mmh_admin_csrf_token']);
         }
     }
 }
@@ -175,4 +178,3 @@ if (!function_exists('mmh_auth_destination')) {
             : ($baseUrl !== '' ? $baseUrl . '/' : '/');
     }
 }
-

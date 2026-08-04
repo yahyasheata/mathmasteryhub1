@@ -60,9 +60,12 @@ if (mmh_public_course_enrolled($conn, (int) $user_id, (string) $course['course_i
 }
 
 // Check course price
-$courseResult = $conn->query("SELECT course_price, course_title FROM courses WHERE course_id = $course_id");
-if ($courseResult && $courseResult->num_rows > 0) {
-    $course = $courseResult->fetch_assoc();
+$courseStmt = $conn->prepare('SELECT course_price, course_title FROM courses WHERE course_id = ? AND archived_at IS NULL LIMIT 1');
+$courseStmt->bind_param('i', $course_id);
+$courseStmt->execute();
+$course = $courseStmt->get_result()->fetch_assoc();
+$courseStmt->close();
+if ($course) {
     if (floatval($course['course_price']) == 0) {
         // Free course: register directly
         $transactionLog = new TransactionLog($conn);
@@ -73,8 +76,12 @@ if ($courseResult && $courseResult->num_rows > 0) {
 }
 
 
-// $apiKey = '9d6d010f953a86245b649c14ea4a1420dc01272f482a471e63'; // TODO: Replace with your real API key or load from config
-$apiKey = 'e5a4ac54665ac8be9b10ae70419f39e72e9887ce27c70be995'; // TODO: Replace with your real API key or load from config
+$apiKey = trim((string) (getenv('FAWATERAK_API_KEY') ?: ''));
+if ($apiKey === '') {
+    http_response_code(503);
+    echo json_encode(['status' => 0, 'message' => 'Online payments are not configured.']);
+    exit;
+}
 
 $fawaterk = new FawaterkPayment($conn, $apiKey);
 

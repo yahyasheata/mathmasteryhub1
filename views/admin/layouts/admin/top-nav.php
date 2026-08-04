@@ -84,7 +84,7 @@ $adminTopAvatarUrl = mmh_site_public_url(mmh_site_settings_valid_local_asset($us
                 <li>
                     <hr style="height: 1px; margin: 10px 0px 5px">
                 </li>
-                <li><a class="dropdown-item font-1" href="logout"><span
+                <li><a class="dropdown-item font-1" href="<?=rtrim((string) ($baseUrl ?? ''), '/')?>/admin/logout" onclick="var f=document.getElementById('admin-sidebar-logout-form') || document.getElementById('logout-form'); if(f){event.preventDefault(); f.submit();} return false;"><span
                             class="fas fa-sign-out-alt font-1"></span> Logout</a></li>
             </ul>
 

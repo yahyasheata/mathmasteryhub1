@@ -37,6 +37,9 @@ function isActive($page)
 
 // echo setActive('teachers');
 ?>
+<form id="admin-sidebar-logout-form" method="post" action="<?=rtrim((string) ($baseUrl ?? ''), '/')?>/admin/logout" class="d-none">
+    <input type="hidden" name="mmh_csrf_token" value="<?=htmlspecialchars(mmh_admin_csrf_token(), ENT_QUOTES, 'UTF-8')?>">
+</form>
 <aside id="admin-sidebar" class='aside active ds-surface' style="width: 260px; min-height: 100vh; position: fixed; z-index: 900">
     <div class="col-12 px-0 d-flex" style="height: 55px">
         <div class='col-12 p-1 ds-text-secondary'>
@@ -210,7 +213,7 @@ function isActive($page)
                 </div>
             </a>
 
-            <a href="logout" class="col-12 px-0" onclick="document.getElementById('logout-form').submit();">
+            <a href="<?=rtrim((string) ($baseUrl ?? ''), '/')?>/admin/logout" class="col-12 px-0" onclick="var f=document.getElementById('admin-sidebar-logout-form'); if(f){event.preventDefault(); f.submit();} return false;">
                 <div class="col-12 item-container px-0 d-flex">
                     <div style="width: 50px" class="px-3 text-center">
                         <span class="fas fa-sign-out-alt font-2 ds-nav-icon" aria-hidden="true"> </span>

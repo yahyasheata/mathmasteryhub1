@@ -51,7 +51,7 @@ $settingsSaveState = (($flash['type'] ?? '') === 'success') ? 'All changes saved
   <link rel="stylesheet" href="<?=mmh_site_public_url('resources/css/admin-settings.css')?>?v=<?=@filemtime('resources/css/admin-settings.css') ?: 1?>">
 </head>
 <body class="dash ds-bg-primary admin-settings-page">
-<form method="POST" action="<?=$adminSettingsBase?>/resources/logout" id="logout-form" class="d-none"></form>
+<form method="POST" action="<?=$adminSettingsBase?>/admin/logout" id="logout-form" class="d-none"><input type="hidden" name="mmh_csrf_token" value="<?=htmlspecialchars(mmh_admin_csrf_token(), ENT_QUOTES, 'UTF-8')?>"></form>
 <div class="col-12 d-flex">
   <?php include 'layouts/admin/aside.php'; ?>
   <div class="main-content in-active admin-settings-main">

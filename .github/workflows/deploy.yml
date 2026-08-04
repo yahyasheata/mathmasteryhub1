@@ -19,8 +19,32 @@ jobs:
           script: |
             set -e
             cd /home/mathqclj/public_html
+            backup_dir="/home/mathqclj/backups/admin-security-$(date -u +%Y%m%dT%H%M%SZ)"
+            mkdir -p "$backup_dir"
+            tar -czf "$backup_dir/files.tgz" .htaccess index.php __init.php connection/config.php inc views/admin views/public/payment views/public/requests views/user/requests
+            if [ -f .env ]; then
+              set -a
+              . ./.env
+              set +a
+            fi
+            DB_HOST="${DB_HOST:-127.0.0.1}"
+            DB_NAME="${DB_NAME:-mathmsgv_lms}"
+            DB_USER="${DB_USER:-root}"
+            DB_PASS="${DB_PASS:-}"
+            if command -v mysqldump >/dev/null 2>&1; then
+              dump_defaults="$(mktemp)"
+              chmod 600 "$dump_defaults"
+              printf '[client]\nhost=%s\nuser=%s\npassword=%s\n' "$DB_HOST" "$DB_USER" "$DB_PASS" > "$dump_defaults"
+              mysqldump --defaults-extra-file="$dump_defaults" "$DB_NAME" course_logs courses users assignments course_items categories timed_exams transactions notifications > "$backup_dir/tables.sql"
+              rm -f "$dump_defaults"
+            else
+              echo "Database backup could not be created: mysqldump or DB settings are unavailable." >&2
+              exit 1
+            fi
             git fetch origin main
             git reset --hard origin/main
+            php database/migrations/20260806_add_admin_archive_markers.php
+            php database/migrations/20260806_enforce_course_log_uniqueness.php
             php database/migrations/20260801_create_student_learning_evidence.php
             php database/migrations/20260802_create_recovery_plans.php
             php database/migrations/20260802_create_recovery_plan_coverage.php

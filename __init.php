@@ -1,4 +1,6 @@
 <?php
+require_once __DIR__ . '/inc/AdminSecurity.php';
+mmh_admin_block_direct_internal_file();
 if (!function_exists('mmh_current_request_origin')) {
     /** Build a safe absolute origin from the current request, retaining a valid port. */
     function mmh_current_request_origin(): string

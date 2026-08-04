@@ -235,7 +235,7 @@ if (!function_exists('mmh_analytics_course_dataset')) {
         $courseId = (string) $courseId;
         $assignments = mmh_analytics_fetch_rows(
             $conn,
-            'SELECT assignment_id, assignment_title, due_date, course_id, section_id, item_id, topic, subtopic, topic_id, subtopic_id, additional_topic_ids, max_score, passing_score, weight, difficulty, recommended_recording_item_id, recommended_notes_item_id, recommended_revision_item_id, allow_self_score, require_teacher_verification, completion_requirement, completion_rule, minimum_score FROM assignments WHERE course_id = ? ORDER BY due_date ASC, id ASC',
+            'SELECT assignment_id, assignment_title, due_date, course_id, section_id, item_id, topic, subtopic, topic_id, subtopic_id, additional_topic_ids, max_score, passing_score, weight, difficulty, recommended_recording_item_id, recommended_notes_item_id, recommended_revision_item_id, allow_self_score, require_teacher_verification, completion_requirement, completion_rule, minimum_score FROM assignments WHERE course_id = ? AND archived_at IS NULL ORDER BY due_date ASC, id ASC',
             's',
             [$courseId]
         );

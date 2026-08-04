@@ -8,9 +8,19 @@
    correct colors are established before any other stylesheet paints, avoiding
    a flash of incorrect theme/layout right after the post-login redirect. */
 require_once 'connection/config.php';
+$adminCsrfToken = mmh_admin_csrf_token();
 $adminBrandSettings = isset($site_settings) && is_array($site_settings) ? $site_settings : getSiteSettings();
 $adminFaviconUrl = mmh_site_settings_asset_url($adminBrandSettings, 'website_icon', 'resources/images/default/favicon.png');
-@$isDarkMode = mysqli_fetch_assoc(mysqli_query($conn,"SELECT settings.key,settings.value FROM settings WHERE settings.key='dashboard_dark_mode'"))['value'];
+$isDarkMode = 0;
+$themeStmt = $conn->prepare("SELECT value FROM settings WHERE `key` = ? LIMIT 1");
+if ($themeStmt) {
+    $themeKey = 'dashboard_dark_mode';
+    $themeStmt->bind_param('s', $themeKey);
+    $themeStmt->execute();
+    $themeRow = $themeStmt->get_result()->fetch_assoc();
+    $isDarkMode = (int) ($themeRow['value'] ?? 0);
+    $themeStmt->close();
+}
 ?>
 <script>
     document.documentElement.setAttribute('data-bs-theme', '<?=$isDarkMode == 1 ? 'dark' : 'light'?>');
@@ -48,6 +58,7 @@ $adminFaviconUrl = mmh_site_settings_asset_url($adminBrandSettings, 'website_ico
     <meta name="theme-color" content="#F15A22">
     <meta name="mobile-web-app-capable" content="no">
     <meta name="application-name" content="<?=$site_name;?>">
+    <meta name="csrf-token" content="<?=htmlspecialchars($adminCsrfToken, ENT_QUOTES, 'UTF-8')?>">
 
     <link href="<?=$adminFaviconUrl?>"
         media="(device-width: 320px) and (device-height: 568px) and (-webkit-device-pixel-ratio: 2)"
@@ -79,6 +90,33 @@ $adminFaviconUrl = mmh_site_settings_asset_url($adminBrandSettings, 'website_ico
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/nprogress/0.2.0/nprogress.min.css" integrity="sha512-42kB9yDlYiCEfx2xVwq0q7hT4uf26FUgSIZBK8uiaEnTdShXjwr8Ip1V4xGJMg3mHkUt9nNuTDxunHF0/EgxLQ==" crossorigin="anonymous" referrerpolicy="no-referrer" />
 
     <script type="text/javascript" src="<?=mmh_site_public_url('resources/js/jquery-3.6.1.min.js')?>"></script>
+    <script>
+    (function () {
+        var token = <?=json_encode($adminCsrfToken, JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT)?>;
+        function addToken(form) {
+            if (!form || (form.method || 'get').toLowerCase() !== 'post') return;
+            var field = form.querySelector('input[name="mmh_csrf_token"]');
+            if (!field) {
+                field = document.createElement('input');
+                field.type = 'hidden';
+                field.name = 'mmh_csrf_token';
+                form.appendChild(field);
+            }
+            field.value = token;
+        }
+        document.addEventListener('DOMContentLoaded', function () {
+            document.querySelectorAll('form').forEach(addToken);
+        });
+        document.addEventListener('submit', function (event) { addToken(event.target); }, true);
+        if (window.jQuery) {
+            window.jQuery.ajaxPrefilter(function (options, originalOptions, jqXHR) {
+                if ((options.type || options.method || 'GET').toUpperCase() !== 'GET') {
+                    jqXHR.setRequestHeader('X-CSRF-Token', token);
+                }
+            });
+        }
+    }());
+    </script>
 <?php $adminShellJsVersion = (string) (@filemtime(__DIR__ . '/../../../../resources/js/admin-shell.js') ?: 1); ?>
 <script defer src="<?=mmh_site_public_url('resources/js/admin-shell.js')?>?v=<?=rawurlencode($adminShellJsVersion)?>"></script>
 
@@ -105,4 +143,3 @@ $adminFaviconUrl = mmh_site_settings_asset_url($adminBrandSettings, 'website_ico
 <!-- include summernote css/js -->
 <!-- <link href="https://cdn.jsdelivr.net/npm/summernote@0.8.18/dist/summernote.min.css" rel="stylesheet">
 <script src="https://cdn.jsdelivr.net/npm/summernote@0.8.18/dist/summernote.min.js"></script> -->
-

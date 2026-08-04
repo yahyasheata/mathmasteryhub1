@@ -1,4 +1,6 @@
 <?php
+require_once __DIR__ . '/../inc/AdminSecurity.php';
+mmh_admin_block_direct_internal_file();
 /**
  * Load local environment values once, without overriding values supplied by
  * the web server/PHP-FPM process. Secrets are never emitted by this bootstrap.
@@ -56,14 +58,27 @@ $conn = mysqli_connect($host, $user, $pass, $db);
 
 if (!$conn) {
     http_response_code(500);
-    exit(
-        'Local database connection failed: ' . mysqli_connect_error()
-        . '. Confirm that MySQL is running and the mathmsgv_lms database exists.'
-    );
+    error_log('Database connection failed: ' . mysqli_connect_error());
+    exit('A temporary server error occurred.');
 }
 
 mysqli_set_charset($conn, 'utf8');
 $GLOBALS['conn'] = $conn;
+
+// Defence in depth for included admin pages/handlers.  The front controller
+// remains the normal gate, but an admin implementation file cannot be reused
+// from another request without an authenticated administrator session.
+if (function_exists('mmh_admin_require_admin')) {
+    $adminStack = debug_backtrace(DEBUG_BACKTRACE_IGNORE_ARGS);
+    $projectRoot = str_replace('\\', '/', dirname(__DIR__));
+    foreach ($adminStack as $frame) {
+        $caller = str_replace('\\', '/', (string) ($frame['file'] ?? ''));
+        if (str_starts_with($caller, $projectRoot . '/views/admin/')) {
+            mmh_admin_require_admin(false);
+            break;
+        }
+    }
+}
 
 function db()
 {

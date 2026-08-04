@@ -68,7 +68,7 @@ function mmh_learning_journey_visible_items(mysqli $conn, string $courseId): arr
 {
     $stmt = $conn->prepare("SELECT i.item_id, i.item_title, i.item_description, i.section_id, i.item_type, i.template_type, i.template_data, i.assignment_id, i.duration_minutes, i.sort_order, i.page_order, s.title AS section_title, s.sort_order AS section_sort_order
         FROM course_items i LEFT JOIN course_sections s ON s.course_id = i.course_id AND s.section_id = i.section_id
-        WHERE i.course_id = ? AND (i.status IS NULL OR i.status = '' OR i.status = 'published')
+        WHERE i.course_id = ? AND i.archived_at IS NULL AND (i.status IS NULL OR i.status = '' OR i.status = 'published')
           AND (i.section_id IS NULL OR i.section_id = '' OR s.status IS NULL OR s.status = '' OR s.status = 'published')
         ORDER BY CASE WHEN i.section_id IS NULL OR i.section_id = '' THEN 0 ELSE 1 END, COALESCE(s.sort_order, 0), COALESCE(s.id, 0), COALESCE(i.sort_order, 0), COALESCE(i.page_order, 0), i.item_id ASC, i.id ASC");
     if (!$stmt) { return []; }

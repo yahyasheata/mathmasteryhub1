@@ -6,7 +6,7 @@ $pageName = "courses";
 $username = $_SESSION['username'];
 $user_id = getUserInfo($username)->user_id;
 $conn = db();
-$courses_query = "SELECT * FROM courses WHERE course_status=1 ";
+$courses_query = "SELECT * FROM courses WHERE course_status=1 AND archived_at IS NULL ";
 $coures_result = mysqli_query($conn,$courses_query);
 // echo ($courseId);
 if( mysqli_num_rows($coures_result) > 0 ){

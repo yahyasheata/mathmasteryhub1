@@ -10,16 +10,16 @@ if($_SERVER['REQUEST_METHOD'] == "POST" ){
         if ( isset($_POST['course_id']) && !empty($_POST['course_id']) ) {
             $conn = db();
             mmh_ensure_learning_schema($conn);
-            $course_id = $_POST['course_id'];
+            $course_id = filter_var($_POST['course_id'], FILTER_VALIDATE_INT, ['options' => ['min_range' => 1]]);
+            if ($course_id === false) { exit(json_encode(['status' => 0, 'message' => 'Invalid course.'])); }
 
     
-            // $query = "SELECT * FROM courses WHERE course_id='$course_id' ";
-            $query = "SELECT * FROM courses WHERE course_id='$course_id' ";
-            
-            $result = mysqli_query($conn,$query);
-            if($result){
-
-                $course_data = mysqli_fetch_assoc($result);
+            $courseStmt = $conn->prepare('SELECT * FROM courses WHERE course_id = ? LIMIT 1');
+            $courseStmt->bind_param('i', $course_id);
+            $courseStmt->execute();
+            $course_data = $courseStmt->get_result()->fetch_assoc();
+            $courseStmt->close();
+            if($course_data){
                 $course_id = $course_data["course_id"];
                 $course_title = $course_data["course_title"];
                 // $course_link = $course_data["course_link"];
@@ -38,7 +38,7 @@ if($_SERVER['REQUEST_METHOD'] == "POST" ){
                 $score_auto_selected = $default_homework_score_mode === 'accept_automatically' ? 'selected' : '';
                 $score_verify_selected = $default_homework_score_mode === 'require_teacher_verification' ? 'selected' : '';
                 
-                $categories_result = mysqli_query($conn,"SELECT id,category_id,category_title from categories");
+                $categories_result = $conn->query("SELECT id, category_id, category_title FROM categories");
                 $categorie_options = "";
                 while( $categories_data = mysqli_fetch_assoc($categories_result)){
                     if ($categories_data['id'] == $c_course_category ) {
@@ -62,7 +62,7 @@ if($_SERVER['REQUEST_METHOD'] == "POST" ){
                         <button type='button' class='btn-close' data-bs-dismiss='modal' aria-label='Close'></button>
                       </div>
                       <div class='modal-body'>
-                        <form action='requests/add-course' method='POST' id='updateCourse' enctype='multipart/form-data'>
+                        <form action='requests/course/edit' method='POST' id='updateCourse' enctype='multipart/form-data'>
 
                             <fieldset class='form-fieldset api-mode'>
                             <label
@@ -236,134 +236,41 @@ if($_SERVER['REQUEST_METHOD'] == "POST" ){
 
 
 
-if($_SERVER['REQUEST_METHOD'] == "POST" ){
-  if(isset($_POST['_method']) && $_POST['_method'] == 'UPDATE' ){
-
-    mmh_ensure_learning_schema(db());
-
-
-    if ( isset($_POST['course_id'],$_POST['course_category'],$_POST['course_title'],$_POST['course_title_en'],$_POST['course_price'],$_POST['course_description']) 
-    && !empty($_POST['course_title']) && !empty($_POST['course_title_en']) && !empty($_POST['course_description']) ) {
-
-        $course_category = $_POST['course_category'];
-        $course_title = $_POST['course_title'];
-        $course_title_en = $_POST['course_title_en'];
-        $course_price = $_POST['course_price'];
-        $course_description = $_POST['course_description'];
-        $course_price = $_POST['course_price'];
-        $preDiscount_course_price = $_POST['preDiscount_course_price'];
-        $course_id = $_POST['course_id'];
-        $whatsapp_group = null; 
-        if(isset($_POST['whatsapp_group']) && !empty($_POST['whatsapp_group']) ){
-            $whatsapp_group = $_POST['whatsapp_group']; 
-        }else{
-            $whatsapp_group = null; 
-            
-        }
-
-        $sequential_learning = (isset($_POST['sequential_learning']) && (string)$_POST['sequential_learning'] === '1') ? 1 : 0;
-        $default_homework_score_mode = mmh_academic_score_mode($_POST['default_homework_score_mode'] ?? 'disabled');
-
-        $old_course_image = mysqli_fetch_assoc(mysqli_query(db(),"SELECT course_image FROM courses WHERE course_id='$course_id' "))['course_image'];
-
-
-
-        if(isset($_FILES['course_image']) && !$_FILES['course_image']['error'] ){
-            $course_image = $_FILES['course_image'];
-            $uploadImgResponse = json_decode(uploadImage($course_image,'uploads/static/courses'));
-            // echo $uploadImgResponse->status;
-            if($uploadImgResponse->status === 1){
-                removeFile($old_course_image);
-
-                $course_image = $uploadImgResponse->file_path;
-
-                $query = "UPDATE courses SET
-                course_title = '$course_title',
-                course_title_en = '$course_title_en',
-                course_description = '$course_description',
-                course_image = '$course_image',
-                course_price = '$course_price',
-                preDiscount_course_price = '$preDiscount_course_price',
-                course_category = '$course_category',
-                whatsapp_group = '$whatsapp_group',
-                sequential_learning = '$sequential_learning',
-                default_homework_score_mode = '$default_homework_score_mode'
-                WHERE course_id = '$course_id';";
-
-
-                $result = mysqli_query(db(),$query);
-                if($result){
-                    $response = array(
-                        'status' => 1,
-                        'message' => 'تم Edit Course Details بنجاح'
-                    );
-                    $response = json_encode($response);
-                    echo $response;
-                }else{
-                    $response = array(
-                        'status' => 0,
-                        'message' => 'Error',
-                        'reason' => 'هناك خطاً عن الاتصال بقاعدة الDetails , حاول مرة Other'
-                    );
-                    $response = json_encode($response);
-                    echo $response;
-                }
-            }else{
-                echo '{"status":0,"message":"Error !","reason":"There was an error uploading the image"}';
-            }
-
-        }else{
-            // $course_image = 'uploads/static/courses/categories/default.jpg';
-            
-            $query = "UPDATE courses SET
-            course_title = '$course_title',
-            course_title_en = '$course_title_en',
-            course_description = '$course_description',
-            course_price = '$course_price',
-            preDiscount_course_price = '$preDiscount_course_price',
-            course_category = '$course_category',
-            whatsapp_group = '$whatsapp_group',
-            sequential_learning = '$sequential_learning',
-            default_homework_score_mode = '$default_homework_score_mode'
-            WHERE course_id = '$course_id';";
-            
-            $result = mysqli_query(db(),$query);
-            if($result){
-                $response = array(
-                    'status' => 1,
-                    'message' => 'تم Edit Course Details بنجاح'
-                );
-                $response = json_encode($response);
-                echo $response;
-            }else{
-                $response = array(
-                    'status' => 0,
-                    'message' => 'Error',
-                    'reason' => 'هناك خطاً عن الاتصال بقاعدة الDetails , حاول مرة Other'
-                );
-                $response = json_encode($response);
-                echo $response;
-            }
-        }
-
-
-
-    }else {
-        $response = array(
-            'status' => 0,
-            'message' => 'Error',
-            'reason' => 'All required fields must be completed'
-        );
-        $response = json_encode($response);
-        echo $response;
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && (string) ($_POST['_method'] ?? '') === 'UPDATE') {
+    $courseId = filter_var($_POST['course_id'] ?? null, FILTER_VALIDATE_INT, ['options' => ['min_range' => 1]]);
+    $category = filter_var($_POST['course_category'] ?? null, FILTER_VALIDATE_INT);
+    $title = trim((string) ($_POST['course_title'] ?? ''));
+    $titleEn = trim((string) ($_POST['course_title_en'] ?? ''));
+    $description = trim((string) ($_POST['course_description'] ?? ''));
+    $price = is_numeric($_POST['course_price'] ?? null) ? (float) $_POST['course_price'] : 0.0;
+    $preDiscount = is_numeric($_POST['preDiscount_course_price'] ?? null) ? (float) $_POST['preDiscount_course_price'] : 0.0;
+    $whatsapp = trim((string) ($_POST['whatsapp_group'] ?? ''));
+    $whatsapp = $whatsapp === '' ? null : $whatsapp;
+    $sequential = (string) ($_POST['sequential_learning'] ?? '') === '1' ? 1 : 0;
+    $scoreMode = mmh_academic_score_mode($_POST['default_homework_score_mode'] ?? 'disabled');
+    if ($courseId === false || $title === '' || $titleEn === '' || $description === '') {
+        exit(json_encode(['status' => 0, 'message' => 'All required fields must be completed']));
     }
 
-  }
-
-
-
-}else{
-
+    $imagePath = null;
+    if (isset($_FILES['course_image']) && (int) ($_FILES['course_image']['error'] ?? UPLOAD_ERR_NO_FILE) === UPLOAD_ERR_OK) {
+        $upload = json_decode(uploadImage($_FILES['course_image'], 'uploads/static/courses'), true);
+        if (!is_array($upload) || (int) ($upload['status'] ?? 0) !== 1) {
+            exit(json_encode(['status' => 0, 'message' => 'There was an error uploading the image']));
+        }
+        $imagePath = (string) ($upload['file_path'] ?? '');
+    }
+    $conn = db();
+    if ($imagePath !== null && $imagePath !== '') {
+        $stmt = $conn->prepare('UPDATE courses SET course_title = ?, course_title_en = ?, course_description = ?, course_image = ?, course_price = ?, preDiscount_course_price = ?, course_category = ?, whatsapp_group = ?, sequential_learning = ?, default_homework_score_mode = ? WHERE course_id = ?');
+        $stmt->bind_param('ssssddisisi', $title, $titleEn, $description, $imagePath, $price, $preDiscount, $category, $whatsapp, $sequential, $scoreMode, $courseId);
+    } else {
+        $stmt = $conn->prepare('UPDATE courses SET course_title = ?, course_title_en = ?, course_description = ?, course_price = ?, preDiscount_course_price = ?, course_category = ?, whatsapp_group = ?, sequential_learning = ?, default_homework_score_mode = ? WHERE course_id = ?');
+        $stmt->bind_param('sssddisisi', $title, $titleEn, $description, $price, $preDiscount, $category, $whatsapp, $sequential, $scoreMode, $courseId);
+    }
+    $ok = $stmt && $stmt->execute();
+    if ($stmt) { $stmt->close(); }
+    echo json_encode(['status' => $ok ? 1 : 0, 'message' => $ok ? 'Course updated successfully' : 'Database connection error']);
 }
 
 

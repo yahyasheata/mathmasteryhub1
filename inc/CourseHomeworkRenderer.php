@@ -22,7 +22,7 @@ if (!function_exists('mmh_homework_submission_endpoint')) {
 if (!function_exists('mmh_homework_assignment')) {
     function mmh_homework_assignment(mysqli $conn, $assignmentId, $courseId)
     {
-        $stmt = $conn->prepare('SELECT assignment_id, assignment_title, assignment_description, due_date, late_submission_enabled, late_submission_until, file_path, course_id, section_id, item_id, max_score, allow_self_score, require_teacher_verification, completion_requirement, completion_rule, minimum_score FROM assignments WHERE assignment_id = ? AND course_id = ? LIMIT 1');
+        $stmt = $conn->prepare('SELECT assignment_id, assignment_title, assignment_description, due_date, late_submission_enabled, late_submission_until, file_path, course_id, section_id, item_id, max_score, allow_self_score, require_teacher_verification, completion_requirement, completion_rule, minimum_score FROM assignments WHERE assignment_id = ? AND course_id = ? AND archived_at IS NULL LIMIT 1');
         if (!$stmt) return null;
         $stmt->bind_param('ss', $assignmentId, $courseId);
         $stmt->execute();

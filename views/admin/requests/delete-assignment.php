@@ -1,40 +1,24 @@
-<?php 
+<?php
 require_once 'connection/config.php';
+require_once '__init.php';
 
-if($_SERVER['REQUEST_METHOD'] == "POST" ){
-    if(isset($_POST['_method']) && $_POST['_method'] == 'DELETE' ){
-        if ( isset($_POST['assignment_id']) && !empty($_POST['assignment_id']) ) {
-            $assignment_id = $_POST['assignment_id'];
-            // Remove the assignment file from the server if it exists
-            $file_query = "SELECT file_path FROM assignments WHERE assignment_id='$assignment_id' ";
-            $file_result = mysqli_query(db(), $file_query);
-            if ($file_result && $row = mysqli_fetch_assoc($file_result)) {
-                $file_path = $row['file_path'];
-                if ($file_path && file_exists($file_path)) {
-                    @unlink($file_path);
-                }
-            }
-            $query = "DELETE FROM assignments WHERE assignment_id='$assignment_id' ";
-            $result = mysqli_query(db(),$query);
-            if($result){
-                $response = array(
-                    'status' => 1,
-                    'message' => 'Assignment deleted successfully'
-                );
-                $response = json_encode($response);
-                echo $response;
-            }else{
-                $response = array(
-                    'status' => 0,
-                    'message' => 'Error',
-                    'reason' => 'There was a database connection error, please try again.'
-                );
-                $response = json_encode($response);
-                echo $response;
-            }
-        }
-    }
-} else {
-    // Optionally handle non-POST requests
+if ($_SERVER['REQUEST_METHOD'] !== 'POST' || ($_POST['_method'] ?? '') !== 'DELETE') {
+    header('Allow: POST');
+    http_response_code(405);
+    exit(json_encode(['status' => 0, 'message' => 'Invalid archive request.']));
 }
-?>
+$assignmentId = trim((string) ($_POST['assignment_id'] ?? ''));
+if ($assignmentId === '') {
+    http_response_code(422);
+    exit(json_encode(['status' => 0, 'message' => 'Invalid assignment.']));
+}
+
+$stmt = db()->prepare('UPDATE assignments SET archived_at = COALESCE(archived_at, UTC_TIMESTAMP()) WHERE assignment_id = ?');
+$stmt->bind_param('s', $assignmentId);
+$ok = $stmt->execute() && $stmt->affected_rows > 0;
+$stmt->close();
+if (!$ok) {
+    http_response_code(404);
+    exit(json_encode(['status' => 0, 'message' => 'Assignment not found.']));
+}
+echo json_encode(['status' => 1, 'message' => 'Assignment archived. Submissions and grades were preserved.']);

@@ -1,4 +1,11 @@
 RewriteEngine On
+
+# Internal PHP files are implementation details.  They must only be reached
+# through the front controller (or an explicitly public endpoint), while still
+# remaining includable by PHP.  These rules work with Apache and LiteSpeed.
+RewriteRule ^(?:views|connection|inc|database|vendor)/.*\.php$ - [R=404,L,NC]
+RewriteRule ^(?:__init|composer|phpunit)\.php$ - [R=404,L,NC]
+
 RewriteCond %{REQUEST_FILENAME} !-f
 RewriteCond %{REQUEST_FILENAME} !-d
 RewriteRule . index.php [L]

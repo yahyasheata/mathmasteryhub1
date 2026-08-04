@@ -101,7 +101,7 @@ if (!function_exists('student_course_access_course')) {
 
         // Route URLs historically accept either courses.id or courses.course_id.
         // Always return the canonical course_id used by enrollment and lessons.
-        $stmt = $conn->prepare('SELECT id, course_id, course_title, course_description, course_image, course_category, username, sequential_learning FROM courses WHERE course_id = ? OR CAST(id AS CHAR) = ? LIMIT 1');
+        $stmt = $conn->prepare('SELECT id, course_id, course_title, course_description, course_image, course_category, username, sequential_learning FROM courses WHERE archived_at IS NULL AND (course_id = ? OR CAST(id AS CHAR) = ?) LIMIT 1');
         if (!$stmt) {
             return null;
         }
@@ -147,7 +147,7 @@ if (!function_exists('student_course_access_item')) {
 
         $stmt = $conn->prepare("SELECT id, item_id, item_title, item_description, course_id, section_id, item_type, template_type, template_data, assignment_id, duration_minutes, status
             FROM course_items
-            WHERE course_id = ? AND item_id = ?
+            WHERE course_id = ? AND item_id = ? AND archived_at IS NULL
               AND (status IS NULL OR status = '' OR status = 'published')
             LIMIT 1");
         if (!$stmt) {
@@ -440,7 +440,7 @@ if (!function_exists('student_course_access_visible_sections')) {
               AND (s.status IS NULL OR s.status = '' OR s.status = 'published')
               AND EXISTS (
                 SELECT 1 FROM course_items AS i
-                WHERE i.course_id = s.course_id AND i.section_id = s.section_id
+                WHERE i.course_id = s.course_id AND i.section_id = s.section_id AND i.archived_at IS NULL
                   AND (i.status IS NULL OR i.status = '' OR i.status = 'published')
               )
             ORDER BY s.sort_order ASC, s.id ASC");
@@ -469,7 +469,7 @@ if (!function_exists('student_course_access_has_visible_general_item')) {
         }
 
         $stmt = $conn->prepare("SELECT id FROM course_items
-            WHERE course_id = ? AND (section_id IS NULL OR section_id = '')
+            WHERE course_id = ? AND archived_at IS NULL AND (section_id IS NULL OR section_id = '')
               AND (status IS NULL OR status = '' OR status = 'published')
             LIMIT 1");
         if (!$stmt) {
@@ -566,7 +566,7 @@ if (!function_exists('student_course_access_ordered_items')) {
             FROM course_items AS i
             LEFT JOIN course_sections AS s ON s.course_id = i.course_id AND s.section_id = i.section_id
               AND (s.status IS NULL OR s.status = '' OR s.status = 'published')
-            WHERE i.course_id = ? AND (i.status IS NULL OR i.status = '' OR i.status = 'published')
+            WHERE i.course_id = ? AND i.archived_at IS NULL AND (i.status IS NULL OR i.status = '' OR i.status = 'published')
               AND (i.section_id IS NULL OR i.section_id = '' OR s.section_id IS NOT NULL)
             ORDER BY CASE WHEN i.section_id IS NULL OR i.section_id = '' THEN 0 ELSE 1 END ASC,
                 s.sort_order ASC, s.id ASC, i.sort_order ASC, i.page_order ASC, i.item_id ASC, i.id ASC");
@@ -608,7 +608,7 @@ if (!function_exists('student_course_access_assignment')) {
             return null;
         }
 
-        $stmt = $conn->prepare('SELECT assignment_id, assignment_title, due_date, late_submission_enabled, late_submission_until, course_id, section_id, item_id, allow_self_score, require_teacher_verification, max_score, completion_requirement, completion_rule, minimum_score FROM assignments WHERE assignment_id = ? LIMIT 1');
+        $stmt = $conn->prepare('SELECT assignment_id, assignment_title, due_date, late_submission_enabled, late_submission_until, course_id, section_id, item_id, allow_self_score, require_teacher_verification, max_score, completion_requirement, completion_rule, minimum_score FROM assignments WHERE assignment_id = ? AND archived_at IS NULL LIMIT 1');
         if (!$stmt) {
             return null;
         }

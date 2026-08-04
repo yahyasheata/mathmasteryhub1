@@ -1,57 +1,39 @@
 <?php
 require_once 'connection/config.php';
+require_once '__init.php';
 
 header('Content-Type: application/json; charset=utf-8');
-
-function delete_item_response($success, $message, $data = [])
-{
-    echo json_encode(array_merge([
-        'success' => (bool) $success,
-        'status' => $success ? 1 : 0,
-        'message' => $message,
-    ], $data));
-    exit;
+if ($_SERVER['REQUEST_METHOD'] !== 'POST' || ($_POST['_method'] ?? '') !== 'DELETE') {
+    http_response_code(405);
+    exit(json_encode(['status' => 0, 'message' => 'Invalid archive request.']));
 }
-
-if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
-    delete_item_response(false, 'Invalid request method.');
-}
-
-if (!isset($_POST['_method']) || $_POST['_method'] !== 'DELETE') {
-    delete_item_response(false, 'Invalid delete request.');
-}
-
-if (!isset($_POST['item_id']) || trim($_POST['item_id']) === '') {
-    delete_item_response(false, 'Validation failed. Lesson ID is missing.');
+$itemId = trim((string) ($_POST['item_id'] ?? ''));
+$courseId = trim((string) ($_POST['course_id'] ?? ''));
+if ($itemId === '') {
+    http_response_code(422);
+    exit(json_encode(['status' => 0, 'message' => 'Lesson ID is missing.']));
 }
 
 $conn = db();
-$item_id = trim($_POST['item_id']);
-$course_id = isset($_POST['course_id']) ? trim($_POST['course_id']) : '';
-
+$conn->begin_transaction();
 try {
-    if ($course_id !== '') {
-        $archiveExam = $conn->prepare("UPDATE timed_exams SET deleted_at = COALESCE(deleted_at, UTC_TIMESTAMP()), status = 'archived' WHERE course_id = ? AND item_id = ?");
-        if ($archiveExam) { $archiveExam->bind_param('ss', $course_id, $item_id); $archiveExam->execute(); $archiveExam->close(); }
-    }
-    if ($course_id !== '') {
-        $stmt = $conn->prepare('DELETE FROM course_items WHERE item_id = ? AND course_id = ? LIMIT 1');
-        $stmt->bind_param('ss', $item_id, $course_id);
+    if ($courseId !== '') {
+        $exam = $conn->prepare("UPDATE timed_exams SET deleted_at = COALESCE(deleted_at, UTC_TIMESTAMP()), status = 'archived' WHERE course_id = ? AND item_id = ?");
+        if ($exam) { $exam->bind_param('ss', $courseId, $itemId); $exam->execute(); $exam->close(); }
+        $stmt = $conn->prepare('UPDATE course_items SET archived_at = COALESCE(archived_at, UTC_TIMESTAMP()) WHERE item_id = ? AND course_id = ?');
+        $stmt->bind_param('ss', $itemId, $courseId);
     } else {
-        $stmt = $conn->prepare('DELETE FROM course_items WHERE item_id = ? LIMIT 1');
-        $stmt->bind_param('s', $item_id);
+        $stmt = $conn->prepare('UPDATE course_items SET archived_at = COALESCE(archived_at, UTC_TIMESTAMP()) WHERE item_id = ?');
+        $stmt->bind_param('s', $itemId);
     }
-
-    if ($stmt->execute()) {
-        delete_item_response(true, 'Lesson deleted successfully.');
-    }
-
-    delete_item_response(false, 'Unexpected server error while deleting the lesson.', [
-        'reason' => $stmt->error ?: $conn->error,
-    ]);
+    $stmt->execute();
+    $changed = $stmt->affected_rows > 0;
+    $stmt->close();
+    if (!$changed) { throw new RuntimeException('Lesson not found.'); }
+    $conn->commit();
+    echo json_encode(['status' => 1, 'message' => 'Lesson archived. Progress and submissions were preserved.']);
 } catch (Throwable $e) {
-    delete_item_response(false, 'Unexpected server error while deleting the lesson.', [
-        'reason' => $e->getMessage(),
-    ]);
+    $conn->rollback();
+    http_response_code($e->getMessage() === 'Lesson not found.' ? 404 : 500);
+    echo json_encode(['status' => 0, 'message' => $e->getMessage() === 'Lesson not found.' ? 'Lesson not found.' : 'Lesson could not be archived.']);
 }
-?>

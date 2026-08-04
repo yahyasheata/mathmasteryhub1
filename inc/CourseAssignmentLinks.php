@@ -6,7 +6,7 @@ if (!function_exists('mmh_course_assignment_generate_id')) {
     {
         do {
             $id = (string) random_int(10000, 99999);
-            $stmt = $conn->prepare('SELECT 1 FROM assignments WHERE assignment_id = ? LIMIT 1');
+            $stmt = $conn->prepare('SELECT 1 FROM assignments WHERE assignment_id = ? AND archived_at IS NULL LIMIT 1');
             $stmt->bind_param('s', $id);
             $stmt->execute();
             $exists = $stmt->get_result()->num_rows > 0;
@@ -36,7 +36,7 @@ if (!function_exists('mmh_course_assignment_clone_for_item')) {
     /** Clone the current assignment policy, then give the copied visible item its own identity. */
     function mmh_course_assignment_clone_for_item(mysqli $conn, string $courseId, string $sourceAssignmentId, string $itemId, string $sectionId): ?string
     {
-        $stmt = $conn->prepare('SELECT * FROM assignments WHERE assignment_id = ? AND course_id = ? LIMIT 1');
+        $stmt = $conn->prepare('SELECT * FROM assignments WHERE assignment_id = ? AND course_id = ? AND archived_at IS NULL LIMIT 1');
         $stmt->bind_param('ss', $sourceAssignmentId, $courseId);
         $stmt->execute();
         $row = $stmt->get_result()->fetch_assoc();
@@ -69,7 +69,7 @@ if (!function_exists('mmh_course_assignment_clone_for_item')) {
 if (!function_exists('mmh_course_assignment_relink_item')) {
     function mmh_course_assignment_relink_item(mysqli $conn, string $courseId, string $itemId, string $oldId, string $newId): void
     {
-        $stmt = $conn->prepare('SELECT item_title, section_id, due_date, template_data, item_description FROM course_items WHERE course_id = ? AND item_id = ? LIMIT 1');
+        $stmt = $conn->prepare('SELECT item_title, section_id, due_date, template_data, item_description FROM course_items WHERE course_id = ? AND item_id = ? AND archived_at IS NULL LIMIT 1');
         $stmt->bind_param('ss', $courseId, $itemId);
         $stmt->execute();
         $item = $stmt->get_result()->fetch_assoc();

@@ -1,4 +1,5 @@
 <?php
+require_once __DIR__ . '/EnrollmentService.php';
 
 class TransactionLog
 {
@@ -57,62 +58,57 @@ function getSiteSettings() {
 
     public function purchaseCourse($user_id, $course_id)
     {
-        // Fetch course price and title
-        $courseResult = $this->conn->query("SELECT course_price,course_title FROM courses WHERE course_id = $course_id");
+        $userId = (int) $user_id;
+        $courseId = (string) $course_id;
+        if ($userId <= 0 || $courseId === '') return ['status' => 0, 'message' => 'Invalid purchase.'];
 
-        if ($courseResult->num_rows > 0) {
-            $course = $courseResult->fetch_assoc();
-            $course_price = $course['course_price'];
-            $course_title = $course['course_title'];
+        $this->conn->begin_transaction();
+        try {
+            $courseStmt = $this->conn->prepare('SELECT course_price, course_title FROM courses WHERE course_id = ? AND archived_at IS NULL LIMIT 1');
+            $courseStmt->bind_param('s', $courseId);
+            $courseStmt->execute();
+            $course = $courseStmt->get_result()->fetch_assoc();
+            $courseStmt->close();
+            if (!$course) throw new RuntimeException('الكورس غير متاح.');
 
-            // Fetch user balance
-            $userResult = $this->conn->query("SELECT balance FROM users WHERE user_id = $user_id");
+            $userStmt = $this->conn->prepare('SELECT balance FROM users WHERE user_id = ? AND archived_at IS NULL LIMIT 1 FOR UPDATE');
+            $userStmt->bind_param('i', $userId);
+            $userStmt->execute();
+            $user = $userStmt->get_result()->fetch_assoc();
+            $userStmt->close();
+            if (!$user) throw new RuntimeException('المستخدم غير موجود');
 
-            if ($userResult->num_rows > 0) {
-                $user = $userResult->fetch_assoc();
-                // echo $user['balance'];
-                // Check if user has sufficient balance
-                $checkCourse = $this->conn->query("SELECT id from transactions WHERE (course_id='$course_id' AND user_id ='$user_id' ) ");
-                if ($checkCourse->num_rows == 0) {
+            $check = $this->conn->prepare('SELECT id FROM transactions WHERE user_id = ? AND course_id = ? LIMIT 1 FOR UPDATE');
+            $check->bind_param('is', $userId, $courseId);
+            $check->execute();
+            $alreadyPurchased = (bool) $check->get_result()->fetch_assoc();
+            $check->close();
+            if ($alreadyPurchased) throw new RuntimeException('لقد قمت بشراء هذا الكورس بنجاح من قبل !');
 
-                    if ($user['balance'] >= $course_price) {
-                        $amount = $course_price;
-
-                        // Deduct amount from user balance
-                        $checkCourse = $this->conn->query("SELECT id from transactions WHERE (course_id='$course_id' AND user_id ='$user_id' ) ");
-                        if ($checkCourse->num_rows == 0) {
-                            $this->conn->query("UPDATE users SET balance = balance - $amount WHERE user_id = $user_id");
-
-                            // Record the transaction
-                            $result = $this->conn->query("INSERT INTO transactions (user_id, course_id, course_title, amount, course_price) VALUES ($user_id, $course_id, '$course_title', $amount, $course_price)");
-        
-                            // Return the result of the transaction along with the course title
-                            return ['status' => $result, 'course_title' => $course_title];
-        
-                        }else{
-                            $msgError = "لقد قمت بشراء هذا الكورس بنجاح من قبل !";
-                        }
-
-                    } else {
-                        $site_settings = getSiteSettings();
-                        $whatsapp_link = $site_settings['whatsapp_link'];
-                        $msgError = "
-                        <h2 style='text-align:center;'>تواصل معنا عبر واتس اب لشراء الكورس</h2><br/>
-                        <a href='$whatsapp_link' target='_blank' class='btn btn-outline-success ' style='width:170px;height:66px;font-size:20px;font-weight:bold;'>واتساب<i class='fab fa-whatsapp' style='margin-right:5px;font-size:22px;'></i> </a>
-                        ";
-                    }
-                }else{
-                    $msgError = "لقد قمت بشراء هذا الكورس بنجاح من قبل !";
-                }
-            } else {
-                $msgError = "المستخدم غير موجود";
+            $price = (float) $course['course_price'];
+            if ((float) $user['balance'] < $price) {
+                $this->conn->rollback();
+                $settings = getSiteSettings();
+                $whatsappLink = htmlspecialchars((string) ($settings['whatsapp_link'] ?? ''), ENT_QUOTES, 'UTF-8');
+                return ['status' => 0, 'message' => '<h2 style="text-align:center;">تواصل معنا عبر واتس اب لشراء الكورس</h2><br/><a href="'.$whatsappLink.'" target="_blank" class="btn btn-outline-success">واتساب</a>'];
             }
-        } else {
-            $msgError = "الكورس غير متاح.";
-        }
 
-        // Return failure status along with an empty course title
-        return ['status' => 0, 'message' => $msgError];
+            $update = $this->conn->prepare('UPDATE users SET balance = balance - ? WHERE user_id = ?');
+            $update->bind_param('di', $price, $userId);
+            if (!$update->execute()) throw new RuntimeException('Could not update balance.');
+            $update->close();
+
+            $insert = $this->conn->prepare('INSERT INTO transactions (user_id, course_id, course_title, amount, course_price) VALUES (?, ?, ?, ?, ?)');
+            $title = (string) $course['course_title'];
+            $insert->bind_param('issdd', $userId, $courseId, $title, $price, $price);
+            if (!$insert->execute()) throw new RuntimeException('Could not record transaction.');
+            $insert->close();
+            $this->conn->commit();
+            return ['status' => 1, 'course_title' => $title];
+        } catch (Throwable $e) {
+            $this->conn->rollback();
+            return ['status' => 0, 'message' => $e->getMessage()];
+        }
     }
 
     public function saveCourseLog($user_id, $course_id)
@@ -123,9 +119,11 @@ function getSiteSettings() {
         if ($purchaseResult['status']) {
             $course_title = $purchaseResult['course_title'];
 
-            // Record course access in the course logs table
-           $result = $this->conn->query("INSERT INTO course_logs (user_id, course_id, course_title, purchase_date) VALUES ($user_id, $course_id, '$course_title', NOW())");
-           return ['status' => 1, 'message' => 'تم شراء الكورس بنجاح , يمكنك الان الاطلاع على محتوى الكورس '];
+            // Record course access through the canonical idempotent writer.
+            $result = mmh_enrollment_ensure($this->conn, (int) $user_id, (string) $course_id, (string) $course_title);
+            return $result
+                ? ['status' => 1, 'message' => 'تم شراء الكورس بنجاح , يمكنك الان الاطلاع على محتوى الكورس ']
+                : ['status' => 0, 'message' => 'Enrollment could not be saved.'];
         
         } else {
             // return "Transaction failed. Course log not saved.";

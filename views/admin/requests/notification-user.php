@@ -8,9 +8,21 @@ if($_SERVER['REQUEST_METHOD'] == "POST" ){
 
         if ( isset($_POST['user_id']) && !empty($_POST['user_id']) ) {
             
-            $user_id = $_POST['user_id'];
-                
-            $full_name = getUserInfo($user_id)->full_name;
+            $user_id = filter_var($_POST['user_id'], FILTER_VALIDATE_INT, ['options' => ['min_range' => 1]]);
+            if ($user_id === false) {
+                http_response_code(422);
+                exit(json_encode(['status' => 0, 'message' => 'Invalid user.']));
+            }
+            $userStmt = db()->prepare('SELECT full_name FROM users WHERE user_id = ? LIMIT 1');
+            $userStmt->bind_param('i', $user_id);
+            $userStmt->execute();
+            $userRow = $userStmt->get_result()->fetch_assoc();
+            $userStmt->close();
+            if (!$userRow) {
+                http_response_code(404);
+                exit(json_encode(['status' => 0, 'message' => 'User not found.']));
+            }
+            $full_name = (string) $userRow['full_name'];
                 $html_response = "
                 
                 <!-- Modal -->
@@ -98,11 +110,23 @@ if($_SERVER['REQUEST_METHOD'] == "POST" ){
 
     if( isset($_POST['user_id'],$_POST['notification_message'],$_POST['notification_title']) && !empty($_POST['user_id']) && !empty($_POST['notification_message']) && !empty($_POST['notification_title']) ){
 
-        $user_id = $_POST['user_id'];
-        $notification_message = $_POST['notification_message'];
-        $notification_title = $_POST['notification_title'];
+        $user_id = filter_var($_POST['user_id'], FILTER_VALIDATE_INT, ['options' => ['min_range' => 1]]);
+        $notification_message = trim((string) $_POST['notification_message']);
+        $notification_title = trim((string) $_POST['notification_title']);
+        if ($user_id === false) {
+            exit(json_encode(['status' => 0, 'message' => 'Invalid user.']));
+        }
 
         $conn = db();
+
+        $userCheck = $conn->prepare('SELECT user_id FROM users WHERE user_id = ? LIMIT 1');
+        $userCheck->bind_param('i', $user_id);
+        $userCheck->execute();
+        $userExists = (bool) $userCheck->get_result()->fetch_assoc();
+        $userCheck->close();
+        if (!$userExists) {
+            exit(json_encode(['status' => 0, 'message' => 'User not found.']));
+        }
 
 function sendPostRequest2($url, $data) {
     $ch = curl_init($url);
@@ -127,7 +151,13 @@ function sendPostRequest2($url, $data) {
 }
 
 
-            $query = "INSERT INTO notifications (user_id,title,message,status) VALUE ('$user_id','$notification_title','$notification_message',0) ;";
+            $insertStmt = $conn->prepare('INSERT INTO notifications (user_id, title, message, status) VALUES (?, ?, ?, 0)');
+            if (!$insertStmt) {
+                exit(json_encode(['status' => 0, 'message' => 'Notification could not be prepared.']));
+            }
+            $insertStmt->bind_param('iss', $user_id, $notification_title, $notification_message);
+            $result = $insertStmt->execute();
+            $insertStmt->close();
             $end_point = "$baseUrl/notification/push.php";
             $post_data = array(
                 'user_id' => $user_id,
@@ -137,7 +167,6 @@ function sendPostRequest2($url, $data) {
             );
             $response = sendPostRequest2($end_point, $post_data);
     
-            $result = mysqli_query($conn,$query);
             if($result){
                 $response = array(
                     'status' => 1,

@@ -1,62 +1,48 @@
-<?php 
+<?php
 require_once 'connection/config.php';
+require_once '__init.php';
 require_once 'inc/functions.php';
 
-if($_SERVER['REQUEST_METHOD'] == "POST" ){
-
-    if( isset($_POST['name'],$_POST['phone_number'],$_POST['gender'],$_POST['governorate'],$_POST['password']) 
-    && !empty($_POST['name']) && !empty($_POST['phone_number']) && !empty($_POST['gender']) && !empty($_POST['governorate']) && !empty($_POST['password']) ){
-
-        $full_name = $_POST['name'];
-        $username = $_POST['phone_number'];
-        $gender = $_POST['gender'];
-        $governorate = $_POST['governorate'];
-        $password = $_POST['password'];
-        $user_id = rand(99, 9999);
-
-        $conn = db();
-
-        // Check if the username already exists
-        $checkQuery = "SELECT * FROM users WHERE username = '$username'";
-        $checkResult = $conn->query($checkQuery);
-
-        if ($checkResult->num_rows > 0) {
-            $response = array(
-                'status' => 0,
-                'message' => 'Error',
-                'reason' => 'Phone Number مرتبط بحساب اخر , يرجي اضافة رقم اخر'
-            );
-            echo json_encode($response);
-        } else {
-            // Insert the new record
-            $query = "INSERT INTO users (user_id, full_name, username, password, governorate) 
-            VALUES ('$user_id', '$full_name', '$username', '$password', '$governorate')";
-            $result = $conn->query($query);
-
-            if ($result) {
-                $_SESSION['username'] = $username;
-                $response = array(
-                    'status' => 1,
-                    'message' => 'Account created successfully'
-                );
-                echo json_encode($response);
-            } else {
-                $response = array(
-                    'status' => 0,
-                    'message' => 'Error',
-                    'reason' => 'There was a database connection error. Please try again.'
-                );
-                echo json_encode($response);
-            }
-        }
-
-
-
-    }
-
-
-}else{
-
+if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
+    header('Allow: POST');
+    http_response_code(405);
+    exit('Method Not Allowed');
 }
 
-?>
+$fullName = trim((string) ($_POST['name'] ?? ''));
+$username = trim((string) ($_POST['phone_number'] ?? ''));
+$governorate = trim((string) ($_POST['governorate'] ?? ''));
+$password = (string) ($_POST['password'] ?? '');
+if ($fullName === '' || $username === '' || $governorate === '' || $password === '') {
+    exit(json_encode(['status' => 0, 'message' => 'All required fields must be completed']));
+}
+if (strlen($password) < 8) {
+    exit(json_encode(['status' => 0, 'message' => 'Password must be at least 8 characters.']));
+}
+
+$conn = db();
+$check = $conn->prepare('SELECT user_id FROM users WHERE username = ? LIMIT 1');
+$check->bind_param('s', $username);
+$check->execute();
+$exists = (bool) $check->get_result()->fetch_assoc();
+$check->close();
+if ($exists) {
+    exit(json_encode(['status' => 0, 'message' => 'Phone Number is already linked to another account.']));
+}
+
+$userId = random_int(99, 9999);
+$passwordHash = password_hash($password, PASSWORD_DEFAULT);
+$stmt = $conn->prepare('INSERT INTO users (user_id, full_name, username, password, governorate) VALUES (?, ?, ?, ?, ?)');
+if (!$stmt) {
+    exit(json_encode(['status' => 0, 'message' => 'User could not be prepared.']));
+}
+$stmt->bind_param('issss', $userId, $fullName, $username, $passwordHash, $governorate);
+$ok = $stmt->execute();
+$stmt->close();
+
+if ($ok) {
+    $_SESSION['username'] = $username;
+}
+echo json_encode($ok
+    ? ['status' => 1, 'message' => 'Account created successfully']
+    : ['status' => 0, 'message' => 'There was a database connection error. Please try again.']);

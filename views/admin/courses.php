@@ -46,7 +46,8 @@ if ($courseCategoryFilter !== 'all' && ctype_digit($courseCategoryFilter)) {
 }
 if ($coursePriceFilter === 'free') $courseFilters[] = 'c.course_price = 0';
 if ($coursePriceFilter === 'paid') $courseFilters[] = 'c.course_price > 0';
-$courseWhere = $courseFilters ? 'WHERE ' . implode(' AND ', $courseFilters) : '';
+$courseFilters[] = 'c.archived_at IS NULL';
+$courseWhere = 'WHERE ' . implode(' AND ', $courseFilters);
 
 $courseLoadError = null;
 $courseTotal = 0;
@@ -86,7 +87,7 @@ try {
   $courseRows = $courseStatement->get_result()->fetch_all(MYSQLI_ASSOC);
   $courseStatement->close();
 
-  $courseCategoriesResult = $conn->query('SELECT id, category_title FROM categories ORDER BY category_title ASC');
+  $courseCategoriesResult = $conn->query('SELECT id, category_title FROM categories WHERE archived_at IS NULL ORDER BY category_title ASC');
   if (!$courseCategoriesResult) throw new RuntimeException('Unable to load course categories.');
   $courseCategories = $courseCategoriesResult->fetch_all(MYSQLI_ASSOC);
 } catch (Throwable $courseQueryError) {
@@ -309,8 +310,7 @@ function admin_course_link(array $changes = []): string {
     </style>
     <div class="col-12 justify-content-end d-flex">
     </div>
-    <form method="POST" action="<?=$baseUrl?>/resources/logout" id="logout-form" class="d-none"><input type="hidden"
-            name="_token" value="XyH8RETZBTH4eYgzreRbeaCLbveyMAOqK8WgNiiH"></form>
+    <form method="POST" action="<?=$baseUrl?>/admin/logout" id="logout-form" class="d-none"><input type="hidden" name="mmh_csrf_token" value="<?=htmlspecialchars(mmh_admin_csrf_token(), ENT_QUOTES, 'UTF-8')?>"></form>
     <div class="col-12 d-flex">
 
         <?php include "layouts/admin/aside.php"; ?>

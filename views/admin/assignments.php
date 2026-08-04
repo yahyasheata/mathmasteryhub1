@@ -11,7 +11,7 @@ $subPageName = "assignments";
 
 $conn = db();
 mmh_ensure_learning_schema($conn);
-$query = "SELECT * FROM assignments";
+$query = "SELECT * FROM assignments WHERE archived_at IS NULL";
 $result = mysqli_query($conn, $query);
 // Query for all courses for the select dropdown
 $courses_result = mysqli_query($conn, "SELECT course_id, course_title FROM courses ORDER BY course_title");
@@ -20,7 +20,7 @@ $items_result = mysqli_query($conn, "SELECT item_id, course_id, section_id, item
 // Legacy import uses existing courses, sections, assignments and enrollments.
 $legacy_courses = $conn->query("SELECT course_id, course_title FROM courses ORDER BY course_title");
 $legacy_sections = $conn->query("SELECT section_id, course_id, title FROM course_sections ORDER BY course_id, sort_order, title");
-$legacy_assignments = $conn->query("SELECT assignment_id, course_id, section_id, assignment_title FROM assignments ORDER BY course_id, due_date, assignment_title");
+$legacy_assignments = $conn->query("SELECT assignment_id, course_id, section_id, assignment_title FROM assignments WHERE archived_at IS NULL ORDER BY course_id, due_date, assignment_title");
 $legacy_students = $conn->query("SELECT user_id, full_name, username FROM users WHERE role = 'user' ORDER BY full_name, username");
 
 function getAssignmentSubmissionsCount($assignment_id)
@@ -51,7 +51,7 @@ function getAssignmentSubmissionsCount($assignment_id)
 
 <body class='dash ds-bg-primary'>
   <div class="col-12 justify-content-end d-flex"></div>
-  <form method="POST" action="<?= $baseUrl ?>/resources/logout" id="logout-form" class="d-none"><input type="hidden" name="_token" value="XyH8RETZBTH4eYgzreRbeaCLbveyMAOqK8WgNiiH"></form>
+  <form method="POST" action="<?= $baseUrl ?>/admin/logout" id="logout-form" class="d-none"><input type="hidden" name="mmh_csrf_token" value="<?=htmlspecialchars(mmh_admin_csrf_token(), ENT_QUOTES, 'UTF-8')?>"></form>
   <div class="col-12 d-flex">
     <?php include "layouts/admin/aside.php"; ?>
     <div class="main-content in-active" style="overflow: hidden">
