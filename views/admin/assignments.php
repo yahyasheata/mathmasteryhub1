@@ -5,14 +5,15 @@ require_once 'inc/functions.php';
 require_once 'inc/learning_schema.php';
 require_once 'inc/AssignmentProgress.php';
 require_once 'inc/LegacyHomework.php';
+require_once 'inc/AdminAssessmentService.php';
 $username = $_SESSION['admin'];
 $pageName = "courses";
 $subPageName = "assignments";
 
 $conn = db();
 mmh_ensure_learning_schema($conn);
-$query = "SELECT * FROM assignments WHERE archived_at IS NULL";
-$result = mysqli_query($conn, $query);
+$assignment_rows = mmh_admin_assignment_rows($conn);
+$submission_counts = mmh_admin_assignment_submission_counts($conn);
 // Query for all courses for the select dropdown
 $courses_result = mysqli_query($conn, "SELECT course_id, course_title FROM courses ORDER BY course_title");
 $sections_result = mysqli_query($conn, "SELECT section_id, course_id, title FROM course_sections ORDER BY course_id, sort_order, title");
@@ -22,15 +23,6 @@ $legacy_courses = $conn->query("SELECT course_id, course_title FROM courses ORDE
 $legacy_sections = $conn->query("SELECT section_id, course_id, title FROM course_sections ORDER BY course_id, sort_order, title");
 $legacy_assignments = $conn->query("SELECT assignment_id, course_id, section_id, assignment_title FROM assignments WHERE archived_at IS NULL ORDER BY course_id, due_date, assignment_title");
 $legacy_students = $conn->query("SELECT user_id, full_name, username FROM users WHERE role = 'user' ORDER BY full_name, username");
-
-function getAssignmentSubmissionsCount($assignment_id)
-{
-  $conn = db();
-  $query = "SELECT COUNT(*) FROM assignment_submissions WHERE assignment_id = '$assignment_id' ";
-  $result = mysqli_query($conn, $query);
-  $count = mysqli_fetch_assoc($result)['COUNT(*)'];
-  return $count;
-}
 
 ?>
 <!DOCTYPE html>
@@ -188,8 +180,8 @@ function getAssignmentSubmissionsCount($assignment_id)
                   <tbody>
                     <?php
                     $count = 1;
-                    while ($assignment = mysqli_fetch_assoc($result)) {
-                      $submissions = getAssignmentSubmissionsCount($assignment['assignment_id']);
+                    foreach ($assignment_rows as $assignment) {
+                      $submissions = $submission_counts[(string) $assignment['assignment_id']] ?? 0;
                       echo "<tr>
                                                 <td>$count</td>
                                                 <td>{$assignment['assignment_title']}</td>

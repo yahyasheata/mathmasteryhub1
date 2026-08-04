@@ -1,4 +1,5 @@
 <?php
+require_once __DIR__ . '/SchemaMigration.php';
 /**
  * Learning Intelligence Foundation — schema bootstrap.
  *
@@ -85,11 +86,9 @@ if (!function_exists('mmh_add_index_if_missing')) {
 }
 
 /**
- * Creates every table/column the Learning Intelligence Foundation needs.
- * Safe to call on every request (each check is a fast primary/unique-key
- * lookup against INFORMATION_SCHEMA); intended to be called once via
- * mmh_ensure_learning_schema() which memoizes per-request so the checks only
- * run a single time even if included from multiple places.
+ * Creates every table/column the Learning Intelligence Foundation needs when
+ * called by the explicit CLI migration. Runtime requests only check whether
+ * the base table is available and never attempt schema changes.
  */
 function mmh_ensure_learning_schema(mysqli $conn)
 {
@@ -98,6 +97,12 @@ function mmh_ensure_learning_schema(mysqli $conn)
         return;
     }
     $checked = true;
+
+    // Production/page requests are read-only with respect to schema. The
+    // deployment migration enables the explicit CLI migration mode.
+    if (!mmh_schema_mutations_allowed()) {
+        return mmh_table_exists($conn, 'learning_events');
+    }
 
     // --- Core append-only Learning Event log (Part 1) ---------------------
     if (!mmh_table_exists($conn, 'learning_events')) {

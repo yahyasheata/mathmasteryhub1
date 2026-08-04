@@ -9,6 +9,7 @@
 
 require_once __DIR__ . '/PastPapers.php';
 require_once __DIR__ . '/GoogleDriveCredentialProvider.php';
+require_once __DIR__ . '/SchemaMigration.php';
 
 if (!function_exists('mmh_past_drive_csrf_token')) {
     function mmh_past_drive_csrf_token()
@@ -62,6 +63,7 @@ if (!function_exists('mmh_past_drive_connection')) {
 if (!function_exists('mmh_past_drive_ensure_schema')) {
     function mmh_past_drive_ensure_schema(mysqli $conn)
     {
+        if (!mmh_schema_mutations_allowed()) return;
         static $checked = false;
         if ($checked) {
             return;
@@ -2097,4 +2099,3 @@ if (!function_exists('mmh_past_drive_import_job')) {
         return mmh_past_drive_import_batch($conn, $jobId, $admin, 50);
     }
 }
-

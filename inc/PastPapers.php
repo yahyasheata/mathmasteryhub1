@@ -9,6 +9,7 @@
  */
 
 require_once __DIR__ . '/learning_schema.php';
+require_once __DIR__ . '/SchemaMigration.php';
 
 if (!function_exists('mmh_past_response')) {
     function mmh_past_response($success, $message, array $data = [], $statusCode = 200)
@@ -163,6 +164,7 @@ if (!function_exists('mmh_past_default_access')) {
 if (!function_exists('mmh_past_ensure_schema')) {
     function mmh_past_ensure_schema(mysqli $conn)
     {
+        if (!mmh_schema_mutations_allowed()) return;
         static $checked = false;
         if ($checked) {
             return;

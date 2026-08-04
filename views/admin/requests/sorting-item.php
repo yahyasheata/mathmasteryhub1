@@ -1,6 +1,7 @@
 <?php
 require_once 'connection/config.php';
 require_once 'inc/functions.php';
+require_once 'inc/AdminCourseService.php';
 
 header('Content-Type: application/json; charset=utf-8');
 
@@ -27,6 +28,16 @@ if (!isset($_POST['page_id_array']) || !is_array($_POST['page_id_array']) || cou
 }
 
 $conn = db();
+$course_id = trim((string) ($_POST['course_id'] ?? ''));
+if ($course_id !== '') {
+    try {
+        $items = array_map(static fn($id) => ['id' => $id], array_values($_POST['page_id_array']));
+        mmh_admin_course_reorder_items($conn, $course_id, $items);
+        sorting_item_response(true, 'Lesson order updated successfully.');
+    } catch (Throwable $e) {
+        sorting_item_response(false, 'Lesson order could not be saved.');
+    }
+}
 $has_sort_order = false;
 $column_stmt = $conn->prepare("SELECT COUNT(*) AS total FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'course_items' AND COLUMN_NAME = 'sort_order'");
 if ($column_stmt) {

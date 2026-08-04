@@ -1,5 +1,6 @@
 <?php
 require_once 'connection/config.php';
+require_once 'inc/AdminCourseService.php';
 
 header('Content-Type: application/json; charset=utf-8');
 
@@ -51,9 +52,19 @@ if (!isset($_POST['course_id']) || trim($_POST['course_id']) === '') {
 }
 
 $conn = db();
-$course_id = trim($_POST['course_id']);
+$course_id = trim((string) $_POST['course_id']);
 $sections = sorting_section_decode('sections');
 $lessons = sorting_section_decode('lessons');
+if (!empty($sections) || !empty($lessons)) {
+    $conn->begin_transaction();
+    try {
+        mmh_admin_course_reorder_sections($conn, $course_id, $sections);
+        mmh_admin_course_reorder_items($conn, $course_id, $lessons);
+        $conn->commit();
+        sorting_section_response(true, 'Course sections updated successfully.');
+    }
+    catch (Throwable $e) { $conn->rollback(); sorting_section_response(false, 'Section order could not be saved.'); }
+}
 $has_sort_order = sorting_section_column_exists($conn, 'course_items', 'sort_order');
 $has_section_id = sorting_section_column_exists($conn, 'course_items', 'section_id');
 

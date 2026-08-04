@@ -1,4 +1,5 @@
 <?php
+require_once __DIR__ . '/SchemaMigration.php';
 /**
  * Minimal OIDC support for Google and Sign in with Apple.
  * Secrets are read from environment variables only and never from source files.
@@ -285,6 +286,12 @@ if (!function_exists('mmh_oauth_apple_client_secret')) {
 if (!function_exists('mmh_oauth_ensure_schema')) {
     function mmh_oauth_ensure_schema(mysqli $conn): bool
     {
+        if (!mmh_schema_mutations_allowed()) {
+            $stmt = $conn->prepare("SELECT COUNT(*) AS total FROM INFORMATION_SCHEMA.TABLES WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'user_oauth_identities'");
+            if (!$stmt) return false;
+            $stmt->execute(); $row = $stmt->get_result()->fetch_assoc() ?: []; $stmt->close();
+            return (int) ($row['total'] ?? 0) > 0;
+        }
         $sql = "CREATE TABLE IF NOT EXISTS `user_oauth_identities` (
             `id` BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
             `user_id` INT NOT NULL,

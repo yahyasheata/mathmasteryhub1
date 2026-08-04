@@ -1,4 +1,5 @@
 <?php
+require_once __DIR__ . '/SchemaMigration.php';
 /**
  * Landing page content helpers.
  *
@@ -9,6 +10,7 @@
 if (!function_exists('mmh_landing_ensure_schema')) {
     function mmh_landing_ensure_schema(mysqli $conn): void
     {
+        if (!mmh_schema_mutations_allowed()) return;
         $conn->query("CREATE TABLE IF NOT EXISTS `landing_page_items` (
             `id` bigint unsigned NOT NULL AUTO_INCREMENT,
             `section_key` varchar(40) COLLATE utf8mb4_unicode_ci NOT NULL,

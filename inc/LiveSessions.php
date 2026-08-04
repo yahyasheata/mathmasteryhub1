@@ -7,6 +7,7 @@
  */
 
 require_once __DIR__ . '/learning_schema.php';
+require_once __DIR__ . '/SchemaMigration.php';
 
 if (!function_exists('mmh_live_response')) {
     function mmh_live_response($success, $message, array $data = [], $statusCode = 200)
@@ -32,6 +33,8 @@ if (!function_exists('mmh_live_ensure_schema')) {
             return;
         }
         $checked = true;
+
+        if (!mmh_schema_mutations_allowed()) return;
 
         if (!mmh_table_exists($conn, 'course_live_schedules')) {
             $conn->query("CREATE TABLE IF NOT EXISTS `course_live_schedules` (

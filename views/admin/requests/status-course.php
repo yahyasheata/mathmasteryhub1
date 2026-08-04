@@ -2,6 +2,7 @@
 require_once 'connection/config.php';
 require_once '__init.php';
 require_once 'inc/functions.php';
+require_once 'inc/AdminCourseService.php';
 
 if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
     http_response_code(405);
@@ -31,20 +32,7 @@ if (!in_array($courseStatus, ['0', '1'], true)) {
     exit;
 }
 
-$stmt = db()->prepare('UPDATE courses SET course_status = ? WHERE course_id = ? LIMIT 1');
-if (!$stmt) {
-    http_response_code(500);
-    echo json_encode(['status' => 0, 'message' => 'The course status could not be updated.']);
-    exit;
-}
-$stmt->bind_param('ss', $courseStatus, $courseId);
-$ok = $stmt->execute();
-$stmt->close();
-
-if (!$ok) {
-    http_response_code(500);
-    echo json_encode(['status' => 0, 'message' => 'The course status could not be updated.']);
-    exit;
-}
+try { mmh_admin_course_set_status(db(), $courseId, $courseStatus); }
+catch (Throwable $e) { http_response_code($e instanceof InvalidArgumentException ? 422 : ($e->getMessage() === 'Course not found.' ? 404 : 500)); echo json_encode(['status' => 0, 'message' => 'The course status could not be updated.']); exit; }
 
 echo json_encode(['status' => 1, 'message' => 'Status updated successfully']);

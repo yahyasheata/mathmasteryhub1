@@ -5,7 +5,7 @@ require_once 'inc/Auth.php';
 require_once 'inc/SiteSettings.php';
 require_once 'inc/LandingPage.php';
 
-function mmh_settings_redirect(string $baseUrl): void
+function mmh_settings_redirect(): void
 {
     header('Location: ' . rtrim(mmh_site_public_base_path(), '/') . '/admin/settings');
     exit;
@@ -180,7 +180,7 @@ if (empty($_SESSION['admin'])) {
 }
 if (!mmh_auth_csrf_valid($_POST['csrf_token'] ?? null)) {
     mmh_settings_flash('error', 'Your session expired. Refresh the page and try again.');
-    mmh_settings_redirect($baseUrl);
+    mmh_settings_redirect();
 }
 
 $conn = db();
@@ -220,7 +220,7 @@ foreach (['website_logo', 'website_wide_logo', 'website_icon', 'website_cover'] 
 if (!empty($errors)) {
     foreach ($uploads as $path) @unlink(dirname(__DIR__, 3) . '/' . $path);
     mmh_settings_flash('error', 'Please correct the highlighted settings and try again.', $posted, $errors);
-    mmh_settings_redirect($baseUrl);
+    mmh_settings_redirect();
 }
 
 $conn->begin_transaction();
@@ -242,4 +242,4 @@ try {
     mmh_settings_flash('error', 'Settings could not be saved. No existing site assets were removed.');
 }
 
-mmh_settings_redirect($baseUrl);
+mmh_settings_redirect();

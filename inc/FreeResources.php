@@ -9,6 +9,7 @@
  */
 
 require_once __DIR__ . '/learning_schema.php';
+require_once __DIR__ . '/SchemaMigration.php';
 
 if (!function_exists('mmh_free_response')) {
     function mmh_free_response($success, $message, array $data = [], $statusCode = 200)
@@ -237,6 +238,7 @@ if (!function_exists('mmh_free_execute')) {
 if (!function_exists('mmh_free_ensure_schema')) {
     function mmh_free_ensure_schema(mysqli $conn)
     {
+        if (!mmh_schema_mutations_allowed()) return;
         return;
     }
 }

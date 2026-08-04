@@ -35,7 +35,7 @@ jobs:
               dump_defaults="$(mktemp)"
               chmod 600 "$dump_defaults"
               printf '[client]\nhost=%s\nuser=%s\npassword=%s\n' "$DB_HOST" "$DB_USER" "$DB_PASS" > "$dump_defaults"
-              mysqldump --defaults-extra-file="$dump_defaults" "$DB_NAME" course_logs courses users assignments course_items categories timed_exams transactions notifications > "$backup_dir/tables.sql"
+              mysqldump --force --defaults-extra-file="$dump_defaults" "$DB_NAME" course_logs courses users assignments course_items categories timed_exams transactions notifications learning_events learning_daily_activity course_topics assignment_submission_files parent_weekly_report_comments parent_weekly_report_overrides course_live_schedules live_session_occurrences live_session_join_events live_session_attendance landing_page_items user_oauth_identities free_resource_collections free_learning_resources free_resource_collection_map free_resource_access_courses free_resource_access_students free_resource_relations past_paper_exam_boards past_paper_syllabuses past_papers past_paper_resources past_paper_resource_courses past_paper_resource_students past_paper_drive_sources past_paper_drive_jobs past_paper_drive_candidates > "$backup_dir/tables.sql"
               rm -f "$dump_defaults"
             else
               echo "Database backup could not be created: mysqldump or DB settings are unavailable." >&2
@@ -43,6 +43,7 @@ jobs:
             fi
             git fetch origin main
             git reset --hard origin/main
+            php database/migrations/20260807_finalize_runtime_schema.php
             php database/migrations/20260806_add_admin_archive_markers.php
             php database/migrations/20260806_enforce_course_log_uniqueness.php
             php database/migrations/20260801_create_student_learning_evidence.php

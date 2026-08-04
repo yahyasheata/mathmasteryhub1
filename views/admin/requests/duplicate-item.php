@@ -1,5 +1,6 @@
 <?php
 require_once 'connection/config.php';
+require_once 'inc/CourseAssignmentLinks.php';
 
 header('Content-Type: application/json; charset=utf-8');
 
@@ -98,6 +99,17 @@ try {
         throw new RuntimeException($insert->error ?: $conn->error);
     }
     $insert->close();
+
+    // A duplicated visible homework item must receive an independent
+    // assignment identity. Reusing the source ID merges student submissions
+    // and makes the two course items indistinguishable to canonical readers.
+    $source_assignment_id = mmh_course_assignment_id($lesson);
+    if ($source_assignment_id !== '') {
+        $new_assignment_id = mmh_course_assignment_clone_for_item($conn, $course_id, $source_assignment_id, $new_item_id, (string) ($section_id ?? ''));
+        if ($new_assignment_id !== null) {
+            mmh_course_assignment_relink_item($conn, $course_id, $new_item_id, $source_assignment_id, $new_assignment_id);
+        }
+    }
 
     if ($template_type === 'timed_exam') {
         $copyExam = $conn->prepare("INSERT INTO timed_exams (course_id, item_id, title, instructions, status, timing_mode, scheduled_start_at_utc, duration_minutes, grace_minutes, max_attempts, allowed_answer_types, max_file_size_bytes, paper_source, paper_external_url, paper_external_preview_url, paper_external_download_url, paper_fallback_instructions, paper_storage_key, paper_original_name, paper_mime, paper_size_bytes, paper_view_allowed, paper_download_allowed, late_submission_allowed, expiry_policy, max_marks, results_release_at_utc, recovery_window_start_at_utc, recovery_window_end_at_utc, recovery_allowed, created_by, updated_by) SELECT course_id, ?, CONCAT(title, ' (Copy)'), instructions, 'draft', timing_mode, scheduled_start_at_utc, duration_minutes, grace_minutes, max_attempts, allowed_answer_types, max_file_size_bytes, paper_source, paper_external_url, paper_external_preview_url, paper_external_download_url, paper_fallback_instructions, paper_storage_key, paper_original_name, paper_mime, paper_size_bytes, paper_view_allowed, paper_download_allowed, late_submission_allowed, expiry_policy, max_marks, results_release_at_utc, recovery_window_start_at_utc, recovery_window_end_at_utc, recovery_allowed, created_by, updated_by FROM timed_exams WHERE course_id = ? AND item_id = ? AND deleted_at IS NULL LIMIT 1");

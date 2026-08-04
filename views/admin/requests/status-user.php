@@ -1,6 +1,7 @@
 <?php
 require_once 'connection/config.php';
 require_once '__init.php';
+require_once 'inc/AdminCourseService.php';
 require_once 'inc/functions.php';
 
 if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
@@ -17,14 +18,8 @@ if ($userId === false || !in_array($requestedStatus, [0, 1, 2], true)) {
 }
 $requestedStatus = in_array($requestedStatus, [1, 2], true) ? 1 : 0;
 
-$stmt = db()->prepare('UPDATE users SET status = ? WHERE user_id = ?');
-if (!$stmt) {
-    http_response_code(500);
-    exit(json_encode(['status' => 0, 'message' => 'Status update could not be prepared.']));
-}
-$stmt->bind_param('ii', $requestedStatus, $userId);
-$ok = $stmt->execute();
-$stmt->close();
+try { mmh_admin_student_set_status(db(), (int) $userId, (int) $requestedStatus); $ok = true; }
+catch (Throwable $e) { $ok = false; }
 
 echo json_encode([
     'status' => $ok ? 1 : 0,

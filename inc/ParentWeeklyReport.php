@@ -1,4 +1,5 @@
 <?php
+require_once __DIR__ . '/SchemaMigration.php';
 /**
  * Parent Weekly Reports read only existing learning data. The optional teacher
  * comment is the sole report-owned record.
@@ -9,6 +10,7 @@ require_once __DIR__ . '/StudentLearningJourney.php';
 
 function mmh_parent_report_ensure_schema(mysqli $conn): void
 {
+    if (!mmh_schema_mutations_allowed()) return;
     $conn->query("CREATE TABLE IF NOT EXISTS parent_weekly_report_comments (
         id INT UNSIGNED NOT NULL AUTO_INCREMENT,
         course_id VARCHAR(40) NOT NULL,
