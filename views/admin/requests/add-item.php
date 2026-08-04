@@ -1295,6 +1295,8 @@ try {
                 'max_attempts' => item_post('timed_exam_max_attempts', '1'),
                 'allowed_answer_types' => item_post('timed_exam_allowed_types', 'pdf,jpg,jpeg,png'),
                 'max_file_size_bytes' => max(1, (int) item_post('timed_exam_max_size_mb', '10')) * 1048576,
+                'paper_external_url' => item_post('timed_exam_paper_url'),
+                'paper_fallback_instructions' => item_post_raw('timed_exam_paper_fallback'),
                 'paper_view_allowed' => item_is_checked('timed_exam_view_allowed'),
                 'paper_download_allowed' => item_is_checked('timed_exam_download_allowed'),
                 'late_submission_allowed' => item_is_checked('timed_exam_late_allowed'),
@@ -1303,7 +1305,7 @@ try {
                 'recovery_allowed' => item_is_checked('timed_exam_recovery_allowed'),
                 'recovery_window_start_at' => item_post('timed_exam_recovery_start'),
                 'recovery_window_end_at' => item_post('timed_exam_recovery_end'),
-            ], $_FILES['timed_exam_paper'] ?? null, null);
+            ], null, null);
         }
         if ($template_type === 'classified_assignment') {
             item_update_assignment_context($conn, $course_id, (string) ($built['data']['assignment_id'] ?? ''), $item_id, $section_id);
@@ -1413,6 +1415,8 @@ try {
             'max_attempts' => item_post('timed_exam_max_attempts', '1'),
             'allowed_answer_types' => item_post('timed_exam_allowed_types', 'pdf,jpg,jpeg,png'),
             'max_file_size_bytes' => max(1, (int) item_post('timed_exam_max_size_mb', '10')) * 1048576,
+            'paper_external_url' => item_post('timed_exam_paper_url'),
+            'paper_fallback_instructions' => item_post_raw('timed_exam_paper_fallback'),
             'paper_view_allowed' => item_is_checked('timed_exam_view_allowed'),
             'paper_download_allowed' => item_is_checked('timed_exam_download_allowed'),
             'late_submission_allowed' => item_is_checked('timed_exam_late_allowed'),
@@ -1421,7 +1425,7 @@ try {
             'recovery_allowed' => item_is_checked('timed_exam_recovery_allowed'),
             'recovery_window_start_at' => item_post('timed_exam_recovery_start'),
             'recovery_window_end_at' => item_post('timed_exam_recovery_end'),
-        ], $_FILES['timed_exam_paper'] ?? null, null);
+        ], null, null);
     }
     if ($template_type === 'classified_assignment') {
         item_update_assignment_context($conn, $course_id, (string) ($built['data']['assignment_id'] ?? ''), $item_id, $section_id);

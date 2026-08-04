@@ -410,7 +410,7 @@ if (!function_exists('mmh_course_resource_embed_details')) {
             return null;
         }
 
-        if ($isHost('drive.google.com') || $isHost('docs.google.com')) {
+        if ($isHost('drive.google.com') || $isHost('docs.google.com') || $isHost('drive.usercontent.google.com')) {
             // Drive folders have their own permission and navigation model.
             if (preg_match('~/(?:drive/)?folders/[^/?]+~i', $path)) {
                 return null;

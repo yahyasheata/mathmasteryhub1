@@ -3,6 +3,46 @@ declare(strict_types=1);
 
 require_once __DIR__ . '/StudentCourseAccess.php';
 require_once __DIR__ . '/StudentCourseCsrf.php';
+require_once __DIR__ . '/CourseResourceResolver.php';
+
+if (!function_exists('mmh_timed_exam_normalize_external_paper_url')) {
+    /**
+     * Normalize a teacher-provided cloud paper link through the shared course
+     * resource resolver. Only HTTPS links from supported providers are stored;
+     * the browser never receives this value before the server opens the exam.
+     */
+    function mmh_timed_exam_normalize_external_paper_url(string $value): ?array
+    {
+        $url = mmh_course_resource_safe_url(trim($value));
+        if ($url === null || strtolower((string) parse_url($url, PHP_URL_SCHEME)) !== 'https') return null;
+        $parts = parse_url($url);
+        $host = strtolower(trim((string) ($parts['host'] ?? '')));
+        if ($host === '' || isset($parts['user']) || isset($parts['pass']) || isset($parts['port'])) return null;
+        $isHost = static fn(string $domain): bool => $host === $domain || str_ends_with($host, '.' . $domain);
+        $path = (string) ($parts['path'] ?? '');
+        $supported = $isHost('drive.google.com') || $isHost('docs.google.com')
+            || $isHost('drive.usercontent.google.com') || $isHost('sharepoint.com')
+            || $isHost('onedrive.live.com') || $isHost('1drv.ms')
+            || $isHost('mathmasteryhub.com');
+        if (!$supported) return null;
+
+        $type = (string) mmh_course_resource_type_for_url($url, 'external_link');
+        $details = mmh_course_resource_embed_details($url, $type);
+        if (($isHost('drive.google.com') || $isHost('docs.google.com')) && !$details) return null;
+        $isPdf = (bool) preg_match('/\.pdf(?:$|[?#])/i', $url);
+        if (!$details && !$isPdf && !$isHost('sharepoint.com') && !$isHost('onedrive.live.com') && !$isHost('1drv.ms')) return null;
+        $preview = $details['embed_url'] ?? $url;
+        $download = $details['download_url'] ?? null;
+        if ($isPdf && $download === null) $download = $url;
+        if (!$isPdf && !$details) $download = null;
+        return [
+            'url' => $url,
+            'preview_url' => mmh_course_resource_safe_url((string) $preview),
+            'download_url' => $download !== null ? mmh_course_resource_safe_url((string) $download) : null,
+            'kind' => (string) ($details['kind'] ?? ($isPdf ? 'pdf' : 'external')),
+        ];
+    }
+}
 
 if (!function_exists('mmh_timed_exam_table_available')) {
     function mmh_timed_exam_table_available(mysqli $conn): bool
@@ -478,8 +518,24 @@ if (!function_exists('mmh_timed_exam_remove_latest_upload')) {
 if (!function_exists('mmh_timed_exam_download')) {
     function mmh_timed_exam_download(mysqli $conn, array $exam, bool $download = false): void
     {
-        if (!$exam['paper_storage_key'] || (!$download && empty($exam['paper_view_allowed'])) || ($download && empty($exam['paper_download_allowed']))) {
+        if ((!$download && empty($exam['paper_view_allowed'])) || ($download && empty($exam['paper_download_allowed']))) {
             http_response_code(403); exit('This exam paper is not available.');
+        }
+        $source = (string) ($exam['paper_source'] ?? '');
+        if ($source === '') $source = !empty($exam['paper_storage_key']) ? 'private_upload' : 'external_link';
+        if ($source === 'external_link') {
+            $resolved = mmh_timed_exam_normalize_external_paper_url((string) ($exam['paper_external_url'] ?? ''));
+            if (!$resolved) { http_response_code(404); exit('Exam paper not found.'); }
+            $target = $download ? ($resolved['download_url'] ?? null) : ($resolved['preview_url'] ?? null);
+            if (!$target) { http_response_code(403); exit('This exam paper cannot be downloaded.'); }
+            header('Cache-Control: private, no-store, max-age=0');
+            header('Pragma: no-cache');
+            header('Referrer-Policy: no-referrer');
+            header('Location: ' . $target, true, 302);
+            exit;
+        }
+        if ($source !== 'private_upload' || empty($exam['paper_storage_key'])) {
+            http_response_code(404); exit('Exam paper not found.');
         }
         $path = dirname(__DIR__) . '/' . ltrim((string) $exam['paper_storage_key'], '/');
         if (!is_file($path) || str_contains((string) $exam['paper_storage_key'], '..')) { http_response_code(404); exit('Exam paper not found.'); }
@@ -534,10 +590,29 @@ if (!function_exists('mmh_timed_exam_save_config')) {
         $recoveryEnd = mmh_timed_exam_datetime_to_utc($data['recovery_window_end_at'] ?? null);
         $recoveryAllowed = !empty($data['recovery_allowed']) ? 1 : 0;
         $existing = mmh_timed_exam_load_for_item($conn, $courseId, $itemId, true);
+        $paperSource = (string) ($existing['paper_source'] ?? '');
+        if ($paperSource === '') $paperSource = !empty($existing['paper_storage_key']) ? 'private_upload' : 'external_link';
         $storageKey = $existing['paper_storage_key'] ?? null;
         $paperName = $existing['paper_original_name'] ?? null;
         $paperMime = $existing['paper_mime'] ?? null;
         $paperSize = $existing['paper_size_bytes'] ?? null;
+        $externalUrl = trim((string) ($data['paper_external_url'] ?? ''));
+        $externalPreviewUrl = (string) ($existing['paper_external_preview_url'] ?? '');
+        $externalDownloadUrl = (string) ($existing['paper_external_download_url'] ?? '');
+        $fallbackInstructions = trim((string) ($data['paper_fallback_instructions'] ?? ($existing['paper_fallback_instructions'] ?? '')));
+        if ($externalUrl !== '') {
+            $resolved = mmh_timed_exam_normalize_external_paper_url($externalUrl);
+            if (!$resolved) throw new InvalidArgumentException('Use a secure HTTPS link from Google Drive, SharePoint, OneDrive, or a supported PDF host.');
+            $paperSource = 'external_link';
+            $externalUrl = $resolved['url'];
+            $externalPreviewUrl = (string) ($resolved['preview_url'] ?? '');
+            $externalDownloadUrl = (string) ($resolved['download_url'] ?? '');
+            $paperName = null;
+            $paperMime = null;
+            $paperSize = null;
+        } elseif ($paperSource === 'external_link') {
+            $externalUrl = (string) ($existing['paper_external_url'] ?? '');
+        }
         if ($paperFile && ($paperFile['error'] ?? UPLOAD_ERR_NO_FILE) !== UPLOAD_ERR_NO_FILE) {
             if (($paperFile['error'] ?? UPLOAD_ERR_NO_FILE) !== UPLOAD_ERR_OK || !is_uploaded_file((string) ($paperFile['tmp_name'] ?? ''))) throw new InvalidArgumentException('The exam paper upload failed.');
             $original = trim((string) ($paperFile['name'] ?? ''));
@@ -556,21 +631,25 @@ if (!function_exists('mmh_timed_exam_save_config')) {
             if (!move_uploaded_file($tmp, $target)) throw new RuntimeException('The exam paper could not be saved securely.');
             $storageKey = 'storage/private/timed-exams/papers/' . gmdate('Y/m') . '/' . $stored;
             $paperName = $original; $paperMime = $mime; $paperSize = $size;
+            $paperSource = 'private_upload';
+        }
+        if ($status === 'published' && $paperSource === 'external_link' && $externalUrl === '') {
+            throw new InvalidArgumentException('A published Timed Exam needs an Exam Paper Link.');
         }
         $jsonTypes = implode(',', $types);
         $createdBy = $adminId ?: null;
         if ($existing) {
-            $stmt = $conn->prepare('UPDATE timed_exams SET title = ?, instructions = ?, status = ?, timing_mode = ?, scheduled_start_at_utc = ?, duration_minutes = ?, grace_minutes = ?, max_attempts = ?, allowed_answer_types = ?, max_file_size_bytes = ?, paper_storage_key = ?, paper_original_name = ?, paper_mime = ?, paper_size_bytes = ?, paper_view_allowed = ?, paper_download_allowed = ?, late_submission_allowed = ?, expiry_policy = ?, max_marks = ?, results_release_at_utc = ?, recovery_window_start_at_utc = ?, recovery_window_end_at_utc = ?, recovery_allowed = ?, updated_by = ? WHERE id = ?');
+            $stmt = $conn->prepare('UPDATE timed_exams SET title = ?, instructions = ?, status = ?, timing_mode = ?, scheduled_start_at_utc = ?, duration_minutes = ?, grace_minutes = ?, max_attempts = ?, allowed_answer_types = ?, max_file_size_bytes = ?, paper_source = ?, paper_external_url = ?, paper_external_preview_url = ?, paper_external_download_url = ?, paper_fallback_instructions = ?, paper_storage_key = ?, paper_original_name = ?, paper_mime = ?, paper_size_bytes = ?, paper_view_allowed = ?, paper_download_allowed = ?, late_submission_allowed = ?, expiry_policy = ?, max_marks = ?, results_release_at_utc = ?, recovery_window_start_at_utc = ?, recovery_window_end_at_utc = ?, recovery_allowed = ?, updated_by = ? WHERE id = ?');
             if (!$stmt) throw new RuntimeException('Unable to prepare Timed Exam update.');
             $id = (int) $existing['id'];
-            $stmt->bind_param('sssssiiisisssiiiisdsssiii', $title, $instructions, $status, $timingMode, $scheduled, $duration, $grace, $maxAttempts, $jsonTypes, $maxSize, $storageKey, $paperName, $paperMime, $paperSize, $viewAllowed, $downloadAllowed, $lateAllowed, $expiryPolicy, $maxMarks, $release, $recoveryStart, $recoveryEnd, $recoveryAllowed, $createdBy, $id);
+            $stmt->bind_param('sssssiiisissssssssiiiisdsssiii', $title, $instructions, $status, $timingMode, $scheduled, $duration, $grace, $maxAttempts, $jsonTypes, $maxSize, $paperSource, $externalUrl, $externalPreviewUrl, $externalDownloadUrl, $fallbackInstructions, $storageKey, $paperName, $paperMime, $paperSize, $viewAllowed, $downloadAllowed, $lateAllowed, $expiryPolicy, $maxMarks, $release, $recoveryStart, $recoveryEnd, $recoveryAllowed, $createdBy, $id);
             if (!$stmt->execute()) { $error = $stmt->error; $stmt->close(); throw new RuntimeException($error); }
             $stmt->close();
             return $id;
         }
-        $stmt = $conn->prepare('INSERT INTO timed_exams (course_id, item_id, title, instructions, status, timing_mode, scheduled_start_at_utc, duration_minutes, grace_minutes, max_attempts, allowed_answer_types, max_file_size_bytes, paper_storage_key, paper_original_name, paper_mime, paper_size_bytes, paper_view_allowed, paper_download_allowed, late_submission_allowed, expiry_policy, max_marks, results_release_at_utc, recovery_window_start_at_utc, recovery_window_end_at_utc, recovery_allowed, created_by, updated_by) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)');
+        $stmt = $conn->prepare('INSERT INTO timed_exams (course_id, item_id, title, instructions, status, timing_mode, scheduled_start_at_utc, duration_minutes, grace_minutes, max_attempts, allowed_answer_types, max_file_size_bytes, paper_source, paper_external_url, paper_external_preview_url, paper_external_download_url, paper_fallback_instructions, paper_storage_key, paper_original_name, paper_mime, paper_size_bytes, paper_view_allowed, paper_download_allowed, late_submission_allowed, expiry_policy, max_marks, results_release_at_utc, recovery_window_start_at_utc, recovery_window_end_at_utc, recovery_allowed, created_by, updated_by) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)');
         if (!$stmt) throw new RuntimeException('Unable to prepare Timed Exam save.');
-        $stmt->bind_param('sssssssiiisisssiiiisdsssiii', $courseId, $itemId, $title, $instructions, $status, $timingMode, $scheduled, $duration, $grace, $maxAttempts, $jsonTypes, $maxSize, $storageKey, $paperName, $paperMime, $paperSize, $viewAllowed, $downloadAllowed, $lateAllowed, $expiryPolicy, $maxMarks, $release, $recoveryStart, $recoveryEnd, $recoveryAllowed, $createdBy, $createdBy);
+        $stmt->bind_param('sssssssiiisissssssssiiiisdsssiii', $courseId, $itemId, $title, $instructions, $status, $timingMode, $scheduled, $duration, $grace, $maxAttempts, $jsonTypes, $maxSize, $paperSource, $externalUrl, $externalPreviewUrl, $externalDownloadUrl, $fallbackInstructions, $storageKey, $paperName, $paperMime, $paperSize, $viewAllowed, $downloadAllowed, $lateAllowed, $expiryPolicy, $maxMarks, $release, $recoveryStart, $recoveryEnd, $recoveryAllowed, $createdBy, $createdBy);
         if (!$stmt->execute()) { $error = $stmt->error; $stmt->close(); throw new RuntimeException($error); }
         $id = (int) $stmt->insert_id; $stmt->close();
         return $id;
