@@ -1,229 +1,117 @@
 <?php
 $user_data = getUserData($username);
-$admin_name = explode(' ',$user_data['full_name'])[0];
-$avatar = $user_data['avatar'];
-$adminAvatarUrl = mmh_site_public_url(mmh_site_settings_valid_local_asset($avatar) ?? 'uploads/default/avatar.png');
-// $pageName = 'xxx';
-function setActive($name = 'home')
-{
-    global $pageName;
-    if (isset($pageName) && $pageName == $name) {
-        echo "active";
-    }
-
-}
-function subSetActive($name = 'home')
-{
-    global $subPageName;
-    if (isset($subPageName) && $subPageName == $name) {
-        echo "active";
-    }
-
-}
-function openMenu($name = 'home')
-{
-    global $pageName;
-    if (isset($pageName) && $pageName == $name) {
-        echo "menu-open";
-    }
-
-}
-
-function isActive($page)
-{
-    global $pageName;
-    return (basename($_SERVER['PHP_SELF']) == $page) ? 'active' : '';
-}
-
-// echo setActive('teachers');
+$admin_name = trim((string) (($user_data['full_name'] ?? '') ?: $username));
+$admin_name = preg_split('/\s+/', $admin_name)[0] ?? $admin_name;
+$adminAvatarUrl = mmh_site_public_url(mmh_site_settings_valid_local_asset($user_data['avatar'] ?? '') ?? 'uploads/default/avatar.png');
+$adminBase = rtrim((string) ($baseUrl ?? ''), '/');
+$isPage = static function (string $name) use ($pageName, $subPageName): bool {
+    return (string) ($pageName ?? '') === $name || (string) ($subPageName ?? '') === $name;
+};
+$isGroup = static function (array $names) use ($pageName, $subPageName): bool {
+    return in_array((string) ($pageName ?? ''), $names, true) || in_array((string) ($subPageName ?? ''), $names, true);
+};
 ?>
-<form id="admin-sidebar-logout-form" method="post" action="<?=rtrim((string) ($baseUrl ?? ''), '/')?>/admin/logout" class="d-none">
+<form id="admin-sidebar-logout-form" method="post" action="<?=$adminBase?>/admin/logout" class="d-none">
     <input type="hidden" name="mmh_csrf_token" value="<?=htmlspecialchars(mmh_admin_csrf_token(), ENT_QUOTES, 'UTF-8')?>">
 </form>
-<aside id="admin-sidebar" class='aside active ds-surface' style="width: 260px; min-height: 100vh; position: fixed; z-index: 900">
-    <div class="col-12 px-0 d-flex" style="height: 55px">
-        <div class='col-12 p-1 ds-text-secondary'>
-            <div class="col-12 p-0 row">
-                <div class="col-3 py-1 px-1">
-
-                </div>
-                <div class="col-9">
-
-                    <button type="button"
-                        style="width: 55px; height: 55px; position: absolute; left: 0px; top: 0px; align-items: center; justify-content: center; cursor: pointer"
-                        class="admin-sidebar-toggle d-flex d-md-none rounded-0" aria-controls="admin-sidebar" aria-expanded="false" aria-label="Close sidebar">
-                        <span class="fas fa-bars font-4" aria-hidden="true"></span>
-                    </button>
-                </div>
-            </div>
-        </div>
-    </div>
-    <div class="col-12 px-0 pb-4 text-center justify-content-center align-items-center">
-        <a href="profile">
-
-            <img src="<?=$adminAvatarUrl?>"
-                style="width: 80px;height: 80px;color: var(--background-1);border-radius: 50%" class="d-inline-block">
+<aside id="admin-sidebar" class="aside admin-sidebar ds-surface" aria-label="Administrator navigation">
+    <div class="admin-sidebar-brand">
+        <a href="dashboard" class="admin-sidebar-profile">
+            <img src="<?=$adminAvatarUrl?>" alt="" class="admin-sidebar-avatar">
+            <span><small>Administrator</small><strong><?=htmlspecialchars($admin_name, ENT_QUOTES, 'UTF-8')?></strong></span>
         </a>
-        <div class='col-12 px-0 mt-2 text-center ds-text-primary'>
-            Welcome, <?=$admin_name?>
-        </div>
-    </div>
-    <div class="col-12 px-0">
-
-        <div class="col-12 px-3 aside-menu" style="height: calc(100vh - 260px); overflow: auto">
-
-            <a href="dashboard" class="col-12 px-0 <?= ($pageName == 'dashboard') ? 'active' : ''; ?>">
-                <div class="col-12 item-container px-0 d-flex <?= ($pageName == 'dashboard') ? 'active' : ''; ?>">
-                    <div style="width: 50px" class="px-3 text-center">
-                        <span class="fas fa-home font-2 ds-nav-icon" aria-hidden="true"> </span>
-                    </div>
-                    <div style="width: calc(100% - 50px)" class="px-2 item-container-title">
-                        Dashboard
-                    </div>
-                </div>
-            </a>
-
-            <div class="col-12 px-0 admin-nav-group" data-admin-nav-group="courses">
-                <div class="col-12 item px-0 d-flex row">
-                    <button type="button" class="col-12 d-flex px-0 item-container admin-nav-submenu-toggle <?= ($pageName == 'courses') ? 'active' : ''; ?>"
-                        data-admin-submenu-toggle="admin-courses-submenu"
-                        aria-controls="admin-courses-submenu"
-                        aria-expanded="<?= ($pageName == 'courses') ? 'true' : 'false'; ?>">
-                        <div style="width: 50px" class="px-3 text-center">
-                            <span class="fas fa-play-circle font-2 ds-nav-icon" aria-hidden="true"> </span>
-                        </div>
-                        <div style="width: calc(100% - 50px)" class="px-2 item-container-title has-sub-menu">
-                            Courses
-                        </div>
-                    </button>
-                    <div class="col-12 px-0">
-                        <ul id="admin-courses-submenu" class="sub-item font-1 <?= ($pageName == 'courses') ? 'active is-open' : ''; ?>"
-                            data-admin-submenu data-route-active="<?= ($pageName == 'courses') ? 'true' : 'false'; ?>"
-                            <?= ($pageName == 'courses') ? '' : 'hidden'; ?>
-                            style="list-style:none;">
-                            
-                            <li>
-                                <a href="categories" style="font-size: 16px; " class="<?= ($subPageName == 'categories') ? 'active': ''; ?>">
-                                    <span class="fas fa-tag px-2 ds-nav-icon" aria-hidden="true" style="width: 28px; font-size: 15px"></span>
-                                    Categories
-                                </a>
-                            </li>
-                            
-                            <li>
-                                <a href="courses" style="font-size: 16px; " class="<?= ($subPageName == 'courses') ? 'active': ''; ?>">
-                                    <span class="fas fa-play-circle px-2 ds-nav-icon" aria-hidden="true" style="width: 28px; font-size: 15px"></span>
-                                    Courses
-                                </a>
-                            </li>
-
-                            <li>
-                                <a href="live-sessions" style="font-size: 16px; " class="<?= ($subPageName == 'live_sessions') ? 'active': ''; ?>">
-                                    <span class="fas fa-video px-2 ds-nav-icon" aria-hidden="true" style="width: 28px; font-size: 15px"></span>
-                                    Live Sessions
-                                </a>
-                            </li>
-                            
-                            <li class="admin-nav-subheading"><span class="fas fa-clipboard-check ds-nav-icon" aria-hidden="true"></span> Assessments</li>
-                            <li>
-                                <a href="assignments" style="font-size: 16px; " class="<?= ($subPageName == 'assignments') ? 'active': ''; ?>">
-                                    <span class="fas fa-tasks px-2 ds-nav-icon" aria-hidden="true" style="width: 28px; font-size: 15px"></span>
-                                    Assignments
-                                </a>
-                            </li>
-                            <li>
-                                <a href="exams" style="font-size: 16px; " class="<?= ($subPageName == 'exams') ? 'active': ''; ?>">
-                                    <span class="fas fa-file-alt px-2 ds-nav-icon" aria-hidden="true" style="width: 28px; font-size: 15px"></span>
-                                    Exams &amp; Quizzes
-                                </a>
-                            </li>
-
-
-                        </ul>
-                    </div>
-                </div>
-            </div>
-
-            <a href="files" class="col-12 px-0 <?= ($pageName == 'files') ? 'active' : ''; ?>">
-                <div class="col-12 item-container px-0 d-flex <?= ($pageName == 'files') ? 'active' : ''; ?>">
-                    <div style="width: 50px" class="px-3 text-center">
-                        <span class="fas fa-folder-open font-2 ds-nav-icon" aria-hidden="true"> </span>
-                    </div>
-                    <div style="width: calc(100% - 50px)" class="px-2 item-container-title">
-                        Media Library
-                    </div>
-                </div>
-            </a>
-
-            <a href="past-papers" class="col-12 px-0 <?= ($pageName == 'past_papers') ? 'active' : ''; ?>">
-                <div class="col-12 item-container px-0 d-flex <?= ($pageName == 'past_papers') ? 'active' : ''; ?>">
-                    <div style="width: 50px" class="px-3 text-center">
-                        <span class="fas fa-file-alt font-2 ds-nav-icon" aria-hidden="true"> </span>
-                    </div>
-                    <div style="width: calc(100% - 50px)" class="px-2 item-container-title">
-                        Past Papers
-                    </div>
-                </div>
-            </a>
-
-
-            <a href="free-learning" class="col-12 px-0 <?= ($pageName == 'free_learning') ? 'active' : ''; ?>">
-                <div class="col-12 item-container px-0 d-flex <?= ($pageName == 'free_learning') ? 'active' : ''; ?>">
-                    <div style="width: 50px" class="px-3 text-center">
-                        <span class="fas fa-book-open font-2 ds-nav-icon" aria-hidden="true"> </span>
-                    </div>
-                    <div style="width: calc(100% - 50px)" class="px-2 item-container-title">
-                        Free Learning
-                    </div>
-                </div>
-            </a>
-
-            <a href="users" class="col-12 px-0 <?= ($pageName == 'users') ? 'active' : ''; ?>">
-                <div class="col-12 item-container px-0 d-flex <?= ($pageName == 'users') ? 'active' : ''; ?>">
-                    <div style="width: 50px" class="px-3 text-center">
-                        <span class="fas fa-users font-2 ds-nav-icon" aria-hidden="true"> </span>
-                    </div>
-                    <div style="width: calc(100% - 50px)" class="px-2 item-container-title">
-                        Users
-                    </div>
-                </div>
-            </a>
-
-            <a href="parent-reports" class="col-12 px-0 <?= ($pageName == 'parent_reports') ? 'active' : ''; ?>">
-                <div class="col-12 item-container px-0 d-flex <?= ($pageName == 'parent_reports') ? 'active' : ''; ?>">
-                    <div style="width: 50px" class="px-3 text-center"><span class="fas fa-file-alt font-2 ds-nav-icon" aria-hidden="true"></span></div>
-                    <div style="width: calc(100% - 50px)" class="px-2 item-container-title">Parent Reports</div>
-                </div>
-            </a>
-
-            <a href="recovery-plan" class="col-12 px-0 <?= (($subPageName ?? '') == 'recovery_plan') ? 'active' : ''; ?>">
-                <div class="col-12 item-container px-0 d-flex <?= (($subPageName ?? '') == 'recovery_plan') ? 'active' : ''; ?>">
-                    <div style="width: 50px" class="px-3 text-center"><span class="fas fa-route font-2 ds-nav-icon" aria-hidden="true"></span></div>
-                    <div style="width: calc(100% - 50px)" class="px-2 item-container-title">Recovery Plans</div>
-                </div>
-            </a>
-
-            <a href="settings" class="col-12 px-0 <?= ($pageName == 'settings') ? 'active' : ''; ?>">
-                <div class="col-12 item-container px-0 d-flex <?= ($pageName == 'settings') ? 'active' : ''; ?>">
-                    <div style="width: 50px" class="px-3 text-center">
-                        <span class="fas fa-wrench font-2 ds-nav-icon" aria-hidden="true"> </span>
-                    </div>
-                    <div style="width: calc(100% - 50px)" class="px-2 item-container-title">
-                        Settings
-                    </div>
-                </div>
-            </a>
-
-            <a href="<?=rtrim((string) ($baseUrl ?? ''), '/')?>/admin/logout" class="col-12 px-0" onclick="var f=document.getElementById('admin-sidebar-logout-form'); if(f){event.preventDefault(); f.submit();} return false;">
-                <div class="col-12 item-container px-0 d-flex">
-                    <div style="width: 50px" class="px-3 text-center">
-                        <span class="fas fa-sign-out-alt font-2 ds-nav-icon" aria-hidden="true"> </span>
-                    </div>
-                    <div style="width: calc(100% - 50px)" class="px-2 item-container-title">
-                        Logout
-                    </div>
-                </div>
-            </a>
-        </div>
+        <button type="button" class="admin-sidebar-toggle admin-sidebar-close d-md-none" aria-controls="admin-sidebar" aria-expanded="false" aria-label="Close sidebar">
+            <span class="fas fa-times" aria-hidden="true"></span>
+        </button>
     </div>
 
-</div>
+    <nav class="admin-sidebar-nav" aria-label="Admin sections">
+        <a href="dashboard" class="admin-nav-link <?=$isPage('dashboard') ? 'active' : ''?>">
+            <span class="fas fa-home" aria-hidden="true"></span><span>Dashboard</span>
+        </a>
+
+        <section class="admin-nav-group" data-admin-nav-group="course-management">
+            <button type="button" class="admin-nav-group-toggle <?=$isGroup(['courses', 'course_content', 'categories']) ? 'active' : ''?>" data-admin-submenu-toggle="admin-course-management-menu" aria-controls="admin-course-management-menu" aria-expanded="<?=$isGroup(['courses', 'course_content', 'categories']) ? 'true' : 'false'?>">
+                <span class="fas fa-book" aria-hidden="true"></span><span>Course Management</span><span class="fas fa-chevron-down admin-nav-chevron" aria-hidden="true"></span>
+            </button>
+            <ul id="admin-course-management-menu" class="admin-nav-submenu" data-admin-submenu data-route-active="<?=$isGroup(['courses', 'course_content', 'categories']) ? 'true' : 'false'?>" <?= $isGroup(['courses', 'course_content', 'categories']) ? '' : 'hidden' ?>>
+                <li><a href="courses" class="<?=$isPage('courses') ? 'active' : ''?>"><span class="fas fa-book-open" aria-hidden="true"></span>Courses</a></li>
+                <li><a href="categories" class="<?=$isPage('categories') ? 'active' : ''?>"><span class="fas fa-tags" aria-hidden="true"></span>Categories</a></li>
+                <li><span class="admin-nav-note">Open Course Content from a course</span></li>
+            </ul>
+        </section>
+
+        <section class="admin-nav-group" data-admin-nav-group="assessments">
+            <button type="button" class="admin-nav-group-toggle <?=$isGroup(['assignments', 'exams', 'timed_exam_submissions', 'assignment_submissions', 'exam_submissions']) ? 'active' : ''?>" data-admin-submenu-toggle="admin-assessments-menu" aria-controls="admin-assessments-menu" aria-expanded="<?=$isGroup(['assignments', 'exams', 'timed_exam_submissions', 'assignment_submissions', 'exam_submissions']) ? 'true' : 'false'?>">
+                <span class="fas fa-clipboard-check" aria-hidden="true"></span><span>Assessments</span><span class="fas fa-chevron-down admin-nav-chevron" aria-hidden="true"></span>
+            </button>
+            <ul id="admin-assessments-menu" class="admin-nav-submenu" data-admin-submenu data-route-active="<?=$isGroup(['assignments', 'exams', 'timed_exam_submissions', 'assignment_submissions', 'exam_submissions']) ? 'true' : 'false'?>" <?= $isGroup(['assignments', 'exams', 'timed_exam_submissions', 'assignment_submissions', 'exam_submissions']) ? '' : 'hidden' ?>>
+                <li><a href="assignments" class="<?=$isPage('assignments') ? 'active' : ''?>"><span class="fas fa-tasks" aria-hidden="true"></span>Assignments</a></li>
+                <li><a href="exams" class="<?=$isPage('exams') ? 'active' : ''?>"><span class="fas fa-file-alt" aria-hidden="true"></span>Legacy Exams <small>Compatibility</small></a></li>
+                <li><span class="admin-nav-note"><span class="fas fa-stopwatch" aria-hidden="true"></span>Timed Exams are managed inside Course Content</span></li>
+                <li><a href="assignment-submissions" class="<?=$isPage('assignment_submissions') ? 'active' : ''?>"><span class="fas fa-inbox" aria-hidden="true"></span>Assignment Submissions</a></li>
+            </ul>
+        </section>
+
+        <a href="live-sessions" class="admin-nav-link <?=$isPage('live_sessions') ? 'active' : ''?>"><span class="fas fa-video" aria-hidden="true"></span><span>Live Sessions</span></a>
+
+        <section class="admin-nav-group" data-admin-nav-group="students">
+            <button type="button" class="admin-nav-group-toggle <?=$isGroup(['users', 'previous-progress']) ? 'active' : ''?>" data-admin-submenu-toggle="admin-students-menu" aria-controls="admin-students-menu" aria-expanded="<?=$isGroup(['users', 'previous-progress']) ? 'true' : 'false'?>">
+                <span class="fas fa-users" aria-hidden="true"></span><span>Students</span><span class="fas fa-chevron-down admin-nav-chevron" aria-hidden="true"></span>
+            </button>
+            <ul id="admin-students-menu" class="admin-nav-submenu" data-admin-submenu data-route-active="<?=$isGroup(['users', 'previous-progress']) ? 'true' : 'false'?>" <?= $isGroup(['users', 'previous-progress']) ? '' : 'hidden' ?>>
+                <li><a href="users" class="<?=$isPage('users') ? 'active' : ''?>"><span class="fas fa-user-graduate" aria-hidden="true"></span>Students</a></li>
+                <li><span class="admin-nav-note"><span class="fas fa-user-plus" aria-hidden="true"></span>Enrollments are managed from student records</span></li>
+                <li><a href="previous-progress" class="<?=$isPage('previous-progress') ? 'active' : ''?>"><span class="fas fa-route" aria-hidden="true"></span>Learning Journey</a></li>
+            </ul>
+        </section>
+
+        <section class="admin-nav-group" data-admin-nav-group="support">
+            <button type="button" class="admin-nav-group-toggle <?=$isGroup(['recovery_plan', 'recovery_plan_templates', 'recovery_plan_assignments', 'parent_reports']) ? 'active' : ''?>" data-admin-submenu-toggle="admin-support-menu" aria-controls="admin-support-menu" aria-expanded="<?=$isGroup(['recovery_plan', 'recovery_plan_templates', 'recovery_plan_assignments', 'parent_reports']) ? 'true' : 'false'?>">
+                <span class="fas fa-life-ring" aria-hidden="true"></span><span>Student Support</span><span class="fas fa-chevron-down admin-nav-chevron" aria-hidden="true"></span>
+            </button>
+            <ul id="admin-support-menu" class="admin-nav-submenu" data-admin-submenu data-route-active="<?=$isGroup(['recovery_plan', 'recovery_plan_templates', 'recovery_plan_assignments', 'parent_reports']) ? 'true' : 'false'?>" <?= $isGroup(['recovery_plan', 'recovery_plan_templates', 'recovery_plan_assignments', 'parent_reports']) ? '' : 'hidden' ?>>
+                <li><a href="recovery-plan" class="<?=$isPage('recovery_plan') ? 'active' : ''?>"><span class="fas fa-route" aria-hidden="true"></span>Recovery Plans</a></li>
+                <li><a href="recovery-plan-templates" class="<?=$isPage('recovery_plan_templates') ? 'active' : ''?>"><span class="fas fa-layer-group" aria-hidden="true"></span>Templates</a></li>
+                <li><a href="recovery-plan-assignments" class="<?=$isPage('recovery_plan_assignments') ? 'active' : ''?>"><span class="fas fa-user-check" aria-hidden="true"></span>Assignments</a></li>
+                <li><a href="parent-reports" class="<?=$isPage('parent_reports') ? 'active' : ''?>"><span class="fas fa-file-alt" aria-hidden="true"></span>Parent Reports</a></li>
+            </ul>
+        </section>
+
+        <section class="admin-nav-group" data-admin-nav-group="resources">
+            <button type="button" class="admin-nav-group-toggle <?=$isGroup(['files', 'past_papers', 'free_learning']) ? 'active' : ''?>" data-admin-submenu-toggle="admin-resources-menu" aria-controls="admin-resources-menu" aria-expanded="<?=$isGroup(['files', 'past_papers', 'free_learning']) ? 'true' : 'false'?>">
+                <span class="fas fa-folder-open" aria-hidden="true"></span><span>Resources</span><span class="fas fa-chevron-down admin-nav-chevron" aria-hidden="true"></span>
+            </button>
+            <ul id="admin-resources-menu" class="admin-nav-submenu" data-admin-submenu data-route-active="<?=$isGroup(['files', 'past_papers', 'free_learning']) ? 'true' : 'false'?>" <?= $isGroup(['files', 'past_papers', 'free_learning']) ? '' : 'hidden' ?>>
+                <li><a href="files" class="<?=$isPage('files') ? 'active' : ''?>"><span class="fas fa-photo-video" aria-hidden="true"></span>Media Library</a></li>
+                <li><a href="past-papers" class="<?=$isPage('past_papers') ? 'active' : ''?>"><span class="fas fa-file-alt" aria-hidden="true"></span>Past Papers</a></li>
+                <li><a href="free-learning" class="<?=$isPage('free_learning') ? 'active' : ''?>"><span class="fas fa-book-open" aria-hidden="true"></span>Free Learning</a></li>
+            </ul>
+        </section>
+
+        <section class="admin-nav-group" data-admin-nav-group="communication">
+            <button type="button" class="admin-nav-group-toggle" data-admin-submenu-toggle="admin-communication-menu" aria-controls="admin-communication-menu" aria-expanded="false">
+                <span class="fas fa-comments" aria-hidden="true"></span><span>Communication</span><span class="fas fa-chevron-down admin-nav-chevron" aria-hidden="true"></span>
+            </button>
+            <ul id="admin-communication-menu" class="admin-nav-submenu" data-admin-submenu data-route-active="false" hidden>
+                <li><span class="admin-nav-note"><span class="fas fa-bell" aria-hidden="true"></span> Notifications are sent from student and course actions</span></li>
+            </ul>
+        </section>
+
+        <section class="admin-nav-group" data-admin-nav-group="system">
+            <button type="button" class="admin-nav-group-toggle <?=$isPage('settings') ? 'active' : ''?>" data-admin-submenu-toggle="admin-system-menu" aria-controls="admin-system-menu" aria-expanded="<?=$isPage('settings') ? 'true' : 'false'?>">
+                <span class="fas fa-cog" aria-hidden="true"></span><span>System</span><span class="fas fa-chevron-down admin-nav-chevron" aria-hidden="true"></span>
+            </button>
+            <ul id="admin-system-menu" class="admin-nav-submenu" data-admin-submenu data-route-active="<?=$isPage('settings') ? 'true' : 'false'?>" <?= $isPage('settings') ? '' : 'hidden' ?>>
+                <li><a href="settings" class="<?=$isPage('settings') ? 'active' : ''?>"><span class="fas fa-sliders-h" aria-hidden="true"></span>Site Settings</a></li>
+                <li><span class="admin-nav-note">Payments, maintenance, authentication, and landing page settings are organized inside Site Settings</span></li>
+            </ul>
+        </section>
+    </nav>
+
+    <div class="admin-sidebar-footer">
+        <a href="profile" class="admin-nav-link"><span class="fas fa-user" aria-hidden="true"></span><span>My Profile</span></a>
+        <a href="<?=$adminBase?>/admin/logout" class="admin-nav-link admin-nav-logout" onclick="var f=document.getElementById('admin-sidebar-logout-form'); if(f){event.preventDefault(); f.submit();} return false;"><span class="fas fa-sign-out-alt" aria-hidden="true"></span><span>Logout</span></a>
+    </div>
+</aside>
+<script>document.documentElement.lang='en';document.documentElement.dir='ltr';</script>

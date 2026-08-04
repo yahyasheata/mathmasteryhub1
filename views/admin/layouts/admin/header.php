@@ -69,6 +69,8 @@ if ($themeStmt) {
     <link rel="stylesheet" href="<?=mmh_site_public_url('resources/css/bootstrap-5.2.3.min.css')?>" data-navigate-track="reload" />
     <?php $adminDashboardCssVersion = (string) (@filemtime(__DIR__ . '/../../../../resources/css/main-dashboard.css') ?: 1); ?>
     <link rel="stylesheet" href="<?=mmh_site_public_url('resources/css/main-dashboard.css')?>?v=<?=rawurlencode($adminDashboardCssVersion)?>" data-navigate-track="reload" />
+    <?php $adminShellCssVersion = (string) (@filemtime(__DIR__ . '/../../../../resources/css/admin-shell.css') ?: 1); ?>
+    <link rel="stylesheet" href="<?=mmh_site_public_url('resources/css/admin-shell.css')?>?v=<?=rawurlencode($adminShellCssVersion)?>" data-navigate-track="reload" />
     <link rel="stylesheet" href="https://cdn.datatables.net/1.13.6/css/dataTables.bootstrap5.min.css" data-navigate-track="reload" />
 
     <style type="text/css">
