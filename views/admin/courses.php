@@ -129,7 +129,8 @@ function admin_course_link(array $changes = []): string {
 أحمد شوقي
 --->
 <?php include "layouts/admin/header.php"; ?>
-<link rel="stylesheet" href="<?=mmh_site_public_url('resources/css/admin-courses.css')?>?v=<?=@filemtime('resources/css/admin-courses.css') ?: 1?>">
+<?php $adminCoursesCssPath = __DIR__ . '/../../resources/css/admin-courses.css'; $adminCoursesCssVersion = (string) (is_file($adminCoursesCssPath) ? (filemtime($adminCoursesCssPath) ?: 1) : 1); ?>
+<link rel="stylesheet" href="<?=mmh_site_public_url('resources/css/admin-courses.css')?>?v=<?=$adminCoursesCssVersion?>">
 
 <script src="<?=$baseUrl?>/resources/js/jquery-ui.min.js"></script>
 <script src="<?=$baseUrl?>/resources/js/jquery.ui.touch-punch.min.js"></script>

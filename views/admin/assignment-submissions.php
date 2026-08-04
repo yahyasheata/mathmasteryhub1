@@ -121,7 +121,11 @@ $result = $submission_stmt->get_result();
                         $file_path = trim((string) ($submission_file['file_path'] ?? ''));
                         if ($file_path === '') { continue; }
                         $label = trim((string) ($submission_file['original_filename'] ?? '')) ?: basename($file_path);
-                        $file_links[] = '<a href="../' . htmlspecialchars($file_path, ENT_QUOTES, 'UTF-8') . '" target="_blank" rel="noopener" class="btn btn-primary btn-sm mb-1">' . htmlspecialchars($label, ENT_QUOTES, 'UTF-8') . '</a>';
+                        $displayLabel = function_exists('mb_strimwidth')
+                          ? mb_strimwidth($label, 0, 30, '…', 'UTF-8')
+                          : (strlen($label) > 30 ? substr($label, 0, 27) . '...' : $label);
+                        $safeLabel = htmlspecialchars($label, ENT_QUOTES, 'UTF-8');
+                        $file_links[] = '<a href="../' . htmlspecialchars($file_path, ENT_QUOTES, 'UTF-8') . '" target="_blank" rel="noopener" class="btn btn-primary btn-sm mb-1 admin-file-link" title="' . $safeLabel . '" aria-label="Open ' . $safeLabel . '"><span class="fas fa-download" aria-hidden="true"></span><span class="admin-file-name">' . htmlspecialchars($displayLabel, ENT_QUOTES, 'UTF-8') . '</span></a>';
                       }
                       $file_link = $file_links ? implode('<br>', $file_links) : '-';
                       $is_imported = (($row['submission_source'] ?? '') === 'legacy_import');

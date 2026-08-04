@@ -10,9 +10,19 @@
 require_once 'connection/config.php';
 $adminCsrfToken = mmh_admin_csrf_token();
 $adminBrandSettings = isset($site_settings) && is_array($site_settings) ? $site_settings : getSiteSettings();
+$adminSiteName = trim((string) ($site_name ?? ($adminBrandSettings['website_name'] ?? 'Math Mastery Hub')));
+$adminSiteName = $adminSiteName !== '' ? $adminSiteName : 'Math Mastery Hub';
+$adminMetaTags = (string) ($metatags ?? '');
+$adminKeywords = (string) ($keywords ?? '');
+$adminOpenGraph = (string) ($openGraph ?? '');
+$adminSchema = (string) ($schema ?? '');
+$adminConnection = isset($conn) && $conn instanceof mysqli ? $conn : db();
+$adminAssetVersion = static function (string $path): string {
+    return (string) (is_file($path) ? (filemtime($path) ?: 1) : 1);
+};
 $adminFaviconUrl = mmh_site_settings_asset_url($adminBrandSettings, 'website_icon', 'resources/images/default/favicon.png');
 $isDarkMode = 0;
-$themeStmt = $conn->prepare("SELECT value FROM settings WHERE `key` = ? LIMIT 1");
+$themeStmt = $adminConnection instanceof mysqli ? $adminConnection->prepare("SELECT value FROM settings WHERE `key` = ? LIMIT 1") : false;
 if ($themeStmt) {
     $themeKey = 'dashboard_dark_mode';
     $themeStmt->bind_param('s', $themeKey);
@@ -47,17 +57,17 @@ if ($themeStmt) {
     }
 </style>
 <?php } ?>
-<?=$metatags."\n"?>
-    <?=$keywords."\n"?>
+<?=$adminMetaTags."\n"?>
+    <?=$adminKeywords."\n"?>
 
-    <?=$openGraph?>
+    <?=$adminOpenGraph?>
 
-    <?=$schema?> 
+    <?=$adminSchema?>
 <link rel="icon" type="image/png" href="<?=$adminFaviconUrl?>" />
     <link rel="icon" type="image/png" sizes="512x512" href="<?=$adminFaviconUrl?>" />
     <meta name="theme-color" content="#F15A22">
     <meta name="mobile-web-app-capable" content="no">
-    <meta name="application-name" content="<?=$site_name;?>">
+    <meta name="application-name" content="<?=htmlspecialchars($adminSiteName, ENT_QUOTES, 'UTF-8')?>">
     <meta name="csrf-token" content="<?=htmlspecialchars($adminCsrfToken, ENT_QUOTES, 'UTF-8')?>">
 
     <link href="<?=$adminFaviconUrl?>"
@@ -67,9 +77,9 @@ if ($themeStmt) {
     <link rel="preload" as="style" href="<?=mmh_site_public_url('resources/build/assets/dashboard-1fcbed15.css')?>" />
     <link rel="stylesheet" href="<?=mmh_site_public_url('resources/build/assets/dashboard-1fcbed15.css')?>" data-navigate-track="reload" />
     <link rel="stylesheet" href="<?=mmh_site_public_url('resources/css/bootstrap-5.2.3.min.css')?>" data-navigate-track="reload" />
-    <?php $adminDashboardCssVersion = (string) (@filemtime(__DIR__ . '/../../../../resources/css/main-dashboard.css') ?: 1); ?>
+    <?php $adminDashboardCssVersion = $adminAssetVersion(__DIR__ . '/../../../../resources/css/main-dashboard.css'); ?>
     <link rel="stylesheet" href="<?=mmh_site_public_url('resources/css/main-dashboard.css')?>?v=<?=rawurlencode($adminDashboardCssVersion)?>" data-navigate-track="reload" />
-    <?php $adminShellCssVersion = (string) (@filemtime(__DIR__ . '/../../../../resources/css/admin-shell.css') ?: 1); ?>
+    <?php $adminShellCssVersion = $adminAssetVersion(__DIR__ . '/../../../../resources/css/admin-shell.css'); ?>
     <link rel="stylesheet" href="<?=mmh_site_public_url('resources/css/admin-shell.css')?>?v=<?=rawurlencode($adminShellCssVersion)?>" data-navigate-track="reload" />
     <link rel="stylesheet" href="https://cdn.datatables.net/1.13.6/css/dataTables.bootstrap5.min.css" data-navigate-track="reload" />
 
@@ -119,7 +129,7 @@ if ($themeStmt) {
         }
     }());
     </script>
-<?php $adminShellJsVersion = (string) (@filemtime(__DIR__ . '/../../../../resources/js/admin-shell.js') ?: 1); ?>
+<?php $adminShellJsVersion = $adminAssetVersion(__DIR__ . '/../../../../resources/js/admin-shell.js'); ?>
 <script defer src="<?=mmh_site_public_url('resources/js/admin-shell.js')?>?v=<?=rawurlencode($adminShellJsVersion)?>"></script>
 
 <link href="https://cdn.datatables.net/v/bs5/jszip-3.10.1/dt-1.13.6/af-2.6.0/b-2.4.2/b-colvis-2.4.2/b-html5-2.4.2/b-print-2.4.2/cr-1.7.0/date-1.5.1/fc-4.3.0/fh-3.4.0/kt-2.10.0/r-2.5.0/rg-1.4.1/rr-1.4.1/sc-2.2.0/sb-1.6.0/sp-2.2.0/sl-1.7.0/sr-1.3.0/datatables.min.css" rel="stylesheet">

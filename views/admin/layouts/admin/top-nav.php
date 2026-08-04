@@ -1,7 +1,10 @@
-<?php 
-$user_data = getUserData($username);
-$user_full_name = explode(' ',$user_data['full_name'])[0];
-$user_balance = $user_data['balance'];
+<?php
+$adminUsername = trim((string) ($username ?? ($_SESSION['admin'] ?? '')));
+$user_data = $adminUsername !== '' && function_exists('getUserData')
+    ? (getUserData($adminUsername) ?: [])
+    : [];
+$user_full_name = trim((string) ($user_data['full_name'] ?? ''));
+$user_full_name = $user_full_name !== '' ? (string) (preg_split('/\s+/', $user_full_name)[0] ?? $user_full_name) : 'Administrator';
 $adminTopAvatarUrl = mmh_site_public_url(mmh_site_settings_valid_local_asset($user_data['avatar'] ?? '') ?? 'uploads/default/avatar.png');
 ?>
 <div class='col-12 px-0 d-flex justify-content-between top-nav admin-top-nav ds-surface ds-border' style="height: 55px;"

@@ -71,6 +71,8 @@ body.dash .form-control:focus, body.dash .form-select:focus { border-color:var(-
 body.dash .btn { min-height:38px; border-radius:var(--radius-sm); font-weight:750; }
 body.dash .btn-sm { min-height:32px; }
 body.dash .table-responsive { max-width:100%; overflow-x:auto; }
+body.dash .admin-file-link { display:inline-flex; max-width:min(220px, 100%); align-items:center; gap:.45rem; overflow:hidden; vertical-align:middle; }
+body.dash .admin-file-link .admin-file-name { min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
 body.dash :is(a,button,input,select,textarea):focus-visible { outline:3px solid color-mix(in srgb,var(--primary) 55%,transparent); outline-offset:2px; }
 
 @media (min-width:701px) {

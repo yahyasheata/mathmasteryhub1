@@ -1,14 +1,22 @@
 <?php
-$user_data = getUserData($username);
-$admin_name = trim((string) (($user_data['full_name'] ?? '') ?: $username));
+/* The shell is shared by old and new admin entry points. Treat its inputs as
+ * optional so compatibility pages cannot emit warnings before rendering. */
+$adminUsername = trim((string) ($username ?? ($_SESSION['admin'] ?? '')));
+$user_data = $adminUsername !== '' && function_exists('getUserData')
+    ? (getUserData($adminUsername) ?: [])
+    : [];
+$admin_name = trim((string) (($user_data['full_name'] ?? '') ?: $adminUsername));
 $admin_name = preg_split('/\s+/', $admin_name)[0] ?? $admin_name;
+$admin_name = $admin_name !== '' ? $admin_name : 'Administrator';
 $adminAvatarUrl = mmh_site_public_url(mmh_site_settings_valid_local_asset($user_data['avatar'] ?? '') ?? 'uploads/default/avatar.png');
 $adminBase = rtrim((string) ($baseUrl ?? ''), '/');
-$isPage = static function (string $name) use ($pageName, $subPageName): bool {
-    return (string) ($pageName ?? '') === $name || (string) ($subPageName ?? '') === $name;
+$adminPageName = (string) ($pageName ?? '');
+$adminSubPageName = (string) ($subPageName ?? '');
+$isPage = static function (string $name) use ($adminPageName, $adminSubPageName): bool {
+    return $adminPageName === $name || $adminSubPageName === $name;
 };
-$isGroup = static function (array $names) use ($pageName, $subPageName): bool {
-    return in_array((string) ($pageName ?? ''), $names, true) || in_array((string) ($subPageName ?? ''), $names, true);
+$isGroup = static function (array $names) use ($adminPageName, $adminSubPageName): bool {
+    return in_array($adminPageName, $names, true) || in_array($adminSubPageName, $names, true);
 };
 ?>
 <form id="admin-sidebar-logout-form" method="post" action="<?=$adminBase?>/admin/logout" class="d-none">

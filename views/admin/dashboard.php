@@ -11,9 +11,11 @@ $base = rtrim(mmh_site_public_base_path(), '/');
 function mmh_dashboard_escape($value): string { return htmlspecialchars((string) $value, ENT_QUOTES, 'UTF-8'); }
 function mmh_dashboard_relative($time): string { $seconds = max(0, time() - strtotime((string) $time)); if ($seconds < 60) return 'Just now'; if ($seconds < 3600) return floor($seconds / 60) . 'm ago'; if ($seconds < 86400) return floor($seconds / 3600) . 'h ago'; return floor($seconds / 86400) . 'd ago'; }
 $maxSeries = max(array_column($dashboard['series'], 'value')) ?: 1;
+$dashboardCssPath = __DIR__ . '/../../resources/css/admin-dashboard.css';
+$dashboardCssVersion = (string) (is_file($dashboardCssPath) ? (filemtime($dashboardCssPath) ?: 1) : 1);
 ?>
 <!doctype html>
-<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>Dashboard · <?=mmh_dashboard_escape($dashboard['admin_name'])?></title><?php include 'layouts/admin/header.php'; ?><link rel="stylesheet" href="<?=mmh_site_public_url('resources/css/admin-dashboard.css')?>?v=<?=@filemtime('resources/css/admin-dashboard.css') ?: 1?>"></head>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>Dashboard · <?=mmh_dashboard_escape($dashboard['admin_name'])?></title><?php include 'layouts/admin/header.php'; ?><link rel="stylesheet" href="<?=mmh_site_public_url('resources/css/admin-dashboard.css')?>?v=<?=$dashboardCssVersion?>"></head>
 <body class="dash ds-bg-primary admin-operational-dashboard">
 <form method="POST" action="<?=$base?>/admin/logout" id="logout-form" class="d-none"><input type="hidden" name="mmh_csrf_token" value="<?=htmlspecialchars(mmh_admin_csrf_token(), ENT_QUOTES, 'UTF-8')?>"></form>
 <div class="col-12 d-flex"><?php include 'layouts/admin/aside.php'; ?><div class="main-content in-active admin-dashboard-main"><?php include 'layouts/admin/top-nav.php'; ?>

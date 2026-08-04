@@ -48,7 +48,8 @@ $settingsSaveState = (($flash['type'] ?? '') === 'success') ? 'All changes saved
   <meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Website Settings · <?=mmh_settings_escape($settings['website_name'])?></title>
   <?php include 'layouts/admin/header.php'; ?>
-  <link rel="stylesheet" href="<?=mmh_site_public_url('resources/css/admin-settings.css')?>?v=<?=@filemtime('resources/css/admin-settings.css') ?: 1?>">
+  <?php $adminSettingsCssPath = __DIR__ . '/../../resources/css/admin-settings.css'; $adminSettingsCssVersion = (string) (is_file($adminSettingsCssPath) ? (filemtime($adminSettingsCssPath) ?: 1) : 1); ?>
+  <link rel="stylesheet" href="<?=mmh_site_public_url('resources/css/admin-settings.css')?>?v=<?=$adminSettingsCssVersion?>">
 </head>
 <body class="dash ds-bg-primary admin-settings-page">
 <form method="POST" action="<?=$adminSettingsBase?>/admin/logout" id="logout-form" class="d-none"><input type="hidden" name="mmh_csrf_token" value="<?=htmlspecialchars(mmh_admin_csrf_token(), ENT_QUOTES, 'UTF-8')?>"></form>

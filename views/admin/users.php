@@ -5,6 +5,8 @@ require_once 'inc/functions.php';
 $username = $_SESSION['admin'];
 $pageName = "users";
 $subPageName = "users";
+$baseUrl = (string) ($baseUrl ?? '');
+$site_name = (string) ($site_name ?? 'Math Mastery Hub');
 
 $conn = db();
 
@@ -363,9 +365,9 @@ $governorates = [
 
                                     <?php 
                                         $count = 1;
-                                        while($users_data = mysqli_fetch_assoc($result)){
+                                        while($result instanceof mysqli_result && ($users_data = mysqli_fetch_assoc($result))){
                                             
-                                          $student_status = $users_data['status'];
+                                          $student_status = (int) ($users_data['status'] ?? 0);
                                           $checked = '';
                                           if ($student_status == 1) {
                                             $checked = 'checked';
@@ -373,7 +375,9 @@ $governorates = [
                                           }else{
                                             $student_status = 1;
                                           }
-                                          $governorateName = governoratesInfo($users_data['governorate'])['governorate_name_ar'];
+                                          $governorateInfo = governoratesInfo($users_data['governorate'] ?? '');
+                                          $governorateName = is_array($governorateInfo) ? (string) ($governorateInfo['governorate_name_ar'] ?? '') : '';
+                                          if ($governorateName === '') { $governorateName = '—'; }
                                           $progressUrl = htmlspecialchars(rtrim((string) $baseUrl, '/') . '/admin/previous-progress?student_id=' . (int) $users_data['user_id'], ENT_QUOTES, 'UTF-8');
                                             $html_rows = "
                                                 <tr>
