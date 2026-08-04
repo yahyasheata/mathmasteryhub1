@@ -117,5 +117,5 @@ mmh_log_event($conn, $userId, 'login', ['meta' => ['role' => 'user', 'first_logi
 mmh_track_daily_visit($conn, $userId);
 
 mmh_auth_json(true, 'Your account is ready. Welcome to Math Mastery Hub.', [
-    'redirect' => mmh_auth_destination($conn, $username, 'user', (string) $baseUrl),
+    'redirect' => mmh_auth_destination($conn, $username, 'user', mmh_current_request_base_url()),
 ]);

@@ -95,11 +95,11 @@ $router->get('/auth/{authPage}', function($authPage) {
     require_once 'connection/config.php';
     require_once 'inc/Auth.php';
     if (isset($_SESSION['admin'])) {
-        header('Location: ' . mmh_auth_destination(db(), (string) $_SESSION['admin'], 'admin', (string) $baseUrl));
+        header('Location: ' . mmh_auth_destination(db(), (string) $_SESSION['admin'], 'admin', mmh_current_request_base_url()));
         exit();
     }
     if (isset($_SESSION['username'])) {
-        header('Location: ' . mmh_auth_destination(db(), (string) $_SESSION['username'], 'user', (string) $baseUrl));
+        header('Location: ' . mmh_auth_destination(db(), (string) $_SESSION['username'], 'user', mmh_current_request_base_url()));
         exit();
     }
     include("views/auth/{$authPage}.php");
@@ -109,6 +109,7 @@ $router->post('/auth/{authPage}', function($authPage) {
         header('HTTP/1.1 404 Not Found');
         exit();
     }
+    require_once '__init.php';
     include("views/auth/{$authPage}_request.php");
 });
 
@@ -123,14 +124,14 @@ $router->mount('/admin', function() use ($router) {
 
     $router->get('/', function() {
         require_once '__init.php';
-        header("Location: {$baseUrl}/admin/dashboard");
+        header('Location: ' . mmh_current_request_base_url() . '/admin/dashboard');
         exit();
     });
 
     $router->get('/courses/{courseId}/content', function($courseId) {
         require_once '__init.php';
         if (!isset($_SESSION['admin'])) {
-            header("Location: {$baseUrl}/auth/login");
+            header('Location: ' . mmh_current_request_base_url() . '/auth/login');
             exit();
         }
         @include('views/admin/course-content.php');
@@ -139,7 +140,7 @@ $router->mount('/admin', function() use ($router) {
     $router->get('/courses/{courseId}/content/{itemId}/preview', function($courseId, $itemId) {
         require_once '__init.php';
         if (!isset($_SESSION['admin'])) {
-            header("Location: {$baseUrl}/auth/login");
+            header('Location: ' . mmh_current_request_base_url() . '/auth/login');
             exit();
         }
         @include('views/admin/course-content-preview.php');
@@ -168,7 +169,7 @@ $router->mount('/admin', function() use ($router) {
     $router->post('/parent-reports', function() {
         require_once '__init.php';
         if (!isset($_SESSION['admin'])) {
-            header("Location: {$baseUrl}/auth/login");
+            header('Location: ' . mmh_current_request_base_url() . '/auth/login');
             exit();
         }
         @include('views/admin/parent-reports.php');
@@ -177,7 +178,7 @@ $router->mount('/admin', function() use ($router) {
     $router->get('/{pageName}', function($pageName) {
         require_once '__init.php';
         if (!isset($_SESSION['admin'])) {
-            header("Location: {$baseUrl}/auth/login");
+            header('Location: ' . mmh_current_request_base_url() . '/auth/login');
             exit();
         } else {
             @include("views/admin/$pageName.php");
@@ -190,7 +191,7 @@ $router->mount('/admin', function() use ($router) {
     $router->post('/requests/item/bulk', function() {
         require_once '__init.php';
         if (!isset($_SESSION['admin'])) {
-            header("Location: {$baseUrl}/auth/login");
+            header('Location: ' . mmh_current_request_base_url() . '/auth/login');
             exit();
         }
         @include('views/admin/requests/bulk-items.php');
@@ -199,7 +200,7 @@ $router->mount('/admin', function() use ($router) {
     $router->post('/requests/{page}/{action}', function($page, $action) {
         require_once '__init.php';
         if (!isset($_SESSION['admin'])) {
-            header("Location: {$baseUrl}/auth/login");
+            header('Location: ' . mmh_current_request_base_url() . '/auth/login');
             exit();
         } else {
             @include("views/admin/requests/$action-$page.php");
@@ -212,13 +213,12 @@ $router->mount('/admin', function() use ($router) {
 // User Routes
 // =======================
 $router->get('/resources/dashboard/notifications', function() {
-    global $baseUrl;
     require_once '__init.php';
     if (!isset($_SESSION['username'])) {
-        header("Location: {$baseUrl}/auth/login");
+        header('Location: ' . mmh_current_request_base_url() . '/auth/login');
         exit();
     }
-    header("Location: {$baseUrl}/user/notifications", true, 302);
+    header('Location: ' . mmh_current_request_base_url() . '/user/notifications', true, 302);
     exit();
 });
 
@@ -234,15 +234,14 @@ $router->mount('/user', function() use ($router) {
 
     $router->get('/', function() {
         require_once '__init.php';
-        header("Location: {$baseUrl}/user/my-courses");
+        header('Location: ' . mmh_current_request_base_url() . '/user/my-courses');
         exit();
     });
 
     $router->get('/live-session/join/{occurrenceId}', function($occurrenceId) {
-        global $baseUrl;
         require_once '__init.php';
         if (!isset($_SESSION['username'])) {
-            header("Location: {$baseUrl}/auth/login");
+            header('Location: ' . mmh_current_request_base_url() . '/auth/login');
             exit();
         }
         include('views/user/requests/join-live-session.php');
@@ -251,20 +250,18 @@ $router->mount('/user', function() use ($router) {
     $router->get('/course/resource/{courseId}/{itemId}', function($courseId, $itemId) {
         // __init.php is loaded during the global bootstrap. Reuse its origin in
         // this callback scope; require_once alone does not import local vars.
-        global $baseUrl;
         require_once '__init.php';
         if (!isset($_SESSION['username'])) {
-            header("Location: {$baseUrl}/auth/login");
+            header('Location: ' . mmh_current_request_base_url() . '/auth/login');
             exit();
         }
         include('views/user/requests/open-course-resource.php');
     });
 
     $router->get('/course/{courseId}/exam/{examId}', function($courseId, $examId) {
-        global $baseUrl;
         require_once '__init.php';
         if (!isset($_SESSION['username'])) {
-            header("Location: {$baseUrl}/auth/login");
+            header('Location: ' . mmh_current_request_base_url() . '/auth/login');
             exit();
         }
         include('views/user/timed-exam.php');
@@ -295,20 +292,18 @@ $router->mount('/user', function() use ($router) {
     });
 
     $router->get('/course/{courseId}/recovery-plan/{planId}', function($courseId, $planId) {
-        global $baseUrl;
         require_once '__init.php';
         if (!isset($_SESSION['username'])) {
-            header("Location: {$baseUrl}/auth/login");
+            header('Location: ' . mmh_current_request_base_url() . '/auth/login');
             exit();
         }
         include('views/user/recovery-plan.php');
     });
 
     $router->get('/{pageName}/{courseId}?', function($pageName, $courseId = null) {
-        global $baseUrl;
         require_once '__init.php';
         if (!isset($_SESSION['username'])) {
-            header("Location: {$baseUrl}/auth/login");
+            header('Location: ' . mmh_current_request_base_url() . '/auth/login');
             exit();
         } else {
             @include("views/user/$pageName.php");
@@ -316,10 +311,9 @@ $router->mount('/user', function() use ($router) {
     });
 
     $router->get('/{pageName}', function($pageName) {
-        global $baseUrl;
         require_once '__init.php';
         if (!isset($_SESSION['username'])) {
-            header("Location: {$baseUrl}/auth/login");
+            header('Location: ' . mmh_current_request_base_url() . '/auth/login');
             exit();
         } else {
             @include("views/user/$pageName.php");
@@ -329,7 +323,7 @@ $router->mount('/user', function() use ($router) {
     $router->post('/requests/{page}/{action}', function($page, $action) {
         require_once '__init.php';
         if (!isset($_SESSION['username'])) {
-            header("Location: {$baseUrl}/auth/login");
+            header('Location: ' . mmh_current_request_base_url() . '/auth/login');
             exit();
         } else {
             @include("views/user/requests/$action-$page.php");
@@ -409,19 +403,19 @@ $router->get('/free-learning', function() {
 
 $router->get('/videos', function() {
     require_once '__init.php';
-    header('Location: ' . rtrim((string) $baseUrl, '/') . '/free-learning?browse=1&type=youtube_video', true, 302);
+    header('Location: ' . rtrim(mmh_current_request_base_url(), '/') . '/free-learning?browse=1&type=youtube_video', true, 302);
     exit();
 });
 
 $router->get('/free-notes', function() {
     require_once '__init.php';
-    header('Location: ' . rtrim((string) $baseUrl, '/') . '/free-learning?browse=1&type=free_notes', true, 302);
+    header('Location: ' . rtrim(mmh_current_request_base_url(), '/') . '/free-learning?browse=1&type=free_notes', true, 302);
     exit();
 });
 
 $router->get('/worksheets', function() {
     require_once '__init.php';
-    header('Location: ' . rtrim((string) $baseUrl, '/') . '/free-learning?browse=1&type=worksheet', true, 302);
+    header('Location: ' . rtrim(mmh_current_request_base_url(), '/') . '/free-learning?browse=1&type=worksheet', true, 302);
     exit();
 });
 

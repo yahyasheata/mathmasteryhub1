@@ -14,5 +14,5 @@ if ($loggedOutUsername) {
 }
 
 mmh_auth_logout();
-header('Location: ' . rtrim((string) $baseUrl, '/') . '/auth/login');
+header('Location: ' . rtrim(mmh_current_request_base_url(), '/') . '/auth/login');
 exit;

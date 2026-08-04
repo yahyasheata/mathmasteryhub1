@@ -67,7 +67,7 @@ if ($legacyPassword) {
 
 mmh_auth_regenerate_session();
 unset($_SESSION['mmh_auth_csrf_token']);
-$appBase = rtrim((string) $baseUrl, '/');
+$appBase = rtrim(mmh_current_request_base_url(), '/');
 
 if ($userData['role'] === 'admin') {
     unset($_SESSION['username']);
@@ -78,7 +78,7 @@ if ($userData['role'] === 'admin') {
         mmh_log_event($conn, (int) $adminInfo->user_id, 'login', ['meta' => ['role' => 'admin']]);
     }
 
-    mmh_auth_json(true, 'Welcome back.', ['redirect' => mmh_auth_destination($conn, $sessionUsername, 'admin', (string) $baseUrl)]);
+    mmh_auth_json(true, 'Welcome back.', ['redirect' => mmh_auth_destination($conn, $sessionUsername, 'admin', mmh_current_request_base_url())]);
 }
 
 if ($userData['role'] === 'user') {
@@ -92,7 +92,7 @@ if ($userData['role'] === 'user') {
         mmh_track_daily_visit($conn, $studentUserId);
     }
 
-    mmh_auth_json(true, 'Welcome back.', ['redirect' => mmh_auth_destination($conn, $sessionUsername, 'user', (string) $baseUrl)]);
+    mmh_auth_json(true, 'Welcome back.', ['redirect' => mmh_auth_destination($conn, $sessionUsername, 'user', mmh_current_request_base_url())]);
 }
 
 mmh_auth_json(false, 'We could not sign you in with those details. Please try again.', [], 401);

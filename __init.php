@@ -16,7 +16,20 @@ if (!function_exists('mmh_current_request_origin')) {
     }
 }
 
+if (!function_exists('mmh_current_request_base_url')) {
+    /** Return the canonical request origin plus the application's install path. */
+    function mmh_current_request_base_url(): string
+    {
+        $script = str_replace('\\', '/', (string) ($_SERVER['SCRIPT_NAME'] ?? '/index.php'));
+        $scriptDirectory = dirname($script);
+        $basePath = ($scriptDirectory === '/' || $scriptDirectory === '.' || $scriptDirectory === '\\')
+            ? ''
+            : rtrim($scriptDirectory, '/');
+        return mmh_current_request_origin() . $basePath;
+    }
+}
+
 $script = str_replace('\\', '/', (string) ($_SERVER['SCRIPT_NAME'] ?? '/index.php'));
 $scriptDirectory = dirname($script);
 $basePath = ($scriptDirectory === '/' || $scriptDirectory === '.' || $scriptDirectory === '\\') ? '' : rtrim($scriptDirectory, '/');
-$baseUrl = mmh_current_request_origin() . $basePath;
+$baseUrl = mmh_current_request_base_url();

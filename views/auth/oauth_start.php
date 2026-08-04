@@ -3,4 +3,4 @@ require_once 'connection/config.php';
 require_once '__init.php';
 require_once 'inc/Auth.php';
 require_once 'inc/OAuth.php';
-mmh_oauth_start((string) ($provider ?? ''), (string) ($baseUrl ?? ''));
+mmh_oauth_start((string) ($provider ?? ''), mmh_current_request_base_url());
