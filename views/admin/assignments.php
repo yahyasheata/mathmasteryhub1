@@ -481,7 +481,6 @@ $legacy_students = $conn->query("SELECT user_id, full_name, username FROM users 
 
     });
   </script>
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/bootstrap/5.2.3/js/bootstrap.min.js" crossorigin="anonymous" referrerpolicy="no-referrer"></script>
 </body>
 
 </html>
