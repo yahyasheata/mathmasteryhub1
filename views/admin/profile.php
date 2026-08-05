@@ -180,13 +180,9 @@ $full_name = $user_data['full_name'];
     </div>
 
 
-    <link rel="modulepreload" href="<?=$baseUrl?>/resources/build/assets/dashboard-d03a2b4e.js" />
-    <link rel="modulepreload" href="<?=$baseUrl?>/resources/build/assets/main-07febffb.js" />
     <script src="https://cdnjs.cloudflare.com/ajax/libs/bootstrap/5.2.3/js/bootstrap.min.js"
         integrity="sha512-1/RvZTcCDEUjY/CypiMz+iqqtaoQfAITmNSJY17Myp4Ms5mdxPS5UV7iOfdZoxcGhzFbOm6sntTKJppjvuhg4g=="
         crossorigin="anonymous" referrerpolicy="no-referrer"></script>
-    <script type="module" src="<?=$baseUrl?>/resources/build/assets/dashboard-d03a2b4e.js"
-        data-navigate-track="reload"></script>
 
 
 
