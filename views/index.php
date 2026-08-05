@@ -4,6 +4,9 @@ require_once '__init.php';
 require_once 'inc/functions.php';
 require_once 'inc/LandingPage.php';
 require_once 'inc/CourseVisibility.php';
+header('Cache-Control: no-store, no-cache, must-revalidate, max-age=0');
+header('Pragma: no-cache');
+header('Vary: Cookie');
 
 $username = $_SESSION['username'] ?? null;
 $site_settings = getSiteSettings();

@@ -3,6 +3,9 @@ require_once 'connection/config.php';
 require_once '__init.php';
 require_once 'inc/functions.php';
 require_once 'inc/CourseVisibility.php';
+header('Cache-Control: no-store, no-cache, must-revalidate, max-age=0');
+header('Pragma: no-cache');
+header('Vary: Cookie');
 $pageName = "courses";
 $username = $_SESSION['username'];
 

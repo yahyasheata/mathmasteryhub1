@@ -6,6 +6,9 @@ require_once 'inc/learning_schema.php';
 require_once 'inc/PastPapers.php';
 require_once 'inc/PublicCourse.php';
 require_once 'views/partials/past-papers-list.php';
+header('Cache-Control: private, no-store, no-cache, must-revalidate, max-age=0');
+header('Pragma: no-cache');
+header('Vary: Cookie');
 $pageName = "courses";
 $username = $_SESSION['username'] ?? '';
 
