@@ -351,7 +351,6 @@ $(document).ready(function() {
 
 
 
-    $.noConflict();
 jQuery( document ).ready(function( $ ) {
     $('table').DataTable({
         // "lengthMenu": [ [10, 25, 50, -1], [10, 25, 50, 100, "All"] ],
