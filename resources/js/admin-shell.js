@@ -1,6 +1,23 @@
 (() => {
   'use strict';
 
+  // Some legacy admin pages still load the compiled dashboard module after
+  // this shell. That module bundles its own jQuery and can replace the
+  // instance already extended with DataTables, leaving $(...).DataTable()
+  // unavailable. Keep the canonical page instance and restore it before any
+  // DOM-ready handlers run; this is presentation/runtime compatibility only.
+  const legacyJQuery = window.jQuery;
+  const restoreLegacyJQuery = () => {
+    if (!legacyJQuery) return;
+    window.jQuery = legacyJQuery;
+    window.$ = legacyJQuery;
+  };
+  if (legacyJQuery) {
+    document.addEventListener('DOMContentLoaded', restoreLegacyJQuery, true);
+    window.addEventListener('load', restoreLegacyJQuery, { once: true });
+    window.setTimeout(restoreLegacyJQuery, 0);
+  }
+
   const desktopQuery = window.matchMedia('(min-width: 701px)');
   const storageKey = 'mmh-admin-sidebar-collapsed';
   const submenuStorageKey = 'mmh-admin-sidebar-submenus';
