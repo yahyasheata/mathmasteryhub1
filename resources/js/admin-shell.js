@@ -78,8 +78,12 @@
     };
     const setControlState = (expanded) => {
       controls.forEach((control) => {
+        const isCloseControl = control.classList.contains('admin-sidebar-close');
         control.setAttribute('aria-expanded', String(expanded));
-        control.setAttribute('aria-label', expanded ? 'Collapse sidebar' : 'Expand sidebar');
+        control.setAttribute(
+          'aria-label',
+          isCloseControl ? 'Close sidebar' : (expanded ? 'Collapse sidebar' : 'Open sidebar')
+        );
       });
     };
     const applyState = () => {
