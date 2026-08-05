@@ -40,7 +40,7 @@ $conn = db();
 $username = $_SESSION['username'];
 $user_id = getUserInfo($username)->user_id;
 $course = mmh_public_course_find($conn, $_POST['course_id']);
-if (!$course || !is_numeric((string) ($course['course_id'] ?? ''))) {
+if (!$course || !mmh_course_is_public($course) || !is_numeric((string) ($course['course_id'] ?? ''))) {
     echo json_encode([
         'status' => 0,
         'message' => 'Course not found',
@@ -60,7 +60,9 @@ if (mmh_public_course_enrolled($conn, (int) $user_id, (string) $course['course_i
 }
 
 // Check course price
-$courseStmt = $conn->prepare('SELECT course_price, course_title FROM courses WHERE course_id = ? AND archived_at IS NULL LIMIT 1');
+$courseStmt = $conn->prepare("SELECT course_price, course_title FROM courses
+    WHERE course_id = ? AND archived_at IS NULL AND course_status = '1'
+      AND COALESCE(course_visibility, 'public') = 'public' LIMIT 1");
 $courseStmt->bind_param('i', $course_id);
 $courseStmt->execute();
 $course = $courseStmt->get_result()->fetch_assoc();

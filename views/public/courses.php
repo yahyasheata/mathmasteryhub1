@@ -2,6 +2,7 @@
 require_once 'connection/config.php';
 require_once '__init.php';
 require_once 'inc/functions.php';
+require_once 'inc/CourseVisibility.php';
 $conn = db();
 $site_settings = getSiteSettings();
 $site_name = $site_settings['website_name'] ?? 'Math Mastery Hub';
@@ -13,6 +14,7 @@ $sql = "SELECT c.id, c.course_id, c.course_title, c.course_image, c.course_descr
         FROM courses AS c
         LEFT JOIN categories AS cat ON cat.id = c.course_category
         WHERE c.course_status = '1'
+          AND COALESCE(c.course_visibility, 'public') = 'public'
         ORDER BY c.id DESC
         LIMIT 60";
 $result = mysqli_query($conn, $sql);

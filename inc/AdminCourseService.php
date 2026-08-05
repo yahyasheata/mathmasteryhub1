@@ -25,6 +25,25 @@ if (!function_exists('mmh_admin_course_set_status')) {
     }
 }
 
+if (!function_exists('mmh_admin_course_set_visibility')) {
+    function mmh_admin_course_set_visibility(mysqli $conn, string $courseId, string $visibility): void
+    {
+        $courseId = trim($courseId);
+        $visibility = strtolower(trim($visibility));
+        if ($courseId === '' || !in_array($visibility, ['public', 'private'], true)) {
+            throw new InvalidArgumentException('Invalid course visibility.');
+        }
+        $stmt = $conn->prepare('UPDATE courses SET course_visibility = ? WHERE course_id = ? LIMIT 1');
+        if (!$stmt) throw new RuntimeException('Course visibility could not be prepared.');
+        $stmt->bind_param('ss', $visibility, $courseId);
+        if (!$stmt->execute() || $stmt->affected_rows < 1) {
+            $stmt->close();
+            throw new RuntimeException('Course not found.');
+        }
+        $stmt->close();
+    }
+}
+
 if (!function_exists('mmh_admin_course_archive_item')) {
     function mmh_admin_course_archive_item(mysqli $conn, string $itemId, ?string $courseId = null): void
     {

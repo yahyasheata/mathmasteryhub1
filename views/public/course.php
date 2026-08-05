@@ -24,6 +24,28 @@ if ($courseId <= 0 || $canonicalCourseId === '') {
   http_response_code(404);
   exit('Course not found.');
 }
+$isAdminPreview = !empty($_SESSION['admin']);
+$publicUserId = 0;
+$publicCourseEnrolled = false;
+if ($username !== '') {
+  $publicUser = getUserInfo($username);
+  $publicUserId = (int) ($publicUser->user_id ?? 0);
+  $publicCourseEnrolled = mmh_public_course_enrolled($conn, $publicUserId, $canonicalCourseId);
+}
+if (!$isAdminPreview && !mmh_course_is_published($resolved_course)) {
+  http_response_code(404);
+  include 'views/404.php';
+  return;
+}
+if (!$isAdminPreview && mmh_course_visibility_normalize($resolved_course['course_visibility'] ?? 'public') === 'private') {
+  if ($publicCourseEnrolled) {
+    header('Location: ' . rtrim((string) $baseUrl, '/') . '/user/course/' . rawurlencode($canonicalCourseId), true, 303);
+    exit;
+  }
+  http_response_code(404);
+  include 'views/404.php';
+  return;
+}
 
 $structured_item_columns = ['section_id', 'status', 'sort_order'];
 $structured_section_columns = ['section_id', 'course_id', 'title', 'description', 'section_type', 'sort_order', 'status'];
@@ -263,13 +285,7 @@ if ($course !== null && !empty($course_public_id)) {
   $course_past_papers = mmh_past_course_preview_papers($conn, $course_public_id, 3);
   $course_past_resources = mmh_past_resources_for_papers($conn, array_column($course_past_papers, 'paper_id'), true);
 }
-$public_user_id = 0;
-$public_course_enrolled = false;
-if ($username !== '') {
-  $public_user = getUserInfo($username);
-  $public_user_id = (int) ($public_user->user_id ?? 0);
-  $public_course_enrolled = mmh_public_course_enrolled($conn, $public_user_id, (string) ($course['course_id'] ?? ''));
-}
+$public_course_enrolled = $publicCourseEnrolled;
 ?>
 <!DOCTYPE html>
 <html lang="en" dir="ltr">
@@ -405,8 +421,10 @@ if ($username !== '') {
           <p class="public-course-price-note"><?= $public_course_enrolled ? 'Your learning workspace is ready.' : 'Enroll to unlock the complete learning workspace.' ?></p>
           <?php if ($public_course_enrolled): ?>
             <a class="public-course-action-link" href="<?=$continue_course_url?>">Continue Learning<i class="fas fa-play" aria-hidden="true"></i></a>
-          <?php else: ?>
+          <?php elseif (!$isAdminPreview && mmh_course_is_public($resolved_course)): ?>
             <a class="public-course-action-link" href="<?=$course_checkout_url?>">Enroll Now<i class="fas fa-arrow-right" aria-hidden="true"></i></a>
+          <?php elseif ($isAdminPreview): ?>
+            <span class="public-course-action-link" aria-label="Admin preview"><i class="fas fa-eye" aria-hidden="true"></i>Admin Preview</span>
           <?php endif; ?>
           <ul class="public-course-includes">
             <li><i class="fas fa-layer-group" aria-hidden="true"></i><span><?=$lesson_count?> <?=$lesson_count === 1 ? 'lesson' : 'lessons'?> included</span></li>

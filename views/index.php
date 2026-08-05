@@ -3,6 +3,7 @@ require_once 'connection/config.php';
 require_once '__init.php';
 require_once 'inc/functions.php';
 require_once 'inc/LandingPage.php';
+require_once 'inc/CourseVisibility.php';
 
 $username = $_SESSION['username'] ?? null;
 $site_settings = getSiteSettings();
@@ -49,7 +50,7 @@ if ($categories_result) {
 }
 
 $homeCourses = [];
-$courses_result = mysqli_query($conn, "SELECT * FROM courses WHERE course_status = '1' ORDER BY created_at DESC, id DESC");
+$courses_result = mysqli_query($conn, "SELECT * FROM courses WHERE course_status = '1' AND COALESCE(course_visibility, 'public') = 'public' ORDER BY created_at DESC, id DESC");
 if ($courses_result) {
     while ($row = mysqli_fetch_assoc($courses_result)) $homeCourses[] = $row;
 }

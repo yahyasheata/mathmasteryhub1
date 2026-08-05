@@ -407,12 +407,12 @@ if (!function_exists('mmh_live_occurrences')) {
             $types .= 'i';
             $params[] = (int) $onlyEnrolledUserId;
         }
-        $sql .= ' WHERE o.scheduled_start_at BETWEEN ? AND ?';
+        $sql .= " WHERE o.scheduled_start_at BETWEEN ? AND ?";
         $types .= 'ss';
         $params[] = $from;
         $params[] = $to;
         if ($onlyEnrolledUserId !== null) {
-            $sql .= " AND o.status NOT IN ('cancelled', 'deleted') AND (o.scheduled_start_at < UTC_TIMESTAMP() OR s.enabled = 1)";
+            $sql .= " AND c.course_status = '1' AND o.status NOT IN ('cancelled', 'deleted') AND (o.scheduled_start_at < UTC_TIMESTAMP() OR s.enabled = 1)";
         }
         if ($courseId !== '') {
             $sql .= ' AND o.course_id = ?';

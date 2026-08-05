@@ -19,6 +19,11 @@ if (!$course) {
     include 'views/404.php';
     return;
 }
+if (!mmh_course_is_public($course)) {
+    http_response_code(404);
+    include 'views/404.php';
+    return;
+}
 
 $username = trim((string) ($_SESSION['username'] ?? ''));
 $user = $username !== '' ? getUserInfo($username) : null;

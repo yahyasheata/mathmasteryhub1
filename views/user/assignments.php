@@ -48,7 +48,9 @@ function student_assignments_due_label($value)
 
 $courseRows = [];
 if ($userId > 0) {
-    $stmt = $conn->prepare('SELECT DISTINCT c.course_id, c.course_title FROM course_logs AS l INNER JOIN courses AS c ON c.course_id = l.course_id WHERE l.user_id = ? ORDER BY c.course_title ASC');
+    $stmt = $conn->prepare("SELECT DISTINCT c.course_id, c.course_title
+        FROM course_logs AS l INNER JOIN courses AS c ON c.course_id = l.course_id
+        WHERE l.user_id = ? AND c.course_status = '1' ORDER BY c.course_title ASC");
     if ($stmt) {
         $stmt->bind_param('i', $userId);
         $stmt->execute();

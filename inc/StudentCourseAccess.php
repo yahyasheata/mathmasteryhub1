@@ -10,6 +10,7 @@
 require_once __DIR__ . '/learning_schema.php';
 require_once __DIR__ . '/CourseSectionAvailability.php';
 require_once __DIR__ . '/AssignmentProgress.php';
+require_once __DIR__ . '/CourseVisibility.php';
 
 if (!function_exists('student_course_access_identifier')) {
     function student_course_access_identifier($value, $maxLength = 40)
@@ -101,7 +102,11 @@ if (!function_exists('student_course_access_course')) {
 
         // Route URLs historically accept either courses.id or courses.course_id.
         // Always return the canonical course_id used by enrollment and lessons.
-        $stmt = $conn->prepare('SELECT id, course_id, course_title, course_description, course_image, course_category, username, sequential_learning FROM courses WHERE archived_at IS NULL AND (course_id = ? OR CAST(id AS CHAR) = ?) LIMIT 1');
+        $stmt = $conn->prepare("SELECT id, course_id, course_title, course_description, course_image, course_category, username, sequential_learning, course_status, course_visibility
+            FROM courses
+            WHERE archived_at IS NULL AND course_status = '1'
+              AND (course_id = ? OR CAST(id AS CHAR) = ?)
+            LIMIT 1");
         if (!$stmt) {
             return null;
         }
@@ -111,6 +116,17 @@ if (!function_exists('student_course_access_course')) {
         $stmt->close();
 
         return $course ?: null;
+    }
+}
+
+if (!function_exists('student_course_access_authorized_course')) {
+    function student_course_access_authorized_course(mysqli $conn, $userId, $courseId): ?array
+    {
+        $course = student_course_access_course($conn, $courseId);
+        if (!$course || !mmh_course_is_student_available($course)) {
+            return null;
+        }
+        return student_course_access_enrolled($conn, $userId, (string) ($course['course_id'] ?? '')) ? $course : null;
     }
 }
 

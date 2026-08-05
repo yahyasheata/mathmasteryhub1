@@ -17,7 +17,10 @@ $escape = static fn($value): string => htmlspecialchars((string) $value, ENT_QUO
 $base = rtrim((string) $baseUrl, '/');
 
 $courses = [];
-$courseStmt = $conn->prepare('SELECT c.course_id, c.course_title, MAX(l.purchase_date) AS enrolled_at FROM course_logs l INNER JOIN courses c ON c.course_id = l.course_id WHERE l.user_id = ? GROUP BY c.id, c.course_id, c.course_title ORDER BY enrolled_at DESC, c.id ASC');
+$courseStmt = $conn->prepare("SELECT c.course_id, c.course_title, MAX(l.purchase_date) AS enrolled_at
+    FROM course_logs l INNER JOIN courses c ON c.course_id = l.course_id
+    WHERE l.user_id = ? AND c.course_status = '1'
+    GROUP BY c.id, c.course_id, c.course_title ORDER BY enrolled_at DESC, c.id ASC");
 if ($courseStmt) {
     $courseStmt->bind_param('i', $userId); $courseStmt->execute(); $courses = $courseStmt->get_result()->fetch_all(MYSQLI_ASSOC); $courseStmt->close();
 }

@@ -1,6 +1,8 @@
 <?php
 /** Shared public-course lookup and enrollment helpers. */
 
+require_once __DIR__ . '/CourseVisibility.php';
+
 if (!function_exists('mmh_public_course_identifier')) {
     function mmh_public_course_identifier($value): ?string
     {

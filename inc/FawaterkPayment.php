@@ -34,7 +34,9 @@ class FawaterkPayment
         }
 
         // Fetch course info
-        $courseStmt = $this->conn->prepare('SELECT * FROM courses WHERE course_id = ? LIMIT 1');
+        $courseStmt = $this->conn->prepare("SELECT * FROM courses
+            WHERE course_id = ? AND archived_at IS NULL AND course_status = '1'
+              AND COALESCE(course_visibility, 'public') = 'public' LIMIT 1");
         $courseStmt->bind_param('i', $course_id);
         $courseStmt->execute();
         $course = $courseStmt->get_result()->fetch_assoc();
