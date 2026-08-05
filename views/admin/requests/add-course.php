@@ -40,7 +40,7 @@ if (isset($_FILES['course_image']) && (int) ($_FILES['course_image']['error'] ??
 }
 
 $conn = db();
-$stmt = $conn->prepare('INSERT INTO courses (course_id, course_title, course_title_en, course_description, course_image, course_price, preDiscount_course_price, course_category, whatsapp_group, sequential_learning, default_homework_score_mode, username) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)');
+$stmt = $conn->prepare("INSERT INTO courses (course_id, course_title, course_title_en, course_description, course_image, course_price, preDiscount_course_price, course_category, whatsapp_group, sequential_learning, default_homework_score_mode, username, course_state) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'draft')");
 if (!$stmt) {
     exit(json_encode(['status' => 0, 'message' => 'Course could not be prepared.']));
 }
