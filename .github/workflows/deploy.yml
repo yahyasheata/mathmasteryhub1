@@ -49,6 +49,7 @@ jobs:
             fi
             git fetch origin main
             git reset --hard origin/main
+            php -r 'if (function_exists("opcache_reset")) { opcache_reset(); echo "OPcache reset.\n"; }'
             php database/migrations/20260807_finalize_runtime_schema.php
             php database/migrations/20260806_add_admin_archive_markers.php
             php database/migrations/20260806_enforce_course_log_uniqueness.php
