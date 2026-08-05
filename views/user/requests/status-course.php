@@ -14,7 +14,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         if (isset($_POST['course_id']) && $course_status == 1 || $course_status == 2 ) {
             $course_status = 1;
             $course_id = $_POST['course_id'];
-            $query = "UPDATE courses SET course_status = '$course_status' WHERE course_id = '$course_id' ";
+            $query = "UPDATE courses SET course_state = 'public' WHERE course_id = '$course_id' ";
             $result = mysqli_query(db(),$query);
             if($result){
                 $response = array(
@@ -37,7 +37,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         }else{
             $course_status = 0;
             $course_id = $_POST['course_id'];
-            $query = "UPDATE courses SET course_status = '$course_status' WHERE course_id = '$course_id' ";
+            $query = "UPDATE courses SET course_state = 'draft' WHERE course_id = '$course_id' ";
             $result = mysqli_query(db(),$query);
             if($result){
                 $response = array(

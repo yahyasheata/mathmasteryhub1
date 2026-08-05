@@ -13,7 +13,7 @@ $site_settings = getSiteSettings();
 $site_name = $site_settings["website_name"];
 
 $conn = db();
-$courses_query = "SELECT *, courses.id as cid FROM courses INNER JOIN categories ON courses.course_category = categories.id WHERE category_link = '$categoryId' AND course_status=1 AND COALESCE(courses.course_visibility, 'public') = 'public'";
+$courses_query = "SELECT *, courses.id as cid FROM courses INNER JOIN categories ON courses.course_category = categories.id WHERE category_link = '$categoryId' AND courses.course_state='public'";
 $coures_result = mysqli_query($conn,$courses_query);
 
 $categorie_header = '';

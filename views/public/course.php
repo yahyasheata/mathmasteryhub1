@@ -35,12 +35,12 @@ if ($username !== '') {
   $publicUserId = (int) ($publicUser->user_id ?? 0);
   $publicCourseEnrolled = mmh_public_course_enrolled($conn, $publicUserId, $canonicalCourseId);
 }
-if (!$isAdminPreview && !mmh_course_is_published($resolved_course)) {
+if (!$isAdminPreview && mmh_course_state($resolved_course) === 'draft') {
   http_response_code(404);
   include 'views/404.php';
   return;
 }
-if (!$isAdminPreview && mmh_course_visibility_normalize($resolved_course['course_visibility'] ?? 'public') === 'private') {
+if (!$isAdminPreview && mmh_course_state($resolved_course) === 'private') {
   if ($publicCourseEnrolled) {
     header('Location: ' . rtrim((string) $baseUrl, '/') . '/user/course/' . rawurlencode($canonicalCourseId), true, 303);
     exit;

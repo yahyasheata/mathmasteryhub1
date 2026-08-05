@@ -65,8 +65,7 @@ function getSiteSettings() {
         $this->conn->begin_transaction();
         try {
             $courseStmt = $this->conn->prepare("SELECT course_price, course_title FROM courses
-                WHERE course_id = ? AND archived_at IS NULL AND course_status = '1'
-                  AND COALESCE(course_visibility, 'public') = 'public' LIMIT 1");
+                WHERE course_id = ? AND archived_at IS NULL AND course_state = 'public' LIMIT 1");
             $courseStmt->bind_param('s', $courseId);
             $courseStmt->execute();
             $course = $courseStmt->get_result()->fetch_assoc();

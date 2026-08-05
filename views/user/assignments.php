@@ -50,7 +50,7 @@ $courseRows = [];
 if ($userId > 0) {
     $stmt = $conn->prepare("SELECT DISTINCT c.course_id, c.course_title
         FROM course_logs AS l INNER JOIN courses AS c ON c.course_id = l.course_id
-        WHERE l.user_id = ? AND c.course_status = '1' ORDER BY c.course_title ASC");
+        WHERE l.user_id = ? AND c.course_state IN ('public', 'private') ORDER BY c.course_title ASC");
     if ($stmt) {
         $stmt->bind_param('i', $userId);
         $stmt->execute();

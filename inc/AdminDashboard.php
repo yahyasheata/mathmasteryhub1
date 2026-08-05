@@ -1,4 +1,5 @@
 <?php
+require_once __DIR__ . '/CourseVisibility.php';
 /** Bounded, operational Admin Dashboard queries. No synthetic analytics. */
 
 if (!function_exists('mmh_admin_dashboard_period')) {
@@ -105,7 +106,7 @@ if (!function_exists('mmh_admin_dashboard_courses')) {
     function mmh_admin_dashboard_courses(mysqli $conn, array $period): array
     {
         $start = $period['start']->format('Y-m-d H:i:s');
-        $sql = "SELECT c.course_id, c.course_title, c.course_status, c.created_at,
+        $sql = "SELECT c.course_id, c.course_title, c.course_state, c.created_at,
                        COALESCE(enrollment.total, 0) AS enrolled_students,
                        COALESCE(activity.total, 0) AS active_students,
                        COALESCE(pending.total, 0) AS pending_assignments
@@ -113,7 +114,7 @@ if (!function_exists('mmh_admin_dashboard_courses')) {
                 LEFT JOIN (SELECT course_id, COUNT(DISTINCT user_id) AS total FROM course_logs GROUP BY course_id) enrollment ON enrollment.course_id = CAST(c.course_id AS UNSIGNED)
                 LEFT JOIN (SELECT course_id, COUNT(DISTINCT user_id) AS total FROM learning_events WHERE created_at >= ? AND event_type NOT IN ('login','logout') GROUP BY course_id) activity ON activity.course_id COLLATE utf8mb3_unicode_ci = c.course_id COLLATE utf8mb3_unicode_ci
                 LEFT JOIN (SELECT a.course_id, COUNT(s.id) AS total FROM assignments a INNER JOIN assignment_submissions s ON s.assignment_id = a.assignment_id WHERE s.grade IS NULL GROUP BY a.course_id) pending ON pending.course_id = c.course_id
-                ORDER BY c.course_status DESC, activity.total DESC, enrollment.total DESC, c.created_at DESC LIMIT 8";
+                ORDER BY FIELD(c.course_state, 'public', 'private', 'draft'), activity.total DESC, enrollment.total DESC, c.created_at DESC LIMIT 8";
         $stmt = $conn->prepare($sql);
         if (!$stmt) return [];
         $stmt->bind_param('s', $start);
@@ -139,16 +140,17 @@ if (!function_exists('mmh_admin_dashboard_data')) {
         foreach ($metrics as &$metric) $metric['comparison'] = mmh_admin_dashboard_delta($metric['current'], $metric['previous']);
         unset($metric);
         $attention = [
-            ['count' => mmh_admin_dashboard_scalar($conn, "SELECT COUNT(*) AS total FROM courses WHERE course_status <> '1'"), 'label' => 'unpublished courses', 'detail' => 'Review course visibility before students can enroll.', 'url' => 'courses'],
-            ['count' => mmh_admin_dashboard_scalar($conn, "SELECT COUNT(*) AS total FROM (SELECT c.course_id FROM courses c LEFT JOIN course_items i ON i.course_id=c.course_id WHERE c.course_status='1' GROUP BY c.course_id HAVING COUNT(i.id)=0) empty_courses", '', []), 'label' => 'published courses with no content', 'detail' => 'Add course content before sharing these courses.', 'url' => 'courses'],
+            ['count' => mmh_admin_dashboard_scalar($conn, "SELECT COUNT(*) AS total FROM courses WHERE course_state = 'draft'"), 'label' => 'draft courses', 'detail' => 'Draft courses are visible only to administrators.', 'url' => 'courses'],
+            ['count' => mmh_admin_dashboard_scalar($conn, "SELECT COUNT(*) AS total FROM (SELECT c.course_id FROM courses c LEFT JOIN course_items i ON i.course_id=c.course_id WHERE c.course_state IN ('public','private') GROUP BY c.course_id HAVING COUNT(i.id)=0) empty_courses", '', []), 'label' => 'available courses with no content', 'detail' => 'Add course content before sharing these courses.', 'url' => 'courses'],
             ['count' => mmh_admin_dashboard_scalar($conn, "SELECT COUNT(*) AS total FROM assignment_submissions WHERE grade IS NULL"), 'label' => 'submissions awaiting review', 'detail' => 'Open assignment submissions to grade or provide feedback.', 'url' => 'assignment-submissions'],
             ['count' => mmh_admin_dashboard_scalar($conn, "SELECT COUNT(*) AS total FROM past_paper_drive_jobs WHERE status='failed'"), 'label' => 'failed Drive import jobs', 'detail' => 'Review importer failures before the next sync.', 'url' => 'past-papers'],
             ['count' => mmh_admin_dashboard_scalar($conn, "SELECT COUNT(*) AS total FROM past_papers WHERE status <> 'published'"), 'label' => 'draft Past Paper groups', 'detail' => 'Review or publish mapped paper groups.', 'url' => 'past-papers'],
         ];
         $attention = array_values(array_filter($attention, static fn(array $item): bool => $item['count'] > 0));
         $content = [
-            ['label' => 'Published courses', 'count' => mmh_admin_dashboard_scalar($conn, "SELECT COUNT(*) AS total FROM courses WHERE course_status='1'"), 'url' => 'courses'],
-            ['label' => 'Draft courses', 'count' => mmh_admin_dashboard_scalar($conn, "SELECT COUNT(*) AS total FROM courses WHERE course_status <> '1'"), 'url' => 'courses'],
+            ['label' => 'Public courses', 'count' => mmh_admin_dashboard_scalar($conn, "SELECT COUNT(*) AS total FROM courses WHERE course_state='public'"), 'url' => 'courses'],
+            ['label' => 'Private courses', 'count' => mmh_admin_dashboard_scalar($conn, "SELECT COUNT(*) AS total FROM courses WHERE course_state='private'"), 'url' => 'courses'],
+            ['label' => 'Draft courses', 'count' => mmh_admin_dashboard_scalar($conn, "SELECT COUNT(*) AS total FROM courses WHERE course_state='draft'"), 'url' => 'courses'],
             ['label' => 'Published Free Learning resources', 'count' => mmh_admin_dashboard_scalar($conn, "SELECT COUNT(*) AS total FROM free_learning_resources WHERE status='published'"), 'url' => 'free-learning'],
             ['label' => 'Published Past Paper resources', 'count' => mmh_admin_dashboard_scalar($conn, "SELECT COUNT(*) AS total FROM past_paper_resources WHERE status='published'"), 'url' => 'past-papers'],
         ];

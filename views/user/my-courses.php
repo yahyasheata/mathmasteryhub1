@@ -87,7 +87,7 @@ $coursesQuery = "
         GROUP BY course_id
     ) AS homework_counts ON courses.course_id = homework_counts.course_id
     WHERE course_logs.user_id = '" . (int) $userId . "'
-      AND courses.course_status = '1'
+      AND courses.course_state IN ('public', 'private')
     ORDER BY course_logs.purchase_date DESC, courses.id ASC";
 
 $enrolledCourses = [];

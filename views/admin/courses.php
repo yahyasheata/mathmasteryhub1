@@ -10,8 +10,7 @@ $subPageName = "courses";
 
 $conn = db();
 $courseSearch = trim((string) ($_GET['q'] ?? ''));
-$courseStatusFilter = (string) ($_GET['status'] ?? 'all');
-$courseVisibilityFilter = (string) ($_GET['visibility'] ?? 'all');
+$courseStateFilter = (string) ($_GET['state'] ?? 'all');
 $courseCategoryFilter = (string) ($_GET['category'] ?? 'all');
 $coursePriceFilter = (string) ($_GET['price'] ?? 'all');
 $courseSort = (string) ($_GET['sort'] ?? 'recent');
@@ -36,15 +35,10 @@ if ($courseSearch !== '') {
   $courseValues[] = $like;
   $courseValues[] = $like;
 }
-if (in_array($courseStatusFilter, ['published', 'draft'], true)) {
-  $courseFilters[] = 'c.course_status = ?';
+if (in_array($courseStateFilter, ['public', 'private', 'draft'], true)) {
+  $courseFilters[] = 'c.course_state = ?';
   $courseTypes .= 's';
-  $courseValues[] = $courseStatusFilter === 'published' ? '1' : '0';
-}
-if (in_array($courseVisibilityFilter, ['public', 'private'], true)) {
-  $courseFilters[] = "COALESCE(c.course_visibility, 'public') = ?";
-  $courseTypes .= 's';
-  $courseValues[] = $courseVisibilityFilter;
+  $courseValues[] = $courseStateFilter;
 }
 if ($courseCategoryFilter !== 'all' && ctype_digit($courseCategoryFilter)) {
   $courseFilters[] = 'c.course_category = ?';
@@ -521,8 +515,7 @@ function admin_course_link(array $changes = []): string {
                           </div>
                           <form class="admin-course-filters" method="get" action="<?=$courseListBase?>/admin/courses" role="search">
                             <label class="admin-course-search"><span class="fas fa-search" aria-hidden="true"></span><input type="search" name="q" value="<?=admin_course_escape($courseSearch)?>" placeholder="Search title or course ID"></label>
-                            <select class="form-select" name="status" aria-label="Filter by status"><option value="all">All statuses</option><option value="published" <?=$courseStatusFilter==='published'?'selected':''?>>Published</option><option value="draft" <?=$courseStatusFilter==='draft'?'selected':''?>>Draft</option></select>
-                            <select class="form-select" name="visibility" aria-label="Filter by visibility"><option value="all">All visibility</option><option value="public" <?=$courseVisibilityFilter==='public'?'selected':''?>>Public</option><option value="private" <?=$courseVisibilityFilter==='private'?'selected':''?>>Private / Enrolled only</option></select>
+                            <select class="form-select" name="state" aria-label="Filter by course state"><option value="all">All course states</option><option value="public" <?=$courseStateFilter==='public'?'selected':''?>>Public</option><option value="private" <?=$courseStateFilter==='private'?'selected':''?>>Private</option><option value="draft" <?=$courseStateFilter==='draft'?'selected':''?>>Draft</option></select>
                             <select class="form-select" name="category" aria-label="Filter by category"><option value="all">All categories</option><?php foreach($courseCategories as $courseCategory): ?><option value="<?=admin_course_escape($courseCategory['id'])?>" <?=$courseCategoryFilter === (string)$courseCategory['id']?'selected':''?>><?=admin_course_escape($courseCategory['category_title'])?></option><?php endforeach;?></select>
                             <select class="form-select" name="price" aria-label="Filter by price"><option value="all">Free and paid</option><option value="free" <?=$coursePriceFilter==='free'?'selected':''?>>Free</option><option value="paid" <?=$coursePriceFilter==='paid'?'selected':''?>>Paid</option></select>
                             <select class="form-select" name="sort" aria-label="Sort courses"><option value="recent" <?=$courseSort==='recent'?'selected':''?>>Recently added</option><option value="title" <?=$courseSort==='title'?'selected':''?>>Title</option><option value="students" <?=$courseSort==='students'?'selected':''?>>Most students</option><option value="content" <?=$courseSort==='content'?'selected':''?>>Most content</option></select>
@@ -534,7 +527,6 @@ function admin_course_link(array $changes = []): string {
                               <colgroup>
                                 <col class="admin-course-column-course">
                                 <col class="admin-course-column-status">
-                                <col class="admin-course-column-status">
                                 <col class="admin-course-column-students">
                                 <col class="admin-course-column-content">
                                 <col class="admin-course-column-price">
@@ -542,18 +534,18 @@ function admin_course_link(array $changes = []): string {
                                 <col class="admin-course-column-manage">
                                 <col class="admin-course-column-actions">
                               </colgroup>
-                              <thead><tr><th>Course</th><th>Status</th><th>Visibility</th><th>Students</th><th>Content</th><th>Price</th><th>Updated</th><th>Manage content</th><th><span class="visually-hidden">More actions</span></th></tr></thead>
-                              <tbody><?php if ($courseLoadError): ?><tr><td colspan="9"><div class="admin-course-empty admin-course-load-error" role="alert"><span class="fas fa-exclamation-circle" aria-hidden="true"></span><strong><?=admin_course_escape($courseLoadError)?></strong><a href="<?=admin_course_escape($_SERVER['REQUEST_URI'] ?? ($courseListBase . '/admin/courses'))?>">Try again</a></div></td></tr><?php elseif (!$courseRows): ?><tr><td colspan="9"><div class="admin-course-empty"><span class="fas fa-search" aria-hidden="true"></span><strong>No courses match these filters.</strong><a href="<?=$courseListBase?>/admin/courses">Clear filters</a></div></td></tr><?php endif; ?>
+                              <thead><tr><th>Course</th><th>Course State</th><th>Students</th><th>Content</th><th>Price</th><th>Updated</th><th>Manage content</th><th><span class="visually-hidden">More actions</span></th></tr></thead>
+                              <tbody><?php if ($courseLoadError): ?><tr><td colspan="8"><div class="admin-course-empty admin-course-load-error" role="alert"><span class="fas fa-exclamation-circle" aria-hidden="true"></span><strong><?=admin_course_escape($courseLoadError)?></strong><a href="<?=admin_course_escape($_SERVER['REQUEST_URI'] ?? ($courseListBase . '/admin/courses'))?>">Try again</a></div></td></tr><?php elseif (!$courseRows): ?><tr><td colspan="8"><div class="admin-course-empty"><span class="fas fa-search" aria-hidden="true"></span><strong>No courses match these filters.</strong><a href="<?=$courseListBase?>/admin/courses">Clear filters</a></div></td></tr><?php endif; ?>
                               <?php foreach($courseRows as $course):
                                 $courseId = (string)$course['course_id'];
                                 $courseContentUrl = $courseListBase . '/admin/courses/' . rawurlencode($courseId) . '/content';
                                 $courseImageUrl = mmh_site_public_url(mmh_site_settings_valid_local_asset($course['course_image'] ?? '') ?? 'resources/images/default/cover.png');
-                                $isPublished = (string)$course['course_status'] === '1';
-                                $nextStatus = $isPublished ? '0' : '1';
+                                $courseState = mmh_course_state($course);
+                                $stateLabel = ucfirst($courseState);
+                                $stateHelp = ['public' => 'Visible on website', 'private' => 'Only manually enrolled students can access', 'draft' => 'Admin only'][$courseState];
                               ?><tr>
                                 <td class="admin-course-cell"><div class="admin-course-cell-content"><img src="<?=admin_course_escape($courseImageUrl)?>" alt="" loading="lazy"><div class="admin-course-cell-copy"><strong><?=admin_course_escape($course['course_title'])?></strong><small><?=admin_course_escape($course['category_title'])?> · ID <?=admin_course_escape($courseId)?></small><p><?=admin_course_escape($course['course_description'])?></p></div></div></td>
-                                <td><form action="" method="post" class="update-course-status"><label class="admin-course-status <?=$isPublished?'is-published':'is-draft'?>"><input type="checkbox" name="course_status" value="<?=$nextStatus?>" <?=$isPublished?'checked':''?> aria-label="<?=$isPublished?'Unpublish':'Publish'?> <?=admin_course_escape($course['course_title'])?>"><span><?=$isPublished?'Published':'Draft'?></span><input type="hidden" name="course_id" value="<?=admin_course_escape($courseId)?>"><input type="hidden" name="update-status" value="1"></label></form></td>
-                                <td><form action="" method="post" class="update-course-visibility"><select name="course_visibility" class="form-select form-select-sm" aria-label="Course visibility for <?=admin_course_escape($course['course_title'])?>"><option value="public" <?=mmh_course_visibility_normalize($course['course_visibility'] ?? 'public') === 'public' ? 'selected' : ''?>>Public</option><option value="private" <?=mmh_course_visibility_normalize($course['course_visibility'] ?? 'public') === 'private' ? 'selected' : ''?>>Private / Enrolled only</option></select><small class="d-block text-muted mt-1">Private: hidden from the public website and available only to manually enrolled students.</small><input type="hidden" name="mmh_csrf_token" value="<?=admin_course_escape(mmh_admin_csrf_token())?>"><input type="hidden" name="course_id" value="<?=admin_course_escape($courseId)?>"><input type="hidden" name="update-visibility" value="1"></form></td>
+                                <td><form action="" method="post" class="update-course-state"><label class="admin-course-state admin-course-state--<?=$courseState?>" title="<?=admin_course_escape($stateHelp)?>"><select name="course_state" aria-label="Course state for <?=admin_course_escape($course['course_title'])?>"><option value="public" <?=$courseState==='public'?'selected':''?>>Public</option><option value="private" <?=$courseState==='private'?'selected':''?>>Private</option><option value="draft" <?=$courseState==='draft'?'selected':''?>>Draft</option></select><span class="admin-course-state-label"><?=admin_course_escape($stateLabel)?></span><input type="hidden" name="mmh_csrf_token" value="<?=admin_course_escape(mmh_admin_csrf_token())?>"><input type="hidden" name="course_id" value="<?=admin_course_escape($courseId)?>"><input type="hidden" name="update-state" value="1"></label></form></td>
                                 <td><form method="post" action="" class="addUserToCourse"><input type="hidden" name="_token" value="<?=admin_course_escape(mmh_auth_csrf_token())?>"><input type="hidden" name="course_id" value="<?=admin_course_escape($courseId)?>"><input type="hidden" name="_method" value="GET"><button class="admin-course-count" title="Manage students" aria-label="Manage students for <?=admin_course_escape($course['course_title'])?>"><?=number_format((int)$course['enrolled_students'])?></button></form></td>
                                 <td><a class="admin-course-count" href="<?=admin_course_escape($courseContentUrl)?>" title="Manage content" aria-label="Manage content for <?=admin_course_escape($course['course_title'])?>"><?=number_format((int)$course['content_count'])?> <span>items</span></a></td>
                                 <td class="admin-course-price"><?=(int)$course['course_price'] === 0 ? 'Free' : number_format((int)$course['course_price']) . ' EGP'?></td>
@@ -928,53 +920,26 @@ $(".deleteCourse").on("submit", function (e) {
 });
 
 
-// Edit status
-$(".update-course-status").change(function () {
-      // var teacher_status = $(this).val();
-      // var teacher_status = $(this).val();
-      var Toast = Swal.mixin({
-      toast: true,
-      position: 'top-end',
-      showConfirmButton: false,
-      timer: 10000
-      });
-
-      var update_status = 1;
-      $.ajax({
-        type: "POST",
-        url: "requests/course/status",
-        // data: {teacher_status:teacher_status,_update_status:update_status},
-        data: new FormData(this),
-        dataType: "json",
-        contentType: false,
-        cache: false,
-        processData: false,
-        beforeSend: function () {
-        },
-        success: function (response) {
-          $(".response-msg").html("");
-          if (response.status == 1) {
-            $(".response-msg").html(
-              Toast.fire({
-                icon: 'success',
-                title: response.message
-              })
-            );
-          } else {
-            $(".response-msg").html(
-              Toast.fire({
-                icon: 'error',
-                title: response.message+', '+response.reason
-              })
-            );
-          }
-          // $("#addApi").css("opacity", "");
-          // $(".submitBtn").removeAttr("disabled");
-        },
-      });
-
-    });
-//End Edit status
+$(".update-course-state").change(function () {
+  var form = this;
+  var select = $(form).find('select');
+  var previous = select.data('previous-value') || select.val();
+  var Toast = Swal.mixin({toast:true, position:'top-end', showConfirmButton:false, timer:5000});
+  $.ajax({
+    type: 'POST', url: 'requests/course/status', data: new FormData(form), dataType: 'json',
+    contentType: false, cache: false, processData: false,
+    success: function (response) {
+      if (response.status == 1) {
+        select.data('previous-value', select.val());
+        Toast.fire({icon:'success', title:response.message});
+      } else {
+        select.val(previous);
+        Toast.fire({icon:'error', title:response.message || 'Course state could not be updated.'});
+      }
+    },
+    error: function () { select.val(previous); Toast.fire({icon:'error', title:'Course state could not be updated.'}); }
+  });
+});
 
 
 
@@ -2419,27 +2384,6 @@ jQuery(document).ready(function($) {
   });
 });
 
-$(".update-course-visibility").change(function () {
-  var form = this;
-  var select = $(form).find('select');
-  var previous = select.data('previous-value');
-  if (previous === undefined) previous = select.val();
-  var Toast = Swal.mixin({toast:true, position:'top-end', showConfirmButton:false, timer:5000});
-  $.ajax({
-    type: 'POST', url: 'requests/course/status', data: new FormData(form), dataType: 'json',
-    contentType: false, cache: false, processData: false,
-    success: function (response) {
-      if (response.status == 1) {
-        select.data('previous-value', select.val());
-        Toast.fire({icon:'success', title:response.message});
-      } else {
-        select.val(previous);
-        Toast.fire({icon:'error', title:response.message || 'Visibility could not be updated.'});
-      }
-    },
-    error: function () { select.val(previous); Toast.fire({icon:'error', title:'Visibility could not be updated.'}); }
-  });
-});
 </script>
 
 

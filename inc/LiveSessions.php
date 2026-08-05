@@ -412,7 +412,7 @@ if (!function_exists('mmh_live_occurrences')) {
         $params[] = $from;
         $params[] = $to;
         if ($onlyEnrolledUserId !== null) {
-            $sql .= " AND c.course_status = '1' AND o.status NOT IN ('cancelled', 'deleted') AND (o.scheduled_start_at < UTC_TIMESTAMP() OR s.enabled = 1)";
+            $sql .= " AND c.course_state IN ('public', 'private') AND o.status NOT IN ('cancelled', 'deleted') AND (o.scheduled_start_at < UTC_TIMESTAMP() OR s.enabled = 1)";
         }
         if ($courseId !== '') {
             $sql .= ' AND o.course_id = ?';

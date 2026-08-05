@@ -43,8 +43,7 @@ $course_id = intval($_POST['course_id']);
 
 // Check course price
 $courseStmt = $conn->prepare("SELECT course_price, course_title FROM courses
-    WHERE course_id = ? AND archived_at IS NULL AND course_status = '1'
-      AND COALESCE(course_visibility, 'public') = 'public' LIMIT 1");
+    WHERE course_id = ? AND archived_at IS NULL AND course_state = 'public' LIMIT 1");
 $courseStmt->bind_param('i', $course_id);
 $courseStmt->execute();
 $course = $courseStmt->get_result()->fetch_assoc();

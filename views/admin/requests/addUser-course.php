@@ -71,7 +71,7 @@ function add_user_course_student_options(mysqli_result $result)
 
 function add_user_course_fetch_course(mysqli $conn, $course_id)
 {
-    $stmt = $conn->prepare('SELECT course_id, course_title, course_price, course_status FROM courses WHERE course_id = ? LIMIT 1');
+    $stmt = $conn->prepare('SELECT course_id, course_title, course_price, course_state FROM courses WHERE course_id = ? LIMIT 1');
     if (!$stmt) {
         return null;
     }

@@ -53,7 +53,7 @@ if ($categories_result) {
 }
 
 $homeCourses = [];
-$courses_result = mysqli_query($conn, "SELECT * FROM courses WHERE course_status = '1' AND COALESCE(course_visibility, 'public') = 'public' ORDER BY created_at DESC, id DESC");
+$courses_result = mysqli_query($conn, "SELECT * FROM courses WHERE course_state = 'public' ORDER BY created_at DESC, id DESC");
 if ($courses_result) {
     while ($row = mysqli_fetch_assoc($courses_result)) $homeCourses[] = $row;
 }

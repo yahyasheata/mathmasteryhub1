@@ -15,7 +15,7 @@ if ($course_id === '') {
     exit('Course not found.');
 }
 
-$course_stmt = $conn->prepare('SELECT course_id, course_title, course_status FROM courses WHERE course_id = ? LIMIT 1');
+$course_stmt = $conn->prepare('SELECT course_id, course_title, course_state FROM courses WHERE course_id = ? LIMIT 1');
 if (!$course_stmt) {
     http_response_code(500);
     exit('Unable to load the course.');

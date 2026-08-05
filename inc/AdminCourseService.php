@@ -17,11 +17,7 @@ if (!function_exists('mmh_admin_course_set_status')) {
     {
         $courseId = trim($courseId);
         if ($courseId === '' || !in_array($status, ['0', '1'], true)) throw new InvalidArgumentException('Invalid course status.');
-        $stmt = $conn->prepare('UPDATE courses SET course_status = ? WHERE course_id = ? LIMIT 1');
-        if (!$stmt) throw new RuntimeException('Course status could not be prepared.');
-        $stmt->bind_param('ss', $status, $courseId);
-        if (!$stmt->execute() || $stmt->affected_rows < 1) { $stmt->close(); throw new RuntimeException('Course not found.'); }
-        $stmt->close();
+        mmh_admin_course_set_state($conn, $courseId, $status === '1' ? 'public' : 'draft');
     }
 }
 
@@ -33,9 +29,21 @@ if (!function_exists('mmh_admin_course_set_visibility')) {
         if ($courseId === '' || !in_array($visibility, ['public', 'private'], true)) {
             throw new InvalidArgumentException('Invalid course visibility.');
         }
-        $stmt = $conn->prepare('UPDATE courses SET course_visibility = ? WHERE course_id = ? LIMIT 1');
-        if (!$stmt) throw new RuntimeException('Course visibility could not be prepared.');
-        $stmt->bind_param('ss', $visibility, $courseId);
+        mmh_admin_course_set_state($conn, $courseId, $visibility);
+    }
+}
+
+if (!function_exists('mmh_admin_course_set_state')) {
+    function mmh_admin_course_set_state(mysqli $conn, string $courseId, string $state): void
+    {
+        $courseId = trim($courseId);
+        $state = strtolower(trim($state));
+        if ($courseId === '' || !in_array($state, ['public', 'private', 'draft'], true)) {
+            throw new InvalidArgumentException('Invalid course state.');
+        }
+        $stmt = $conn->prepare('UPDATE courses SET course_state = ? WHERE course_id = ? LIMIT 1');
+        if (!$stmt) throw new RuntimeException('Course state could not be prepared.');
+        $stmt->bind_param('ss', $state, $courseId);
         if (!$stmt->execute() || $stmt->affected_rows < 1) {
             $stmt->close();
             throw new RuntimeException('Course not found.');

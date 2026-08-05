@@ -102,9 +102,9 @@ if (!function_exists('student_course_access_course')) {
 
         // Route URLs historically accept either courses.id or courses.course_id.
         // Always return the canonical course_id used by enrollment and lessons.
-        $stmt = $conn->prepare("SELECT id, course_id, course_title, course_description, course_image, course_category, username, sequential_learning, course_status, course_visibility
+        $stmt = $conn->prepare("SELECT id, course_id, course_title, course_description, course_image, course_category, username, sequential_learning, course_status, course_visibility, course_state
             FROM courses
-            WHERE archived_at IS NULL AND course_status = '1'
+            WHERE archived_at IS NULL AND course_state IN ('public', 'private')
               AND (course_id = ? OR CAST(id AS CHAR) = ?)
             LIMIT 1");
         if (!$stmt) {

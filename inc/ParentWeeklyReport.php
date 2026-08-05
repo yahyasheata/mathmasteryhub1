@@ -138,7 +138,7 @@ function mmh_parent_report_reset_override(mysqli $conn, string $courseId, int $s
 
 function mmh_parent_report_courses(mysqli $conn): array
 {
-    $result = $conn->query('SELECT course_id, course_title, course_status FROM courses ORDER BY course_status DESC, course_title ASC, course_id ASC');
+    $result = $conn->query("SELECT course_id, course_title, course_state FROM courses ORDER BY FIELD(course_state, 'public', 'private', 'draft'), course_title ASC, course_id ASC");
     return $result ? $result->fetch_all(MYSQLI_ASSOC) : [];
 }
 

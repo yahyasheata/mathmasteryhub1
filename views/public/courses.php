@@ -16,8 +16,7 @@ $courses = [];
 $sql = "SELECT c.id, c.course_id, c.course_title, c.course_image, c.course_description, c.course_price, c.preDiscount_course_price, cat.category_title
         FROM courses AS c
         LEFT JOIN categories AS cat ON cat.id = c.course_category
-        WHERE c.course_status = '1'
-          AND COALESCE(c.course_visibility, 'public') = 'public'
+        WHERE c.course_state = 'public'
         ORDER BY c.id DESC
         LIMIT 60";
 $result = mysqli_query($conn, $sql);
