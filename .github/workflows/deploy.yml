@@ -59,6 +59,7 @@ jobs:
             php database/migrations/20260803_create_recovery_plan_templates.php
             php database/migrations/20260804_create_timed_exams.php
             php database/migrations/20260805_add_timed_exam_external_paper.php
+            php database/migrations/20260810_timed_exam_drive_only.php
             php database/migrations/20260808_add_course_visibility.php
             php database/migrations/20260809_add_course_state.php
             php database/migrations/verify_student_learning_evidence.php

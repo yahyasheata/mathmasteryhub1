@@ -64,9 +64,12 @@ $router = new \Bramus\Router\Router();
 // Main Routes
 // =======================
 $router->get('/', function() use ($meta_title, $meta_description, $meta_url, $meta_image) {
-    include('views/partials/header.php');
+    // The landing view is a complete document and must not be preceded by a
+    // partial that emits HTML. Send its response policy before rendering.
+    header('Cache-Control: no-store, no-cache, must-revalidate, max-age=0');
+    header('Pragma: no-cache');
+    header('Vary: Cookie');
     include('views/index.php');
-    include('views/partials/footer.php');
 });
 
 $router->get('/testFunc', function() {

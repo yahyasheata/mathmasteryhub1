@@ -20,26 +20,20 @@ if (!function_exists('mmh_timed_exam_normalize_external_paper_url')) {
         if ($host === '' || isset($parts['user']) || isset($parts['pass']) || isset($parts['port'])) return null;
         $isHost = static fn(string $domain): bool => $host === $domain || str_ends_with($host, '.' . $domain);
         $path = (string) ($parts['path'] ?? '');
-        $supported = $isHost('drive.google.com') || $isHost('docs.google.com')
-            || $isHost('drive.usercontent.google.com') || $isHost('sharepoint.com')
-            || $isHost('onedrive.live.com') || $isHost('1drv.ms')
-            || $isHost('mathmasteryhub.com');
+        // Timed Exam papers are intentionally limited to Google Drive links.
+        // Keep using the shared resource resolver for Drive preview/download
+        // URL construction instead of maintaining a second provider system.
+        $supported = $isHost('drive.google.com') || $isHost('docs.google.com');
         if (!$supported) return null;
-
-        $type = (string) mmh_course_resource_type_for_url($url, 'external_link');
-        $details = mmh_course_resource_embed_details($url, $type);
-        if (($isHost('drive.google.com') || $isHost('docs.google.com')) && !$details) return null;
-        $isPdf = (bool) preg_match('/\.pdf(?:$|[?#])/i', $url);
-        if (!$details && !$isPdf && !$isHost('sharepoint.com') && !$isHost('onedrive.live.com') && !$isHost('1drv.ms')) return null;
+        $details = mmh_course_resource_embed_details($url, 'external_link');
+        if (!$details) return null;
         $preview = $details['embed_url'] ?? $url;
         $download = $details['download_url'] ?? null;
-        if ($isPdf && $download === null) $download = $url;
-        if (!$isPdf && !$details) $download = null;
         return [
             'url' => $url,
             'preview_url' => mmh_course_resource_safe_url((string) $preview),
             'download_url' => $download !== null ? mmh_course_resource_safe_url((string) $download) : null,
-            'kind' => (string) ($details['kind'] ?? ($isPdf ? 'pdf' : 'external')),
+            'kind' => (string) ($details['kind'] ?? 'google'),
         ];
     }
 }
@@ -521,31 +515,20 @@ if (!function_exists('mmh_timed_exam_download')) {
         if ((!$download && empty($exam['paper_view_allowed'])) || ($download && empty($exam['paper_download_allowed']))) {
             http_response_code(403); exit('This exam paper is not available.');
         }
-        $source = (string) ($exam['paper_source'] ?? '');
-        if ($source === '') $source = !empty($exam['paper_storage_key']) ? 'private_upload' : 'external_link';
-        if ($source === 'external_link') {
-            $resolved = mmh_timed_exam_normalize_external_paper_url((string) ($exam['paper_external_url'] ?? ''));
-            if (!$resolved) { http_response_code(404); exit('Exam paper not found.'); }
-            $target = $download ? ($resolved['download_url'] ?? null) : ($resolved['preview_url'] ?? null);
-            if (!$target) { http_response_code(403); exit('This exam paper cannot be downloaded.'); }
-            header('Cache-Control: private, no-store, max-age=0');
-            header('Pragma: no-cache');
-            header('Referrer-Policy: no-referrer');
-            header('Location: ' . $target, true, 302);
-            exit;
+        $resolved = mmh_timed_exam_normalize_external_paper_url((string) ($exam['paper_external_url'] ?? ''));
+        if (!$resolved) {
+            http_response_code(409);
+            exit('This exam paper needs a Google Drive link. Please contact your teacher.');
         }
-        if ($source !== 'private_upload' || empty($exam['paper_storage_key'])) {
-            http_response_code(404); exit('Exam paper not found.');
-        }
-        $path = dirname(__DIR__) . '/' . ltrim((string) $exam['paper_storage_key'], '/');
-        if (!is_file($path) || str_contains((string) $exam['paper_storage_key'], '..')) { http_response_code(404); exit('Exam paper not found.'); }
-        header('Content-Type: ' . ((string) ($exam['paper_mime'] ?? '') ?: 'application/octet-stream'));
-        header('Content-Length: ' . (string) filesize($path));
-        header('X-Content-Type-Options: nosniff');
+        // A Drive file has a real download URL. Docs/Slides/Sheets links may
+        // only expose their provider preview, so keep the request safe and
+        // open the approved Drive URL rather than pretending a download exists.
+        $target = $download ? ($resolved['download_url'] ?? $resolved['url']) : ($resolved['preview_url'] ?? $resolved['url']);
         header('Cache-Control: private, no-store, max-age=0');
-        $disposition = $download ? 'attachment' : 'inline';
-        header('Content-Disposition: ' . $disposition . '; filename="' . str_replace('"', '', (string) ($exam['paper_original_name'] ?? 'exam-paper')) . '"');
-        readfile($path); exit;
+        header('Pragma: no-cache');
+        header('Referrer-Policy: no-referrer');
+        header('Location: ' . $target, true, 302);
+        exit;
     }
 }
 
@@ -590,8 +573,7 @@ if (!function_exists('mmh_timed_exam_save_config')) {
         $recoveryEnd = mmh_timed_exam_datetime_to_utc($data['recovery_window_end_at'] ?? null);
         $recoveryAllowed = !empty($data['recovery_allowed']) ? 1 : 0;
         $existing = mmh_timed_exam_load_for_item($conn, $courseId, $itemId, true);
-        $paperSource = (string) ($existing['paper_source'] ?? '');
-        if ($paperSource === '') $paperSource = !empty($existing['paper_storage_key']) ? 'private_upload' : 'external_link';
+        $paperSource = 'external_link';
         $storageKey = $existing['paper_storage_key'] ?? null;
         $paperName = $existing['paper_original_name'] ?? null;
         $paperMime = $existing['paper_mime'] ?? null;
@@ -602,39 +584,21 @@ if (!function_exists('mmh_timed_exam_save_config')) {
         $fallbackInstructions = trim((string) ($data['paper_fallback_instructions'] ?? ($existing['paper_fallback_instructions'] ?? '')));
         if ($externalUrl !== '') {
             $resolved = mmh_timed_exam_normalize_external_paper_url($externalUrl);
-            if (!$resolved) throw new InvalidArgumentException('Use a secure HTTPS link from Google Drive, SharePoint, OneDrive, or a supported PDF host.');
+            if (!$resolved) throw new InvalidArgumentException('Use a secure HTTPS Google Drive file link.');
             $paperSource = 'external_link';
             $externalUrl = $resolved['url'];
             $externalPreviewUrl = (string) ($resolved['preview_url'] ?? '');
             $externalDownloadUrl = (string) ($resolved['download_url'] ?? '');
-            $paperName = null;
-            $paperMime = null;
-            $paperSize = null;
-        } elseif ($paperSource === 'external_link') {
+            // Keep legacy storage metadata intact for audit/compatibility, but
+            // never serve it once an exam is configured for a Drive paper.
+        } elseif ($externalUrl === '') {
             $externalUrl = (string) ($existing['paper_external_url'] ?? '');
         }
         if ($paperFile && ($paperFile['error'] ?? UPLOAD_ERR_NO_FILE) !== UPLOAD_ERR_NO_FILE) {
-            if (($paperFile['error'] ?? UPLOAD_ERR_NO_FILE) !== UPLOAD_ERR_OK || !is_uploaded_file((string) ($paperFile['tmp_name'] ?? ''))) throw new InvalidArgumentException('The exam paper upload failed.');
-            $original = trim((string) ($paperFile['name'] ?? ''));
-            $tmp = (string) ($paperFile['tmp_name'] ?? '');
-            $size = (int) ($paperFile['size'] ?? 0);
-            $ext = strtolower(pathinfo($original, PATHINFO_EXTENSION));
-            if ($original === '' || $size <= 0 || $size > 524288000 || $ext !== 'pdf') throw new InvalidArgumentException('The exam paper must be a PDF up to 500 MB.');
-            $finfo = function_exists('finfo_open') ? finfo_open(FILEINFO_MIME_TYPE) : null;
-            $mime = $finfo ? (string) finfo_file($finfo, $tmp) : (string) ($paperFile['type'] ?? '');
-            if ($finfo) finfo_close($finfo);
-            if ($mime !== 'application/pdf') throw new InvalidArgumentException('The exam paper must be a valid PDF.');
-            $dir = dirname(__DIR__) . '/storage/private/timed-exams/papers/' . gmdate('Y/m');
-            if (!is_dir($dir) && !mkdir($dir, 0700, true) && !is_dir($dir)) throw new RuntimeException('Unable to prepare secure paper storage.');
-            $stored = bin2hex(random_bytes(20)) . '.pdf';
-            $target = $dir . '/' . $stored;
-            if (!move_uploaded_file($tmp, $target)) throw new RuntimeException('The exam paper could not be saved securely.');
-            $storageKey = 'storage/private/timed-exams/papers/' . gmdate('Y/m') . '/' . $stored;
-            $paperName = $original; $paperMime = $mime; $paperSize = $size;
-            $paperSource = 'private_upload';
+            throw new InvalidArgumentException('Timed Exams now use a Google Drive Exam Paper Link. Uploaded paper files are no longer supported.');
         }
-        if ($status === 'published' && $paperSource === 'external_link' && $externalUrl === '') {
-            throw new InvalidArgumentException('A published Timed Exam needs an Exam Paper Link.');
+        if ($externalUrl === '') {
+            throw new InvalidArgumentException('Add a Google Drive Exam Paper Link before saving this Timed Exam.');
         }
         $jsonTypes = implode(',', $types);
         $createdBy = $adminId ?: null;

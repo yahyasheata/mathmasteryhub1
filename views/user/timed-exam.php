@@ -31,7 +31,7 @@ $context = mmh_timed_exam_student_context($conn, $exam, (int) $studentId);
 $state = $context['state'];
 $attempt = $context['attempt'];
 $version = $context['latest_version'];
-$base = rtrim((string) $baseUrl, '/');
+$base = rtrim(mmh_current_request_base_url(), '/');
 $esc = static fn($value): string => htmlspecialchars((string) $value, ENT_QUOTES, 'UTF-8');
 $localDate = static function (?string $value): string {
     if (!$value) return 'Not scheduled';
@@ -48,10 +48,8 @@ $closeTimestamp = $state['window']['closes_at'] instanceof DateTimeImmutable ? $
 if (($state['key'] ?? '') === 'grace' && $state['window']['grace_closes_at'] instanceof DateTimeImmutable) $closeTimestamp = $state['window']['grace_closes_at']->getTimestamp();
 $stateKey = (string) ($state['key'] ?? 'unavailable');
 $activeState = in_array($stateKey, ['open', 'grace'], true);
-$paperSource = (string) ($exam['paper_source'] ?? (!empty($exam['paper_storage_key']) ? 'private_upload' : 'external_link'));
-$paperHasDownload = $paperSource === 'private_upload'
-    ? !empty($exam['paper_storage_key'])
-    : trim((string) ($exam['paper_external_download_url'] ?? '')) !== '';
+$paperResolved = mmh_timed_exam_normalize_external_paper_url((string) ($exam['paper_external_url'] ?? ''));
+$paperHasDownload = $paperResolved !== null;
 $acceptedTypes = implode(', ', array_map(static fn($type): string => strtoupper((string) $type), $exam['allowed_answer_types_list'] ?? ['pdf']));
 $acceptedExtensions = implode(',', array_map(static fn($type): string => '.' . $type, $exam['allowed_answer_types_list'] ?? ['pdf']));
 $maxFileSizeMb = max(1, (int) ceil(((int) ($exam['max_file_size_bytes'] ?? 10485760)) / 1048576));
@@ -97,7 +95,11 @@ include 'views/user/layouts/user/header.php';
     <?php elseif ($activeState): ?>
       <section class="timed-exam-card" aria-labelledby="timed-exam-paper-title">
         <h2 id="timed-exam-paper-title" class="h5">Exam paper</h2>
-        <div class="timed-exam-actions"><a class="course-btn course-btn-primary" href="<?= $esc($paperBase); ?>"><span class="fas fa-eye" aria-hidden="true"></span> View Exam</a><a class="course-btn course-btn-secondary" href="<?= $esc($paperBase); ?>" target="_blank" rel="noopener"><span class="fas fa-external-link-alt" aria-hidden="true"></span> Open Exam in New Tab</a><?php if (!empty($exam['paper_download_allowed']) && $paperHasDownload): ?><a class="course-btn course-btn-secondary" href="<?= $esc($paperBase . (str_contains($paperBase, '?') ? '&' : '?') . 'download=1'); ?>"><span class="fas fa-download" aria-hidden="true"></span> Download Exam</a><?php endif; ?></div>
+        <?php if ($paperResolved): ?>
+          <div class="timed-exam-actions"><a class="course-btn course-btn-primary" href="<?= $esc($paperBase); ?>"><span class="fas fa-eye" aria-hidden="true"></span> View Exam</a><a class="course-btn course-btn-secondary" href="<?= $esc($paperBase); ?>" target="_blank" rel="noopener"><span class="fas fa-external-link-alt" aria-hidden="true"></span> Open Exam in New Tab</a><?php if (!empty($exam['paper_download_allowed']) && $paperHasDownload): ?><a class="course-btn course-btn-secondary" href="<?= $esc($paperBase . (str_contains($paperBase, '?') ? '&' : '?') . 'download=1'); ?>"><span class="fas fa-download" aria-hidden="true"></span> Download Exam</a><?php endif; ?></div>
+        <?php else: ?>
+          <p class="timed-exam-message timed-exam-error">The exam paper is not available yet. Your teacher must add a Google Drive link.</p>
+        <?php endif; ?>
         <?php if (!empty($exam['paper_fallback_instructions'])): ?><p class="timed-exam-message"><?= $esc($exam['paper_fallback_instructions']); ?></p><?php endif; ?>
       </section>
       <section class="timed-exam-upload-card" aria-labelledby="timed-exam-answer-title">
