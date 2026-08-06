@@ -17,23 +17,30 @@ if (!function_exists('mmh_timed_exam_normalize_external_paper_url')) {
         if ($url === null || strtolower((string) parse_url($url, PHP_URL_SCHEME)) !== 'https') return null;
         $parts = parse_url($url);
         $host = strtolower(trim((string) ($parts['host'] ?? '')));
-        if ($host === '' || isset($parts['user']) || isset($parts['pass']) || isset($parts['port'])) return null;
-        $isHost = static fn(string $domain): bool => $host === $domain || str_ends_with($host, '.' . $domain);
+        if ($host !== 'drive.google.com' || isset($parts['user']) || isset($parts['pass']) || isset($parts['port'])) return null;
         $path = (string) ($parts['path'] ?? '');
-        // Timed Exam papers are intentionally limited to Google Drive links.
-        // Keep using the shared resource resolver for Drive preview/download
-        // URL construction instead of maintaining a second provider system.
-        $supported = $isHost('drive.google.com') || $isHost('docs.google.com');
-        if (!$supported) return null;
-        $details = mmh_course_resource_embed_details($url, 'external_link');
-        if (!$details) return null;
-        $preview = $details['embed_url'] ?? $url;
-        $download = $details['download_url'] ?? null;
+        $query = [];
+        parse_str((string) ($parts['query'] ?? ''), $query);
+        $fileId = null;
+        if (preg_match('~^/file/d/([A-Za-z0-9_-]+)/(?:view|preview)/?$~i', $path, $match)) {
+            $fileId = $match[1];
+        } elseif (preg_match('~^/(?:open|uc)/?$~i', $path) && !empty($query['id']) && preg_match('/^[A-Za-z0-9_-]+$/', (string) $query['id'])) {
+            $fileId = (string) $query['id'];
+        }
+        // Folders, malformed paths, and links without an explicit file id are
+        // rejected rather than passed through to Google unchanged.
+        if ($fileId === null) return null;
+        $fileId = rawurlencode($fileId);
+        $preview = 'https://drive.google.com/file/d/' . $fileId . '/preview';
+        $open = 'https://drive.google.com/file/d/' . $fileId . '/view';
+        $download = 'https://drive.google.com/uc?export=download&id=' . $fileId;
         return [
             'url' => $url,
-            'preview_url' => mmh_course_resource_safe_url((string) $preview),
-            'download_url' => $download !== null ? mmh_course_resource_safe_url((string) $download) : null,
-            'kind' => (string) ($details['kind'] ?? 'google'),
+            'file_id' => $fileId,
+            'preview_url' => $preview,
+            'open_url' => $open,
+            'download_url' => $download,
+            'kind' => 'google_drive',
         ];
     }
 }
@@ -520,10 +527,7 @@ if (!function_exists('mmh_timed_exam_download')) {
             http_response_code(409);
             exit('This exam paper needs a Google Drive link. Please contact your teacher.');
         }
-        // A Drive file has a real download URL. Docs/Slides/Sheets links may
-        // only expose their provider preview, so keep the request safe and
-        // open the approved Drive URL rather than pretending a download exists.
-        $target = $download ? ($resolved['download_url'] ?? $resolved['url']) : ($resolved['preview_url'] ?? $resolved['url']);
+        $target = $download ? $resolved['download_url'] : $resolved['open_url'];
         header('Cache-Control: private, no-store, max-age=0');
         header('Pragma: no-cache');
         header('Referrer-Policy: no-referrer');

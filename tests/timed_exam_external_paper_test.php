@@ -5,16 +5,17 @@ require_once dirname(__DIR__) . '/inc/TimedExam.php';
 
 $accepted = [
     'https://drive.google.com/file/d/abc123/view',
-    'https://drive.usercontent.google.com/download?id=abc123&export=download',
-    'https://docs.google.com/document/d/abc123/edit',
-    'https://docs.google.com/spreadsheets/d/abc123/edit',
-    'https://docs.google.com/presentation/d/abc123/edit',
-    'https://team.sharepoint.com/:b:/s/class/Eabc?e=x',
-    'https://1drv.ms/u/s!abc',
-    'https://cdn.mathmasteryhub.com/papers/sample.pdf',
+    'https://drive.google.com/file/d/abc123/preview?usp=sharing',
+    'https://drive.google.com/open?id=abc123',
+    'https://drive.google.com/uc?id=abc123',
+    'https://drive.google.com/uc?export=download&id=abc123',
 ];
 foreach ($accepted as $url) {
-    if (!mmh_timed_exam_normalize_external_paper_url($url)) {
+    $resolved = mmh_timed_exam_normalize_external_paper_url($url);
+    if (!$resolved || ($resolved['file_id'] ?? '') !== 'abc123'
+        || ($resolved['preview_url'] ?? '') !== 'https://drive.google.com/file/d/abc123/preview'
+        || ($resolved['open_url'] ?? '') !== 'https://drive.google.com/file/d/abc123/view'
+        || ($resolved['download_url'] ?? '') !== 'https://drive.google.com/uc?export=download&id=abc123') {
         throw new RuntimeException('Expected supported paper URL: ' . $url);
     }
 }
@@ -26,6 +27,11 @@ foreach ([
     'file:///tmp/exam.pdf',
     'https://evil.example/exam.pdf',
     'https://example.com/not-a-paper',
+    'https://drive.google.com/drive/folders/abc123',
+    'https://drive.google.com/file/d/abc123/edit',
+    'https://drive.google.com/file/d/not valid/view',
+    'https://docs.google.com/document/d/abc123/edit',
+    'https://drive.usercontent.google.com/download?id=abc123&export=download',
 ] as $url) {
     if (mmh_timed_exam_normalize_external_paper_url($url) !== null) {
         throw new RuntimeException('Unsupported paper URL was accepted: ' . $url);
@@ -38,8 +44,13 @@ if (!is_string($migration) || !str_contains($migration, 'paper_source') || !str_
 }
 
 $view = file_get_contents(dirname(__DIR__) . '/views/user/timed-exam.php');
-if (!is_string($view) || !str_contains($view, 'Open Exam in New Tab') || !str_contains($view, 'paper_external_download_url')) {
+if (!is_string($view) || !str_contains($view, "paperUrl('preview')") || !str_contains($view, "paperUrl('open')") || !str_contains($view, "paperUrl('download')")) {
     throw new RuntimeException('Timed Exam paper actions are incomplete.');
+}
+
+$paperRoute = file_get_contents(dirname(__DIR__) . '/views/user/requests/open-timed-exam-paper.php');
+if (!is_string($paperRoute) || !str_contains($paperRoute, "['preview_url']") || !str_contains($paperRoute, "\$action === 'open'") || !str_contains($paperRoute, "\$action === 'download'")) {
+    throw new RuntimeException('Timed Exam paper redirect route is incomplete.');
 }
 
 echo "Timed Exam external paper tests passed.\n";

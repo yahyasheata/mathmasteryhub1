@@ -42,8 +42,10 @@ $paperBase = $base . '/user/course/' . rawurlencode((string) $course['course_id'
 $uploadUrl = $base . '/user/course/' . rawurlencode((string) $course['course_id']) . '/exam/' . (int) $exam['id'] . '/upload';
 $removeUploadUrl = $base . '/user/course/' . rawurlencode((string) $course['course_id']) . '/exam/' . (int) $exam['id'] . '/remove-upload';
 $submitUrl = $base . '/user/course/' . rawurlencode((string) $course['course_id']) . '/exam/' . (int) $exam['id'] . '/submit';
-$recoveryQuery = ($recoveryPlanId > 0 && $recoveryTaskId > 0) ? '?recovery_plan=' . $recoveryPlanId . '&recovery_task=' . $recoveryTaskId : '';
-$paperBase .= $recoveryQuery; $uploadUrl .= $recoveryQuery; $removeUploadUrl .= $recoveryQuery; $submitUrl .= $recoveryQuery;
+$recoveryParams = ($recoveryPlanId > 0 && $recoveryTaskId > 0) ? ['recovery_plan' => $recoveryPlanId, 'recovery_task' => $recoveryTaskId] : [];
+$paperUrl = static fn(string $action): string => $paperBase . '?' . http_build_query($recoveryParams + ['paper_action' => $action], '', '&', PHP_QUERY_RFC3986);
+$recoveryQuery = $recoveryParams ? '?' . http_build_query($recoveryParams, '', '&', PHP_QUERY_RFC3986) : '';
+$uploadUrl .= $recoveryQuery; $removeUploadUrl .= $recoveryQuery; $submitUrl .= $recoveryQuery;
 $closeTimestamp = $state['window']['closes_at'] instanceof DateTimeImmutable ? $state['window']['closes_at']->getTimestamp() : 0;
 if (($state['key'] ?? '') === 'grace' && $state['window']['grace_closes_at'] instanceof DateTimeImmutable) $closeTimestamp = $state['window']['grace_closes_at']->getTimestamp();
 $stateKey = (string) ($state['key'] ?? 'unavailable');
@@ -96,7 +98,7 @@ include 'views/user/layouts/user/header.php';
       <section class="timed-exam-card" aria-labelledby="timed-exam-paper-title">
         <h2 id="timed-exam-paper-title" class="h5">Exam paper</h2>
         <?php if ($paperResolved): ?>
-          <div class="timed-exam-actions"><a class="course-btn course-btn-primary" href="<?= $esc($paperBase); ?>"><span class="fas fa-eye" aria-hidden="true"></span> View Exam</a><a class="course-btn course-btn-secondary" href="<?= $esc($paperBase); ?>" target="_blank" rel="noopener"><span class="fas fa-external-link-alt" aria-hidden="true"></span> Open Exam in New Tab</a><?php if (!empty($exam['paper_download_allowed']) && $paperHasDownload): ?><a class="course-btn course-btn-secondary" href="<?= $esc($paperBase . (str_contains($paperBase, '?') ? '&' : '?') . 'download=1'); ?>"><span class="fas fa-download" aria-hidden="true"></span> Download Exam</a><?php endif; ?></div>
+          <div class="timed-exam-actions"><a class="course-btn course-btn-primary" href="<?= $esc($paperUrl('preview')); ?>"><span class="fas fa-eye" aria-hidden="true"></span> View Exam</a><a class="course-btn course-btn-secondary" href="<?= $esc($paperUrl('open')); ?>" target="_blank" rel="noopener noreferrer"><span class="fas fa-external-link-alt" aria-hidden="true"></span> Open Exam in New Tab</a><?php if (!empty($exam['paper_download_allowed']) && $paperHasDownload): ?><a class="course-btn course-btn-secondary" href="<?= $esc($paperUrl('download')); ?>"><span class="fas fa-download" aria-hidden="true"></span> Download Exam</a><?php endif; ?></div>
         <?php else: ?>
           <p class="timed-exam-message timed-exam-error">The exam paper is not available yet. Your teacher must add a Google Drive link.</p>
         <?php endif; ?>
