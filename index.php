@@ -265,6 +265,15 @@ $router->mount('/user', function() use ($router) {
         include('views/user/requests/open-course-resource.php');
     });
 
+    // Register the paper endpoint before the shorter exam workspace pattern.
+    // Bramus Router matches the shorter dynamic path first, so placing this
+    // route after it makes /paper requests render the exam page again.
+    $router->get('/course/{courseId}/exam/{examId}/paper', function($courseId, $examId) {
+        require_once '__init.php';
+        if (!isset($_SESSION['username'])) { http_response_code(401); exit('Sign in required.'); }
+        include('views/user/requests/open-timed-exam-paper.php');
+    });
+
     $router->get('/course/{courseId}/exam/{examId}', function($courseId, $examId) {
         require_once '__init.php';
         if (!isset($_SESSION['username'])) {
@@ -272,12 +281,6 @@ $router->mount('/user', function() use ($router) {
             exit();
         }
         include('views/user/timed-exam.php');
-    });
-
-    $router->get('/course/{courseId}/exam/{examId}/paper', function($courseId, $examId) {
-        require_once '__init.php';
-        if (!isset($_SESSION['username'])) { http_response_code(401); exit('Sign in required.'); }
-        include('views/user/requests/open-timed-exam-paper.php');
     });
 
     $router->post('/course/{courseId}/exam/{examId}/upload', function($courseId, $examId) {
