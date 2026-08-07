@@ -6,6 +6,7 @@ require_once 'inc/learning_schema.php';
 require_once 'inc/AcademicMetadata.php';
 require_once 'inc/CourseResourceResolver.php';
 require_once 'inc/TimedExam.php';
+require_once 'inc/AdminAssessmentService.php';
 
 header('Content-Type: application/json; charset=utf-8');
 
@@ -423,20 +424,6 @@ function item_due_date_label($value)
     return $time ? date('j F Y', $time) : item_html($value);
 }
 
-function item_generate_assignment_id(mysqli $conn)
-{
-    do {
-        $assignment_id = (string) random_int(10000, 99999);
-        $stmt = $conn->prepare('SELECT id FROM assignments WHERE assignment_id = ? LIMIT 1');
-        $stmt->bind_param('s', $assignment_id);
-        $stmt->execute();
-        $exists = $stmt->get_result()->num_rows > 0;
-        $stmt->close();
-    } while ($exists);
-
-    return $assignment_id;
-}
-
 function item_save_classified_assignment(mysqli $conn, $course_id, $title, $description, $due_date, $file_path, array $academic_metadata, array $score_mode)
 {
     $assignment_id = item_post('existing_assignment_id');
@@ -487,69 +474,18 @@ function item_save_classified_assignment(mysqli $conn, $course_id, $title, $desc
         item_response(false, 'Validation failed. Choose a late-submission deadline.');
     }
 
-    $assignment_fields = [
-        'assignment_title = ?', 'assignment_description = ?', 'due_date = ?', 'late_submission_enabled = ?', 'late_submission_until = ?', 'file_path = ?',
-        'course_id = ?', 'section_id = ?', 'homework_type = ?', 'allow_self_score = ?',
-        'require_teacher_verification = ?', 'max_score = ?', 'topic_id = ?', 'subtopic_id = ?',
-        'additional_topic_ids = ?', 'difficulty = ?', 'estimated_time = ?', 'passing_score = ?',
-        'weight = ?', 'skills_tested = ?', 'calculator_mode = ?', 'exam_board = ?', 'paper = ?',
-        'teacher_notes = ?', 'importance = ?', 'category = ?', 'learning_objectives = ?',
-        'keywords = ?', 'week = ?', 'unit = ?', 'term = ?', 'syllabus_code = ?',
-        'recommended_recording_item_id = ?', 'recommended_notes_item_id = ?',
-        'recommended_revision_item_id = ?',
-    ];
     $assignment_values = [
-        $title, $description, $due_date, $late_submission_enabled, $late_submission_until, $file_path, $course_id, $section_id, $homework_type,
-        $allow_self_score, $require_teacher_verification, $max_score, $topic_id, $subtopic_id,
-        $additional_topic_ids, $difficulty, $estimated_time, $passing_score, $weight, $skills_tested,
-        $calculator_mode, $exam_board, $paper, $teacher_notes, $importance, $category,
-        $learning_objectives, $keywords, $week, $unit, $term, $syllabus_code,
-        $recommended_recording, $recommended_notes, $recommended_revision,
+        'assignment_title' => $title, 'assignment_description' => $description, 'due_date' => $due_date, 'late_submission_enabled' => $late_submission_enabled, 'late_submission_until' => $late_submission_until, 'file_path' => $file_path,
+        'course_id' => $course_id, 'section_id' => $section_id, 'homework_type' => $homework_type,
+        'allow_self_score' => $allow_self_score, 'require_teacher_verification' => $require_teacher_verification, 'max_score' => $max_score, 'topic_id' => $topic_id, 'subtopic_id' => $subtopic_id,
+        'additional_topic_ids' => $additional_topic_ids, 'difficulty' => $difficulty, 'estimated_time' => $estimated_time, 'passing_score' => $passing_score,
+        'weight' => $weight, 'skills_tested' => $skills_tested, 'calculator_mode' => $calculator_mode, 'exam_board' => $exam_board, 'paper' => $paper,
+        'teacher_notes' => $teacher_notes, 'importance' => $importance, 'category' => $category, 'learning_objectives' => $learning_objectives,
+        'keywords' => $keywords, 'week' => $week, 'unit' => $unit, 'term' => $term, 'syllabus_code' => $syllabus_code,
+        'recommended_recording_item_id' => $recommended_recording, 'recommended_notes_item_id' => $recommended_notes,
+        'recommended_revision_item_id' => $recommended_revision,
     ];
-
-    if ($assignment_id !== '') {
-        $check_stmt = $conn->prepare('SELECT assignment_id, item_id FROM assignments WHERE assignment_id = ? AND course_id = ? LIMIT 1');
-        $check_stmt->bind_param('ss', $assignment_id, $course_id);
-        $check_stmt->execute();
-        $existing = $check_stmt->get_result()->fetch_assoc();
-        $check_stmt->close();
-
-        // A duplicated lesson may still post the source lesson's assignment.
-        // Never move or overwrite that source assignment; create a new one.
-        $owned_by_this_item = !$existing
-            ? false
-            : trim((string) ($existing['item_id'] ?? '')) === ''
-                || ($edited_item_id !== '' && trim((string) $existing['item_id']) === $edited_item_id);
-        if ($owned_by_this_item) {
-            $assignment_values[] = $assignment_id;
-            $stmt = item_bind_and_execute(
-                $conn,
-                'UPDATE assignments SET ' . implode(', ', $assignment_fields) . ' WHERE assignment_id = ? LIMIT 1',
-                str_repeat('s', count($assignment_values)),
-                $assignment_values
-            );
-            $stmt->close();
-            return $assignment_id;
-        }
-    }
-
-    $assignment_id = item_generate_assignment_id($conn);
-    $columns = ['assignment_id'];
-    $placeholders = ['?'];
-    foreach ($assignment_fields as $field) {
-        $columns[] = trim(substr($field, 0, strpos($field, ' =')));
-        $placeholders[] = '?';
-    }
-    array_unshift($assignment_values, $assignment_id);
-    $stmt = item_bind_and_execute(
-        $conn,
-        'INSERT INTO assignments (' . implode(', ', $columns) . ') VALUES (' . implode(', ', $placeholders) . ')',
-        str_repeat('s', count($assignment_values)),
-        $assignment_values
-    );
-    $stmt->close();
-
-    return $assignment_id;
+    return mmh_admin_assignment_upsert_definition($conn, $assignment_values, $assignment_id, $edited_item_id);
 }
 
 function item_update_assignment_context(mysqli $conn, $course_id, $assignment_id, $item_id, $section_id)
@@ -558,14 +494,7 @@ function item_update_assignment_context(mysqli $conn, $course_id, $assignment_id
         return;
     }
 
-    $stmt = $conn->prepare('UPDATE assignments SET item_id = ?, section_id = ? WHERE assignment_id = ? AND course_id = ? LIMIT 1');
-    if (!$stmt) {
-        return;
-    }
-    $section_id = $section_id ?: null;
-    $stmt->bind_param('ssss', $item_id, $section_id, $assignment_id, $course_id);
-    $stmt->execute();
-    $stmt->close();
+    mmh_admin_assignment_link_item($conn, (string) $course_id, (string) $assignment_id, (string) $item_id, (string) $section_id);
 }
 
 function item_recording_html($title, $url)

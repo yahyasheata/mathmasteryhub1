@@ -5,6 +5,7 @@ require_once 'inc/CourseDuration.php';
 require_once 'inc/learning_schema.php';
 require_once 'inc/CourseSectionAvailability.php';
 require_once 'inc/CourseResourceResolver.php';
+require_once 'inc/AdminAssessmentService.php';
 
 header('Content-Type: application/json; charset=utf-8');
 
@@ -47,41 +48,6 @@ function items_item_table_exists(mysqli $conn, $table)
     $row = $stmt->get_result()->fetch_assoc();
     $stmt->close();
     return (int) ($row['total'] ?? 0) > 0;
-}
-
-/** Load assignment operations in one query for the current Course Content view. */
-function items_item_assignment_stats(mysqli $conn, $course_id, array $assignment_ids)
-{
-    $assignment_ids = array_values(array_unique(array_filter(array_map('strval', $assignment_ids), static function ($id) {
-        return $id !== '' && preg_match('/^[A-Za-z0-9_-]{1,40}$/', $id);
-    })));
-    if (!$assignment_ids) {
-        return [];
-    }
-    $placeholders = implode(',', array_fill(0, count($assignment_ids), '?'));
-    $types = 's' . str_repeat('s', count($assignment_ids));
-    $sql = "SELECT a.assignment_id, a.assignment_title, a.due_date, a.completion_requirement, a.completion_rule,
-                    COUNT(DISTINCT s.id) AS submission_count,
-                    COUNT(DISTINCT CASE WHEN s.grade IS NULL AND s.self_score IS NULL THEN s.id END) AS needs_review,
-                    (SELECT COUNT(DISTINCT cl.user_id) FROM course_logs cl WHERE cl.course_id = a.course_id) AS enrolled_count
-             FROM assignments a
-             LEFT JOIN assignment_submissions s ON s.assignment_id = a.assignment_id
-             WHERE a.course_id = ? AND a.archived_at IS NULL AND a.assignment_id IN ({$placeholders})
-             GROUP BY a.assignment_id, a.assignment_title, a.due_date, a.completion_requirement, a.completion_rule";
-    $stmt = $conn->prepare($sql);
-    if (!$stmt) {
-        return [];
-    }
-    $params = array_merge([(string) $course_id], $assignment_ids);
-    $stmt->bind_param($types, ...$params);
-    $stmt->execute();
-    $result = $stmt->get_result();
-    $stats = [];
-    while ($row = $result->fetch_assoc()) {
-        $stats[(string) $row['assignment_id']] = $row;
-    }
-    $stmt->close();
-    return $stats;
 }
 
 function items_item_status_meta($value)
@@ -650,7 +616,7 @@ while ($row = $items_result->fetch_assoc()) {
     }
 }
 $stmt->close();
-$assignment_stats = items_item_assignment_stats($conn, $course_id, $assignment_ids);
+$assignment_stats = mmh_admin_assignment_operational_stats($conn, $course_id, $assignment_ids);
 
 $general_section = items_item_render_section(
     $course_id,

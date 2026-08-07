@@ -3,6 +3,7 @@ require_once 'connection/config.php';
 require_once 'inc/functions.php';
 require_once 'inc/LearningEvents.php';
 require_once 'inc/AcademicMetadata.php';
+require_once 'inc/AdminAssessmentService.php';
 
 header('Content-Type: application/json; charset=utf-8');
 
@@ -32,14 +33,7 @@ if (!in_array($action, ['verify', 'correct', 'reject'], true)) {
     assignment_feedback_response(false, 'Choose a valid verification action.');
 }
 
-$context_stmt = $conn->prepare('SELECT s.feedback, s.student_id, s.assignment_id, s.self_score, a.course_id, a.section_id, a.item_id, a.max_score FROM assignment_submissions s LEFT JOIN assignments a ON s.assignment_id = a.assignment_id WHERE s.id = ? LIMIT 1');
-if (!$context_stmt) {
-    assignment_feedback_response(false, 'Unable to prepare the submission lookup.');
-}
-$context_stmt->bind_param('i', $submission_id);
-$context_stmt->execute();
-$submission = $context_stmt->get_result()->fetch_assoc();
-$context_stmt->close();
+$submission = mmh_admin_assignment_submission_context($conn, $submission_id);
 if (!$submission) {
     assignment_feedback_response(false, 'Submission not found.');
 }
@@ -95,17 +89,9 @@ if (!empty($_SESSION['admin'])) {
     }
 }
 $grade = $final_score === null ? null : number_format($final_score, 2, '.', '');
-$update_stmt = $conn->prepare('UPDATE assignment_submissions SET feedback = ?, grade = ?, self_score_status = ?, verification_note = ?, verified_at = NOW(), verified_by = ? WHERE id = ? LIMIT 1');
-if (!$update_stmt) {
-    assignment_feedback_response(false, 'Unable to prepare the verification update.');
+if (!mmh_admin_assignment_save_verification($conn, $submission_id, $feedback_path, $grade, $verification_status, $verification_note, $verified_by)) {
+    assignment_feedback_response(false, 'Database update error.');
 }
-$update_stmt->bind_param('ssssii', $feedback_path, $grade, $verification_status, $verification_note, $verified_by, $submission_id);
-if (!$update_stmt->execute()) {
-    $error = $update_stmt->error;
-    $update_stmt->close();
-    assignment_feedback_response(false, 'Database update error.', ['reason' => $error]);
-}
-$update_stmt->close();
 
 mmh_log_event($conn, (int) $submission['student_id'], $action === 'reject' ? 'homework_rejected' : 'homework_approved', [
     'course_id' => $submission['course_id'] ?? '',
