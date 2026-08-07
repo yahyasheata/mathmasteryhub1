@@ -84,6 +84,9 @@
 .course-manager-edit-link { background: transparent; border: 0; color: var(--text-primary); display: block; font-size: .88rem; font-weight: 750; max-width: 100%; overflow: hidden; padding: .1rem 0; text-align: left; text-overflow: ellipsis; white-space: nowrap; }
 .course-manager-edit-link:hover, .course-manager-edit-link:focus-visible { color: var(--primary); outline: 0; }
 .course-manager-row-meta { align-items: center; display: flex; flex-wrap: wrap; gap: .3rem; margin-top: .18rem; }
+.course-manager-assignment-meta { align-items: center; color: var(--text-muted); display: flex; flex-wrap: wrap; font-size: .72rem; gap: .65rem; margin-top: .3rem; }
+.course-manager-assignment-actions { margin-top: .35rem; }
+.course-manager-row-badge-warning { background: var(--warning-soft); border-color: color-mix(in srgb, var(--warning) 30%, var(--border)); color: var(--warning); }
 .course-manager-status-published { background: var(--success-soft); border-color: color-mix(in srgb, var(--success) 30%, var(--border)); color: var(--success); }
 .course-manager-status-draft { background: var(--warning-soft); border-color: color-mix(in srgb, var(--warning) 30%, var(--border)); color: var(--warning); }
 .course-manager-row-badge-locked { background: var(--surface-inset); color: var(--text-secondary); }

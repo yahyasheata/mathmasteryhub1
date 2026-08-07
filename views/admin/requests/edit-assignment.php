@@ -44,6 +44,22 @@ $method = (string) ($_POST['_method'] ?? '');
 $assignmentId = trim((string) ($_POST['assignment_id'] ?? ''));
 if ($assignmentId === '') edit_assignment_response(false, 'Assignment not found.', [], 422);
 
+// The standalone editor is retained only as a compatibility endpoint. The
+// canonical assignment editor is the Assignment element in Course Content.
+$ownerStmt = $conn->prepare('SELECT course_id, item_id FROM assignments WHERE assignment_id = ? LIMIT 1');
+if ($ownerStmt) {
+    $ownerStmt->bind_param('s', $assignmentId);
+    $ownerStmt->execute();
+    $owner = $ownerStmt->get_result()->fetch_assoc();
+    $ownerStmt->close();
+    if (!$owner) edit_assignment_response(false, 'Assignment not found.', [], 404);
+    $courseForRedirect = rawurlencode((string) ($owner['course_id'] ?? ''));
+    $itemForRedirect = rawurlencode((string) ($owner['item_id'] ?? ''));
+    edit_assignment_response(false, 'Open this assignment from Course Content to edit it.', ['redirect' => 'courses/' . $courseForRedirect . '/content#course-item-' . $itemForRedirect], 409);
+} else {
+    edit_assignment_response(false, 'Unable to validate the assignment owner.', [], 500);
+}
+
 if ($method === 'GET') {
     $stmt = $conn->prepare('SELECT * FROM assignments WHERE assignment_id = ? LIMIT 1');
     $stmt->bind_param('s', $assignmentId); $stmt->execute(); $assignment = $stmt->get_result()->fetch_assoc(); $stmt->close();

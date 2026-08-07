@@ -49,6 +49,41 @@ function items_item_table_exists(mysqli $conn, $table)
     return (int) ($row['total'] ?? 0) > 0;
 }
 
+/** Load assignment operations in one query for the current Course Content view. */
+function items_item_assignment_stats(mysqli $conn, $course_id, array $assignment_ids)
+{
+    $assignment_ids = array_values(array_unique(array_filter(array_map('strval', $assignment_ids), static function ($id) {
+        return $id !== '' && preg_match('/^[A-Za-z0-9_-]{1,40}$/', $id);
+    })));
+    if (!$assignment_ids) {
+        return [];
+    }
+    $placeholders = implode(',', array_fill(0, count($assignment_ids), '?'));
+    $types = 's' . str_repeat('s', count($assignment_ids));
+    $sql = "SELECT a.assignment_id, a.assignment_title, a.due_date, a.completion_requirement, a.completion_rule,
+                    COUNT(DISTINCT s.id) AS submission_count,
+                    COUNT(DISTINCT CASE WHEN s.grade IS NULL AND s.self_score IS NULL THEN s.id END) AS needs_review,
+                    (SELECT COUNT(DISTINCT cl.user_id) FROM course_logs cl WHERE cl.course_id = a.course_id) AS enrolled_count
+             FROM assignments a
+             LEFT JOIN assignment_submissions s ON s.assignment_id = a.assignment_id
+             WHERE a.course_id = ? AND a.archived_at IS NULL AND a.assignment_id IN ({$placeholders})
+             GROUP BY a.assignment_id, a.assignment_title, a.due_date, a.completion_requirement, a.completion_rule";
+    $stmt = $conn->prepare($sql);
+    if (!$stmt) {
+        return [];
+    }
+    $params = array_merge([(string) $course_id], $assignment_ids);
+    $stmt->bind_param($types, ...$params);
+    $stmt->execute();
+    $result = $stmt->get_result();
+    $stats = [];
+    while ($row = $result->fetch_assoc()) {
+        $stats[(string) $row['assignment_id']] = $row;
+    }
+    $stmt->close();
+    return $stats;
+}
+
 function items_item_status_meta($value)
 {
     $status = strtolower(trim((string) $value));
@@ -201,6 +236,9 @@ function items_item_type_label($row)
     if (strtolower((string) $type) === 'custom_html') {
         return 'Legacy Lesson';
     }
+    if (strtolower((string) $type) === 'classified_assignment') {
+        return 'Assignment';
+    }
     return ucwords(str_replace('_', ' ', (string) $type));
 }
 
@@ -212,7 +250,7 @@ function items_item_quick_add_buttons($course_id, $section_id, $compact = false)
     $templates = [
         'recording' => ['fas fa-play-circle', 'Recording'],
         'notes' => ['fas fa-file-alt', 'Notes'],
-        'classified_assignment' => ['fas fa-clipboard-list', 'Classified Assignment'],
+        'classified_assignment' => ['fas fa-clipboard-list', 'Assignment'],
         'custom_lesson' => ['fas fa-puzzle-piece', 'Custom Lesson'],
     ];
 
@@ -315,7 +353,7 @@ function items_item_render_lesson($row)
 }
 
 
-function items_item_manager_render_lesson($row, $section_locked = false)
+function items_item_manager_render_lesson($row, $section_locked = false, array $assignment_stats = [])
 {
     $db_id = (int) $row['id'];
     $item_id = items_item_html($row['item_id']);
@@ -332,6 +370,29 @@ function items_item_manager_render_lesson($row, $section_locked = false)
     $locked_badge = $section_locked ? "<span class='course-manager-row-badge course-manager-row-badge-locked'><i class='fas fa-lock ds-icon ds-icon-xs' aria-hidden='true'></i> Section rule</span>" : '';
     $publish_label = $status_key === 'published' ? 'Unpublish' : 'Publish';
     $publish_icon = $status_key === 'published' ? 'fa-eye-slash' : 'fa-eye';
+    $assignment_panel = '';
+    if ($template_type === 'classified_assignment') {
+        $assignment_id = trim((string) ($row['assignment_id'] ?? ''));
+        if ($assignment_id === '' && function_exists('mmh_course_assignment_id')) {
+            $assignment_id = mmh_course_assignment_id($row);
+        }
+        $meta = $assignment_stats[$assignment_id] ?? null;
+        if ($meta) {
+            $due = trim((string) ($meta['due_date'] ?? ''));
+            $due_label = $due !== '' ? 'Due ' . date('j M Y, H:i', strtotime($due)) : 'No due date';
+            $submitted = (int) ($meta['submission_count'] ?? 0);
+            $enrolled = (int) ($meta['enrolled_count'] ?? 0);
+            $submission_label = 'Submissions ' . $submitted . ($enrolled > 0 ? '/' . $enrolled : '');
+            $needs_review = (int) ($meta['needs_review'] ?? 0);
+            $needs_label = $needs_review > 0 ? "<span class='course-manager-row-badge course-manager-row-badge-warning'><i class='fas fa-flag ds-icon ds-icon-xs' aria-hidden='true'></i> Needs review {$needs_review}</span>" : '';
+            $admin_base = rtrim((string) ($GLOBALS['baseUrl'] ?? ''), '/') . '/admin';
+            if ($admin_base === '/admin') {
+                $admin_base = '/admin';
+            }
+            $submission_url = $admin_base . '/assignment-submissions?assignment_id=' . rawurlencode($assignment_id) . '&course_id=' . rawurlencode((string) ($row['course_id'] ?? '')) . '&item_id=' . rawurlencode((string) ($row['item_id'] ?? '')) . '&from_course_content=1';
+            $assignment_panel = "<div class='course-manager-assignment-meta'><span><i class='far fa-calendar-alt ds-icon ds-icon-xs' aria-hidden='true'></i> " . items_item_html($due_label) . "</span><span><i class='fas fa-inbox ds-icon ds-icon-xs' aria-hidden='true'></i> " . items_item_html($submission_label) . "</span>{$needs_label}</div><div class='course-manager-assignment-actions'><a class='btn btn-sm btn-outline-primary' href='" . items_item_html($submission_url) . "'><i class='fas fa-list ds-icon ds-icon-sm' aria-hidden='true'></i> View submissions</a></div>";
+        }
+    }
 
     return "
       <li class='lesson-manager-row course-builder-item'
@@ -355,6 +416,7 @@ function items_item_manager_render_lesson($row, $section_locked = false)
             <span class='course-manager-row-badge course-manager-status-{$status_key}'>{$status_label}</span>
             {$locked_badge}
           </div>
+          {$assignment_panel}
         </div>
         <div class='course-manager-row-actions'>
           <button type='button' class='btn btn-sm btn-outline-secondary' data-manager-action='edit-item' data-item-id='{$item_id}' title='Edit lesson' aria-label='Edit lesson'><i class='fas fa-pen ds-icon' aria-hidden='true'></i></button>
@@ -366,7 +428,7 @@ function items_item_manager_render_lesson($row, $section_locked = false)
               <li><button type='button' class='dropdown-item' data-manager-action='toggle-item-status' data-item-id='{$item_id}' data-status='{$status_key}'><i class='fas {$publish_icon} ds-icon ds-icon-sm' aria-hidden='true'></i> {$publish_label}</button></li>
               <li><button type='button' class='dropdown-item' data-manager-action='duplicate-item' data-item-id='{$item_id}'><i class='fas fa-copy ds-icon ds-icon-sm' aria-hidden='true'></i> Duplicate</button></li>
               <li><hr class='dropdown-divider'></li>
-              <li><button type='button' class='dropdown-item text-danger' data-manager-action='delete-item' data-item-id='{$item_id}'><i class='fas fa-trash ds-icon ds-icon-sm' aria-hidden='true'></i> Delete</button></li>
+              <li><button type='button' class='dropdown-item text-danger' data-manager-action='delete-item' data-item-id='{$item_id}'><i class='fas fa-archive ds-icon ds-icon-sm' aria-hidden='true'></i> Archive</button></li>
             </ul>
           </div>
         </div>
@@ -563,6 +625,7 @@ $items_result = $stmt->get_result();
 $lessons_by_section = ['__general__' => ''];
 $manager_rows_by_section = ['__general__' => []];
 $counts_by_section = ['__general__' => 0];
+$assignment_ids = [];
 while ($row = $items_result->fetch_assoc()) {
     $section_id = $has_sections ? (string) ($row['section_id'] ?? '') : '';
     if ($section_id === '' || !isset($section_lookup[$section_id])) {
@@ -576,8 +639,18 @@ while ($row = $items_result->fetch_assoc()) {
     $lessons_by_section[$section_id] .= items_item_render_lesson($row);
     $manager_rows_by_section[$section_id][] = $row;
     $counts_by_section[$section_id]++;
+    if (strtolower(trim((string) ($row['template_type'] ?? ''))) === 'classified_assignment') {
+        $assignment_id = trim((string) ($row['assignment_id'] ?? ''));
+        if ($assignment_id === '' && function_exists('mmh_course_assignment_id')) {
+            $assignment_id = mmh_course_assignment_id($row);
+        }
+        if ($assignment_id !== '') {
+            $assignment_ids[] = $assignment_id;
+        }
+    }
 }
 $stmt->close();
+$assignment_stats = items_item_assignment_stats($conn, $course_id, $assignment_ids);
 
 $general_section = items_item_render_section(
     $course_id,
@@ -618,7 +691,7 @@ if (isset($_POST['layout']) && $_POST['layout'] === 'manager') {
         $section_lessons_html = '';
         $section_locked = strtolower(trim((string) ($section['unlock_mode'] ?? 'always'))) !== 'always';
         foreach ($manager_rows_by_section[$section_id] ?? [] as $section_item) {
-            $section_lessons_html .= items_item_manager_render_lesson($section_item, $section_locked);
+            $section_lessons_html .= items_item_manager_render_lesson($section_item, $section_locked, $assignment_stats);
         }
         $manager_real_sections_html .= items_item_manager_render_section(
             $conn,
@@ -632,7 +705,7 @@ if (isset($_POST['layout']) && $_POST['layout'] === 'manager') {
 
     $general_lessons_html = '';
     foreach ($manager_rows_by_section['__general__'] ?? [] as $general_item) {
-        $general_lessons_html .= items_item_manager_render_lesson($general_item, false);
+        $general_lessons_html .= items_item_manager_render_lesson($general_item, false, $assignment_stats);
     }
 
     $general_manager_section = items_item_manager_render_section(

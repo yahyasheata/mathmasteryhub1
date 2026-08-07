@@ -50,14 +50,12 @@ $isGroup = static function (array $names) use ($adminPageName, $adminSubPageName
         </section>
 
         <section class="admin-nav-group" data-admin-nav-group="assessments">
-            <button type="button" class="admin-nav-group-toggle <?=$isGroup(['assignments', 'exams', 'timed_exam_submissions', 'assignment_submissions', 'exam_submissions']) ? 'active' : ''?>" data-admin-submenu-toggle="admin-assessments-menu" aria-controls="admin-assessments-menu" aria-expanded="<?=$isGroup(['assignments', 'exams', 'timed_exam_submissions', 'assignment_submissions', 'exam_submissions']) ? 'true' : 'false'?>">
+            <button type="button" class="admin-nav-group-toggle <?=$isGroup(['exams', 'timed_exam_submissions', 'exam_submissions']) ? 'active' : ''?>" data-admin-submenu-toggle="admin-assessments-menu" aria-controls="admin-assessments-menu" aria-expanded="<?=$isGroup(['exams', 'timed_exam_submissions', 'exam_submissions']) ? 'true' : 'false'?>">
                 <span class="fas fa-clipboard-check" aria-hidden="true"></span><span>Assessments</span><span class="fas fa-chevron-down admin-nav-chevron" aria-hidden="true"></span>
             </button>
-            <ul id="admin-assessments-menu" class="admin-nav-submenu" data-admin-submenu data-route-active="<?=$isGroup(['assignments', 'exams', 'timed_exam_submissions', 'assignment_submissions', 'exam_submissions']) ? 'true' : 'false'?>" <?= $isGroup(['assignments', 'exams', 'timed_exam_submissions', 'assignment_submissions', 'exam_submissions']) ? '' : 'hidden' ?>>
-                <li><a href="assignments" class="<?=$isPage('assignments') ? 'active' : ''?>"><span class="fas fa-tasks" aria-hidden="true"></span>Assignments</a></li>
+            <ul id="admin-assessments-menu" class="admin-nav-submenu" data-admin-submenu data-route-active="<?=$isGroup(['exams', 'timed_exam_submissions', 'exam_submissions']) ? 'true' : 'false'?>" <?= $isGroup(['exams', 'timed_exam_submissions', 'exam_submissions']) ? '' : 'hidden' ?>>
                 <li><a href="exams" class="<?=$isPage('exams') ? 'active' : ''?>"><span class="fas fa-file-alt" aria-hidden="true"></span>Legacy Exams <small>Compatibility</small></a></li>
                 <li><span class="admin-nav-note"><span class="fas fa-stopwatch" aria-hidden="true"></span>Timed Exams are managed inside Course Content</span></li>
-                <li><a href="assignment-submissions" class="<?=$isPage('assignment_submissions') ? 'active' : ''?>"><span class="fas fa-inbox" aria-hidden="true"></span>Assignment Submissions</a></li>
             </ul>
         </section>
 

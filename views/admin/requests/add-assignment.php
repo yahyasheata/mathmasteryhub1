@@ -67,6 +67,27 @@ try {
     if (empty($context['ok'])) {
         add_assignment_response(false, $context['message'] ?? 'Invalid course-content reference.', [], 422);
     }
+    // Assignment definitions are owned by a Course Content assignment item.
+    // Keep this legacy endpoint for old integrations, but never allow it to
+    // create an unlinked standalone assignment.
+    $itemIdRequest = trim((string) ($_POST['item_id'] ?? ''));
+    if ($itemIdRequest === '') {
+        add_assignment_response(false, 'Create assignments from the Assignment element inside Course Content.', [], 409);
+    }
+    $itemStmt = $conn->prepare("SELECT template_type, assignment_id FROM course_items WHERE course_id = ? AND item_id = ? AND (archived_at IS NULL OR archived_at = '') LIMIT 1");
+    if (!$itemStmt) {
+        add_assignment_response(false, 'Unable to validate the Course Content item.', [], 500);
+    }
+    $itemStmt->bind_param('ss', $courseId, $itemIdRequest);
+    $itemStmt->execute();
+    $itemRow = $itemStmt->get_result()->fetch_assoc();
+    $itemStmt->close();
+    if (!$itemRow || strtolower(trim((string) ($itemRow['template_type'] ?? ''))) !== 'classified_assignment') {
+        add_assignment_response(false, 'Choose an Assignment element from Course Content.', [], 409);
+    }
+    if (trim((string) ($itemRow['assignment_id'] ?? '')) !== '') {
+        add_assignment_response(false, 'This Assignment element already has an assignment. Edit it from Course Content.', [], 409);
+    }
 
     $assignmentId = add_assignment_new_id($conn);
     $filePath = null;

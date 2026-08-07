@@ -23,6 +23,13 @@ $legacy_courses = $conn->query("SELECT course_id, course_title FROM courses ORDE
 $legacy_sections = $conn->query("SELECT section_id, course_id, title FROM course_sections ORDER BY course_id, sort_order, title");
 $legacy_assignments = $conn->query("SELECT assignment_id, course_id, section_id, assignment_title FROM assignments WHERE archived_at IS NULL ORDER BY course_id, due_date, assignment_title");
 $legacy_students = $conn->query("SELECT user_id, full_name, username FROM users WHERE role = 'user' ORDER BY full_name, username");
+$canonical_item_map = [];
+$canonical_item_result = $conn->query("SELECT a.assignment_id, a.course_id, a.item_id, i.id AS item_db_id, i.item_title, i.template_type, i.status AS item_status FROM assignments a INNER JOIN course_items i ON i.course_id = a.course_id AND i.item_id = a.item_id WHERE a.archived_at IS NULL AND i.template_type = 'classified_assignment'");
+if ($canonical_item_result) {
+  while ($canonical_item = $canonical_item_result->fetch_assoc()) {
+    $canonical_item_map[(string) $canonical_item['assignment_id']] = $canonical_item;
+  }
+}
 
 ?>
 <!DOCTYPE html>
@@ -56,18 +63,14 @@ $legacy_students = $conn->query("SELECT user_id, full_name, username FROM users 
           <div class="col-12 col-lg-12 p-0 main-box">
             <div class="col-12 px-0">
               <div class="col-12 p-0 row">
-                <div class="col-12 col-lg-4 py-3 px-3">
-                  <span class="fas fa-tasks"></span> Assignments
+                <div class="col-12 col-lg-8 py-3 px-3">
+                  <span class="fas fa-tasks"></span> Assignment overview <span class="badge bg-secondary ms-2">Compatibility view</span>
+                  <div class="small ds-text-muted mt-1">Create and manage assignments from the Assignment element inside Course Content.</div>
                 </div>
                 <div class="col-12 col-lg-4 p-0"></div>
                 <div class="col-12 col-lg-4 p-2 text-lg-end">
-                  <button type="button" class="btn btn-primary btn-sm" data-bs-toggle="modal" data-bs-target="#addAssignmentModal">
-                    <span class="fas fa-plus"></span> Add New
-                  </button>
-                  <button type="button" class="btn btn-outline-primary btn-sm ms-1" data-bs-toggle="modal" data-bs-target="#legacyHomeworkImportModal">
-                    <span class="fas fa-file-import"></span> Import Legacy Submission
-                  </button>
-                  <div class="modal fade" id="addAssignmentModal" aria-labelledby="addAssignmentLabel" aria-hidden="true">
+                  <a href="courses" class="btn btn-primary btn-sm"><span class="fas fa-book-open"></span> Open Course Content</a>
+                  <?php if (false): ?><div class="modal fade" id="addAssignmentModal" aria-labelledby="addAssignmentLabel" aria-hidden="true">
                     <div class="modal-dialog modal-lg">
                       <div class="modal-content">
                         <div class="modal-header">
@@ -156,7 +159,7 @@ $legacy_students = $conn->query("SELECT user_id, full_name, username FROM users 
                         </form>
                       </div>
                     </div>
-                  </div>
+                  </div><?php endif; ?>
                 </div>
               </div>
               <div class="col-12 divider" style="min-height: 2px"></div>
@@ -196,20 +199,9 @@ $legacy_students = $conn->query("SELECT user_id, full_name, username FROM users 
                                                     </a>
                                                 </td>
                                                 <td style='width: 250px'>
-
-                                                    <button class='btn btn-outline-primary btn-sm font-small mx-1 embedBtn' data-assignment-id='{$assignment['assignment_id']}' data-assignment-title='{$assignment['assignment_title']}' data-due-date='{$assignment['due_date']}' >
-                                                          <span class='fas fa-code'></span> Assignment Submission
-                                                    </button>
-                                                                                                        <form method='POST' action='' class='d-inline-block editAssignment'>
-                                                        <input type='hidden' name='assignment_id' value='{$assignment['assignment_id']}'>
-                                                        <input type='hidden' name='_method' value='GET'>
-                                                        <button class='btn btn-outline-success btn-sm font-small mx-1'>Edit</button>
-                                                    </form>
-                                                    <form method='POST' action='' class='d-inline-block deleteAssignment'>
-                                                        <input type='hidden' name='assignment_id' value='{$assignment['assignment_id']}'>
-                                                        <input type='hidden' name='_method' value='DELETE'>
-                                                        <button class='btn btn-outline-danger btn-sm font-small mx-1'>Delete</button>
-                                                    </form>
+                                                    " . (isset($canonical_item_map[(string) $assignment['assignment_id']])
+                                                        ? "<a class='btn btn-outline-primary btn-sm font-small mx-1' href='courses/" . rawurlencode((string) $assignment['course_id']) . "/content#course-item-" . (int) $canonical_item_map[(string) $assignment['assignment_id']]['item_db_id'] . "'><span class='fas fa-edit'></span> Open Assignment</a>"
+                                                        : "<span class='badge bg-secondary'>Legacy / archived</span>") . "
                                                 </td>
                                             </tr>";
                       $count++;
@@ -225,7 +217,7 @@ $legacy_students = $conn->query("SELECT user_id, full_name, username FROM users 
       </div>
     </div>
   </div>
-  <div class="modal fade" id="legacyHomeworkImportModal" tabindex="-1" aria-labelledby="legacyHomeworkImportTitle" aria-hidden="true">
+  <?php if (false): ?><div class="modal fade" id="legacyHomeworkImportModal" tabindex="-1" aria-labelledby="legacyHomeworkImportTitle" aria-hidden="true">
     <div class="modal-dialog modal-lg"><div class="modal-content">
       <div class="modal-header"><h5 class="modal-title" id="legacyHomeworkImportTitle">Import Legacy Submission</h5><button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button></div>
       <form id="legacyHomeworkImportForm" action="requests/submission/import-legacy" method="post" enctype="multipart/form-data">
@@ -244,7 +236,7 @@ $legacy_students = $conn->query("SELECT user_id, full_name, username FROM users 
         <div class="modal-footer"><button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancel</button><button type="submit" class="btn btn-primary" data-legacy-import-submit>Import Submission</button></div>
       </form>
     </div></div>
-  </div>
+  </div><?php endif; ?>
   <div class="ajax-response"></div>
   <script>
     $(document).ready(function() {
