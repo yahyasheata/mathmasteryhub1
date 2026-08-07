@@ -1,10 +1,18 @@
+<?php
+require_once 'inc/StudentResourceGateway.php';
+$continueCourseId = (string) ($continue_course['courseId'] ?? '');
+$continueItemId = (string) ($continue_course['item_id'] ?? '');
+$continueHref = $continueItemId !== ''
+    ? mmh_student_resource_url($baseUrl, $continueCourseId, $continueItemId)
+    : rtrim((string) $baseUrl, '/') . '/user/course/' . rawurlencode($continueCourseId);
+?>
 <section class="learning-home-section" id="continue-learning">
     <div class="learning-home-section-heading"><span>Continue Learning</span><h2>Pick up from your course workspace.</h2></div>
     <?php if ($continue_course): ?>
         <article class="learning-home-continue-card">
             <img src="<?=learning_home_html(rtrim((string)$baseUrl, '/') . '/' . ltrim((string)($continue_course['course_image'] ?? ''), '/'))?>" alt="<?=learning_home_html($continue_course['course_title'] ?? 'Course')?>">
             <div><strong><?=learning_home_html($continue_course['course_title'] ?? 'Course')?></strong><p><?=learning_home_html(($continue_course['item_title'] ?? '') ?: (($continue_course['section_title'] ?? '') ?: 'Start your next lesson'))?></p><small>Last activity: <?=learning_home_relative_time($continue_course['created_at'] ?? '')?></small></div>
-            <a class="learning-home-btn primary" href="<?=learning_home_html(rtrim((string)$baseUrl, '/'))?>/user/course/<?=learning_home_html($continue_course['courseId'] ?? '')?>">Continue</a>
+            <a class="learning-home-btn primary" href="<?=learning_home_html($continueHref)?>">Continue</a>
         </article>
     <?php endif; ?>
 </section>
@@ -16,7 +24,7 @@
     </article>
     <article>
         <div class="learning-home-section-heading"><span>Homework Due</span><h2>Needs attention</h2></div>
-        <?php if (!empty($homework_items)): ?><div class="learning-home-mini-list"><?php foreach ($homework_items as $item): ?><a href="<?=learning_home_html(rtrim((string)$baseUrl, '/'))?>/user/course/<?=learning_home_html($item['courseId'])?>"><strong><?=learning_home_html($item['assignment_title'])?></strong><small><?=learning_home_html($item['course_title'])?> · <?=learning_home_date_label($item['due_date'])?></small></a><?php endforeach; ?></div><?php else: ?><div class="learning-home-empty compact"><span class="fas fa-check-circle"></span><p>No urgent homework right now.</p></div><?php endif; ?>
+        <?php if (!empty($homework_items)): ?><div class="learning-home-mini-list"><?php foreach ($homework_items as $item): $homeworkCourseId = (string) ($item['courseId'] ?? ''); $homeworkItemId = (string) ($item['item_id'] ?? ''); $homeworkHref = $homeworkItemId !== '' ? mmh_student_resource_url($baseUrl, $homeworkCourseId, $homeworkItemId) : rtrim((string) $baseUrl, '/') . '/user/course/' . rawurlencode($homeworkCourseId); ?><a href="<?=learning_home_html($homeworkHref)?>"><strong><?=learning_home_html($item['assignment_title'])?></strong><small><?=learning_home_html($item['course_title'])?> · <?=learning_home_date_label($item['due_date'])?></small></a><?php endforeach; ?></div><?php else: ?><div class="learning-home-empty compact"><span class="fas fa-check-circle"></span><p>No urgent homework right now.</p></div><?php endif; ?>
     </article>
 </section>
 
@@ -38,4 +46,3 @@
     <div class="learning-home-section-heading split"><div><span>Past Papers</span><h2>Practise after learning the lesson.</h2></div><a class="learning-home-btn secondary" href="<?=learning_home_html(rtrim((string)$baseUrl, '/'))?>/past-papers">Open Past Papers</a></div>
     <?php if (!empty($free_past_papers)): ?><div class="learning-home-mini-list"><?php foreach ($free_past_papers as $paper): ?><a href="<?=learning_home_html(rtrim((string)$baseUrl, '/'))?>/past-papers?syllabus_id=<?=learning_home_html(rawurlencode((string)$paper['syllabus_id']))?>"><strong><?=learning_home_html($paper['syllabus_title'])?></strong><small><?=learning_home_html($paper['exam_session'])?> <?=learning_home_html($paper['year'])?> · <?=learning_home_html($paper['paper_number'])?> <?=learning_home_html($paper['variant'])?></small></a><?php endforeach; ?></div><?php else: ?><div class="learning-home-empty compact"><span class="fas fa-folder-open"></span><p>Published Past Papers will appear here.</p></div><?php endif; ?>
 </section>
-

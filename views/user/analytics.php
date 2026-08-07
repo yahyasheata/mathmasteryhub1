@@ -6,6 +6,7 @@ require_once 'inc/ParentWeeklyReport.php';
 require_once 'inc/StudentCourseAccess.php';
 require_once 'inc/RecoveryPlan.php';
 require_once 'inc/TimedExam.php';
+require_once 'inc/StudentResourceGateway.php';
 
 $pageName = 'analytics';
 $username = (string) ($_SESSION['username'] ?? '');
@@ -55,7 +56,7 @@ if ($selectedCourse) {
  $resourceUrl = static function (string $courseId, string $itemId) use ($base, $conn): string {
     $exam = mmh_timed_exam_load_for_item($conn, $courseId, $itemId, false);
     if ($exam) return $base . '/user/course/' . rawurlencode($courseId) . '/exam/' . (int) $exam['id'];
-    return $base . '/user/course/resource/' . rawurlencode($courseId) . '/' . rawurlencode($itemId);
+    return mmh_student_resource_url($base, $courseId, $itemId);
 };
 $statusClass = static function (string $key): string {
     return in_array($key, ['attended_live', 'opened', 'completed', 'graded'], true) ? 'is-success' : (in_array($key, ['missing', 'absent'], true) ? 'is-danger' : (in_array($key, ['awaiting_grading', 'late'], true) ? 'is-warning' : 'is-muted'));

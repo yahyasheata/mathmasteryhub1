@@ -8,6 +8,7 @@ require_once 'inc/AssignmentProgress.php';
 require_once 'inc/StudentLearningJourney.php';
 require_once 'inc/RecoveryPlan.php';
 require_once 'inc/TimedExam.php';
+require_once 'inc/StudentResourceGateway.php';
 
 $pageName = 'mycourses';
 $username = (string) ($_SESSION['username'] ?? '');
@@ -48,6 +49,9 @@ function student_courses_table_exists(mysqli $conn, $table)
 
 function student_courses_item_link($baseUrl, $courseRouteId, $itemId = '')
 {
+    if (trim((string) $itemId) !== '' && function_exists('mmh_student_resource_url')) {
+        return mmh_student_resource_url($baseUrl, $courseRouteId, $itemId);
+    }
     $url = rtrim((string) $baseUrl, '/') . '/user/course/' . rawurlencode((string) $courseRouteId);
     if (trim((string) $itemId) !== '') $url .= '?lesson=' . rawurlencode((string) $itemId);
     return $url;

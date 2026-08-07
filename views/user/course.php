@@ -12,6 +12,7 @@ require_once 'inc/AssignmentProgress.php';
 require_once 'inc/CourseResourceResolver.php';
 require_once 'inc/CourseHomeworkRenderer.php';
 require_once 'inc/TimedExam.php';
+require_once 'inc/StudentResourceGateway.php';
 $pageName = "course";
 $username = $_SESSION['username'] ?? '';
 $conn = db();
@@ -394,7 +395,7 @@ if ($coures_result && mysqli_num_rows($coures_result) > 0) {
       : null;
     $resource_open_url = $timed_exam_for_item
       ? rtrim((string) $baseUrl, '/') . '/user/course/' . rawurlencode($course_id) . '/exam/' . (int) $timed_exam_for_item['id']
-      : rtrim((string) $baseUrl, '/') . '/user/course/resource/' . rawurlencode($course_id) . '/' . rawurlencode((string) ($courses_data['item_id'] ?? ''));
+      : mmh_student_resource_url($baseUrl, $course_id, (string) ($courses_data['item_id'] ?? ''));
     $lesson_type = trim((string) ($resource_resolution['label'] ?? ''));
     if ($lesson_type === '') {
       [$lesson_type] = mmh_course_resource_meta($template_type ?: ($courses_data['item_type'] ?? ''));

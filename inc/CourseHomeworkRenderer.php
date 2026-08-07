@@ -169,8 +169,9 @@ if (!function_exists('mmh_homework_part')) {
 }
 
 if (!function_exists('mmh_homework_render')) {
-    function mmh_homework_render(mysqli $conn, $baseUrl, $userId, array $course, array $selection, $itemId, array $resource, array $planContext = [])
+    function mmh_homework_render(mysqli $conn, $baseUrl, $userId, array $course, array $selection, $itemId, array $resource, array $planContext = [], ?array $gatewayContext = null)
     {
+        $gatewayContext = $gatewayContext ?: (is_array($planContext['_gateway_context'] ?? null) ? $planContext['_gateway_context'] : null);
         $item = $selection['item'];
         $assignmentId = trim((string) ($resource['assignment_id'] ?? ''));
         $assignment = mmh_homework_assignment($conn, $assignmentId, (string) $course['course_id']);
@@ -179,7 +180,9 @@ if (!function_exists('mmh_homework_render')) {
         $submission = $submissions[$assignmentId] ?? null;
         $status = mmh_homework_status($assignment, $submission);
         $due = mmh_homework_due($assignment['due_date'] ?? '');
-        $navigation = course_resource_navigation($conn, $course, $userId, $itemId, $planContext);
+        $navigation = is_array($gatewayContext['navigation'] ?? null)
+            ? $gatewayContext['navigation']
+            : course_resource_navigation($conn, $course, $userId, $itemId, $planContext);
         $section = $selection['section_state']['section'] ?? [];
         $sectionTitle = trim((string) ($section['title'] ?? 'General')) ?: 'General';
         $title = trim((string) ($item['item_title'] ?? $assignment['assignment_title'] ?? 'Homework')) ?: 'Homework';

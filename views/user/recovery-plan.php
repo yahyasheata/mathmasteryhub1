@@ -4,6 +4,7 @@ require_once '__init.php';
 require_once 'inc/StudentCourseAccess.php';
 require_once 'inc/RecoveryPlan.php';
 require_once 'inc/TimedExam.php';
+require_once 'inc/StudentResourceGateway.php';
 
 global $baseUrl;
 $conn = db();
@@ -28,7 +29,10 @@ $taskUrl = static function (array $task) use ($conn, $base, $course, $plan): str
         $timedExam = mmh_timed_exam_load_for_item($conn, (string) $course['course_id'], (string) $task['item_id'], false);
         if ($timedExam) return $base . '/user/course/' . rawurlencode((string) $course['course_id']) . '/exam/' . (int) $timedExam['id'] . '?recovery_plan=' . (int) $plan['id'] . '&recovery_task=' . (int) $task['id'];
     }
-    return mmh_recovery_plan_resource_url($base, (string) $course['course_id'], (string) $task['item_id'], (int) $plan['id'], (int) $task['id']);
+    return mmh_student_resource_url($base, (string) $course['course_id'], (string) $task['item_id'], [
+        'recovery_plan_id' => (int) $plan['id'],
+        'recovery_task_id' => (int) $task['id'],
+    ]);
 };
 // Reuse the authenticated student shell: it owns the fixed public header,
 // theme initialization, shared design tokens, and mobile navigation.

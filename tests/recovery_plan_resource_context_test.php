@@ -54,10 +54,12 @@ if ($resourceUrl !== 'https://example.test/user/course/resource/math-ol/workshop
 
 $routeSource = file_get_contents(dirname(__DIR__) . '/views/user/requests/open-course-resource.php');
 if (!is_string($routeSource)
-    || !str_contains($routeSource, 'if (($requestedPlanId > 0) !== ($requestedTaskId > 0))')
-    || !str_contains($routeSource, "course_resource_notice(403, 'Recovery Plan unavailable'")
+    || !str_contains($routeSource, 'mmh_student_resource_gateway')
+    || !str_contains($routeSource, "'recovery_plan_id' => \$requestedPlanId")
+    || !str_contains($routeSource, "'recovery_task_id' => \$requestedTaskId")
+    || !str_contains($routeSource, "'Recovery Plan unavailable'")
     || !str_contains($routeSource, 'array $planContext = []')
-    || !str_contains($routeSource, 'course_resource_render_viewer($conn, $baseUrl, $userId, $course, $selection, $itemId, $resource, $course_resource_plan_context)')) {
+    || !str_contains($routeSource, 'course_resource_render_viewer($conn, $baseUrl, $userId, $course, $selection, $itemId, $resource, $course_resource_plan_context, $gateway)')) {
     throw new RuntimeException('Recovery context boundary or explicit viewer handoff is missing.');
 }
 

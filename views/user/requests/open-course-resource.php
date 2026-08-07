@@ -15,6 +15,7 @@ require_once 'inc/StudentLearningJourney.php';
 require_once 'inc/CourseResourceResolver.php';
 require_once 'inc/CourseHomeworkRenderer.php';
 require_once 'inc/CourseResourceNavigation.php';
+require_once 'inc/StudentResourceGateway.php';
 
 function course_resource_escape($value)
 {
@@ -23,43 +24,18 @@ function course_resource_escape($value)
 
 function course_resource_url($baseUrl, $courseId, $itemId)
 {
-    return rtrim((string) $baseUrl, '/') . '/user/course/resource/' . rawurlencode((string) $courseId) . '/' . rawurlencode((string) $itemId);
+    return mmh_student_resource_url($baseUrl, $courseId, $itemId);
 }
 
 function course_resource_plan_url($baseUrl, $courseId, $itemId, array $planContext = [], ?int $taskId = null)
 {
     if (!empty($planContext['plan']['id']) && (($taskId ?? (int) ($planContext['task']['id'] ?? 0)) > 0)) {
-        return mmh_recovery_plan_resource_url($baseUrl, (string) $courseId, (string) $itemId, (int) $planContext['plan']['id'], (int) ($taskId ?? $planContext['task']['id']));
+        return mmh_student_resource_url($baseUrl, $courseId, $itemId, [
+            'recovery_plan_id' => (int) $planContext['plan']['id'],
+            'recovery_task_id' => (int) ($taskId ?? $planContext['task']['id']),
+        ]);
     }
     return course_resource_url($baseUrl, $courseId, $itemId);
-}
-
-/**
- * Resolve Recovery Plan context once at the protected route boundary. Every
- * downstream renderer receives a non-null, validated array; normal course
- * resources continue to use the empty array context.
- */
-function course_resource_recovery_context(mysqli $conn, int $userId, array $course, int $planId, int $taskId, string $itemId): array
-{
-    if ($planId <= 0 || $taskId <= 0 || $itemId === '') return ['valid' => false];
-    $plan = mmh_recovery_plan_load($conn, $userId, (string) $course['course_id'], $planId);
-    if (!$plan || !in_array((string) ($plan['status'] ?? ''), ['active', 'completed'], true)) return ['valid' => false];
-    $plan = mmh_recovery_plan_sync($conn, $plan, $userId, (string) $course['course_id']);
-    $task = null;
-    foreach (($plan['items'] ?? []) as $candidate) {
-        if ((int) ($candidate['id'] ?? 0) === $taskId && (string) ($candidate['item_id'] ?? '') === $itemId) {
-            $task = $candidate;
-            break;
-        }
-    }
-    if (!$task || (!empty($task['is_locked']) && empty($task['is_completed']))) return ['valid' => false];
-    return [
-        'valid' => true,
-        'plan' => $plan,
-        'task' => $task,
-        'ordered_tasks' => array_values($plan['items'] ?? []),
-        'navigation' => mmh_recovery_plan_task_context($plan, $taskId),
-    ];
 }
 
 function course_resource_notice($statusCode, $title, $message, $courseId = '')
@@ -95,16 +71,24 @@ function course_resource_record_open(mysqli $conn, $userId, array $course, $sect
     }
 }
 
-function course_resource_render_viewer(mysqli $conn, $baseUrl, $userId, array $course, array $selection, $itemId, array $resource, array $planContext = [])
+function course_resource_render_viewer(mysqli $conn, $baseUrl, $userId, array $course, array $selection, $itemId, array $resource, array $planContext = [], ?array $gatewayContext = null)
 {
+    $gatewayContext = $gatewayContext ?: (is_array($planContext['_gateway_context'] ?? null) ? $planContext['_gateway_context'] : null);
     $item = $selection['item'];
     $section = $selection['section_state']['section'] ?? null;
     $sectionTitle = $section ? trim((string) ($section['title'] ?? '')) : 'General';
     $sectionTitle = $sectionTitle !== '' ? $sectionTitle : 'General';
     $title = trim((string) ($item['item_title'] ?? '')) ?: 'Learning resource';
     $courseUrl = student_course_access_course_url($baseUrl, $course['course_id']);
-    $returnUrl = !empty($planContext['plan']['id']) ? mmh_recovery_plan_workspace_url($baseUrl, (string) $course['course_id'], (int) $planContext['plan']['id'], (int) ($planContext['task']['id'] ?? 0)) : student_course_access_course_url($baseUrl, $course['course_id'], $itemId, true);
-    $navigation = course_resource_navigation($conn, $course, $userId, $itemId, $planContext);
+    $returnUrl = trim((string) ($gatewayContext['return_url'] ?? ''));
+    if ($returnUrl === '') {
+        $returnUrl = !empty($planContext['plan']['id'])
+            ? mmh_recovery_plan_workspace_url($baseUrl, (string) $course['course_id'], (int) $planContext['plan']['id'], (int) ($planContext['task']['id'] ?? 0))
+            : student_course_access_course_url($baseUrl, $course['course_id'], $itemId, true);
+    }
+    $navigation = is_array($gatewayContext['navigation'] ?? null)
+        ? $gatewayContext['navigation']
+        : course_resource_navigation($conn, $course, $userId, $itemId, $planContext);
     $previous = $navigation['previous'];
     $next = $navigation['next'];
     $previousUrl = $previous ? course_resource_plan_url($baseUrl, $course['course_id'], $previous['item_id'], $planContext, (int) ($previous['id'] ?? 0)) : '';
@@ -219,8 +203,9 @@ function course_resource_render_viewer(mysqli $conn, $baseUrl, $userId, array $c
     exit;
 }
 
-function course_resource_open_homework_part(mysqli $conn, $baseUrl, $userId, array $course, array $selection, $itemId, array $resource, $part, array $planContext = [])
+function course_resource_open_homework_part(mysqli $conn, $baseUrl, $userId, array $course, array $selection, $itemId, array $resource, $part, array $planContext = [], ?array $gatewayContext = null)
 {
+    $gatewayContext = $gatewayContext ?: (is_array($planContext['_gateway_context'] ?? null) ? $planContext['_gateway_context'] : null);
     $assignmentId = trim((string) ($resource['assignment_id'] ?? ''));
     $assignment = mmh_homework_assignment($conn, $assignmentId, (string) $course['course_id']);
     if (!$assignment || !student_course_access_assignment_matches_item($assignment, $selection['item'])) {
@@ -257,7 +242,7 @@ function course_resource_open_homework_part(mysqli $conn, $baseUrl, $userId, arr
             'download_url' => $details['download_url'],
             'embed_kind' => $details['kind'],
         ]);
-        course_resource_render_viewer($conn, $baseUrl, $userId, $course, $viewerSelection, $itemId, $viewerResource, $planContext);
+        course_resource_render_viewer($conn, $baseUrl, $userId, $course, $viewerSelection, $itemId, $viewerResource, $planContext, $gatewayContext);
     }
     course_resource_record_open($conn, $userId, $course, (string) ($selection['section_id'] ?? ''), $itemId, $viewerResource);
     header('Location: ' . $target, true, 302);
@@ -271,66 +256,54 @@ $userId = student_course_access_student_id($conn, $_SESSION['username'] ?? '');
 if ($courseId === null || $itemId === null || $userId === null) {
     course_resource_notice(404, 'Resource unavailable', 'This learning resource could not be found.');
 }
-
-$course = student_course_access_course($conn, $courseId);
-if (!$course || !student_course_access_enrolled($conn, $userId, $course['course_id'])) {
-    course_resource_notice(403, 'Resource unavailable', 'You do not have access to this course.');
-}
-$course_resource_plan_context = [];
 $requestedPlanId = (int) ($_GET['recovery_plan'] ?? 0);
 $requestedTaskId = (int) ($_GET['recovery_task'] ?? 0);
-if (($requestedPlanId > 0) !== ($requestedTaskId > 0)) {
-    course_resource_notice(403, 'Recovery Plan unavailable', 'The Recovery Plan context is incomplete.', $course['course_id']);
+
+$part = strtolower(trim((string) ($_GET['part'] ?? '')));
+if ($part === '' && ($_GET['homework_open'] ?? '') === '1') {
+    $part = 'homework';
+}
+$gateway = mmh_student_resource_gateway($conn, (int) $userId, $courseId, $itemId, [
+    'base_url' => $baseUrl,
+    'recovery_plan_id' => $requestedPlanId,
+    'recovery_task_id' => $requestedTaskId,
+    'homework_part' => $part,
+]);
+if (empty($gateway['authorized'])) {
+    $gatewayCourseId = (string) (($gateway['course']['course_id'] ?? '') ?: $courseId);
+    course_resource_notice(
+        (int) ($gateway['status'] ?? 403),
+        $requestedPlanId > 0 || $requestedTaskId > 0 ? 'Recovery Plan unavailable' : 'Resource unavailable',
+        (string) ($gateway['reason'] ?? 'This learning resource is unavailable.'),
+        $gatewayCourseId
+    );
 }
 
-$item = student_course_access_item($conn, $course['course_id'], $itemId);
-if (!$item) {
-    course_resource_notice(404, 'Resource unavailable', 'This learning resource is no longer available.', $course['course_id']);
-}
-if ($requestedPlanId > 0 && $requestedTaskId > 0) {
-    $course_resource_plan_context = course_resource_recovery_context($conn, (int) $userId, $course, $requestedPlanId, $requestedTaskId, (string) $itemId);
-    if (empty($course_resource_plan_context['valid'])) {
-        course_resource_notice(403, 'Recovery task unavailable', 'This Recovery Plan task is not available for your account.', $course['course_id']);
-    }
-}
-// Keep every downstream renderer on the strict array contract, including the
-// normal course path where no Recovery Plan context is present.
-$course_resource_plan_context = is_array($course_resource_plan_context) ? $course_resource_plan_context : [];
-$sectionId = student_course_access_normalize_section_id($item['section_id'] ?? '');
-if ($sectionId === null) {
-    course_resource_notice(404, 'Resource unavailable', 'This learning resource is unavailable.', $course['course_id']);
-}
-$selection = student_course_access_selected_item($conn, $course, $itemId, $sectionId, $userId);
-if (!$selection) {
-    course_resource_notice(403, 'Section locked', 'This resource will be available when its section is unlocked.', $course['course_id']);
-}
+$course = $gateway['course'];
+$selection = $gateway['selection'];
+$item = $gateway['item'];
+$resource = $gateway['resource'];
+$course_resource_plan_context = is_array($gateway['recovery_context'] ?? null) ? $gateway['recovery_context'] : [];
+$sectionId = (string) ($selection['section_id'] ?? '');
 
-$resource = mmh_course_resource_resolve($selection['item']);
 if (($resource['action'] ?? '') === 'timed_exam' || strtolower((string) ($selection['item']['template_type'] ?? '')) === 'timed_exam') {
-    require_once 'inc/TimedExam.php';
-    $timedExam = mmh_timed_exam_load_for_item($conn, (string) $course['course_id'], (string) $itemId, false);
+    $timedExam = $gateway['timed_exam'] ?? null;
     if (!$timedExam) course_resource_notice(404, 'Timed Exam unavailable', 'This Timed Exam is not currently published.', $course['course_id']);
     $target = rtrim((string) $baseUrl, '/') . '/user/course/' . rawurlencode((string) $course['course_id']) . '/exam/' . (int) $timedExam['id'];
     if ($requestedPlanId > 0 && $requestedTaskId > 0) $target .= '?recovery_plan=' . $requestedPlanId . '&recovery_task=' . $requestedTaskId;
     header('Location: ' . $target, true, 302); exit;
 }
 if (($resource['action'] ?? '') === 'homework') {
-    // The old homework_open flag remains a protected compatibility alias. New
-    // links use a clear part name and always resolve through this endpoint.
-    $part = strtolower(trim((string) ($_GET['part'] ?? '')));
-    if ($part === '' && ($_GET['homework_open'] ?? '') === '1') {
-        $part = 'homework';
-    }
     if ($part !== '') {
         if (!in_array($part, ['homework', 'model-answer'], true)) {
             course_resource_notice(404, 'Resource unavailable', 'This Homework resource could not be found.', $course['course_id']);
         }
-        course_resource_open_homework_part($conn, $baseUrl, $userId, $course, $selection, $itemId, $resource, $part, $course_resource_plan_context);
+        course_resource_open_homework_part($conn, $baseUrl, $userId, $course, $selection, $itemId, $resource, $part, $course_resource_plan_context, $gateway);
     }
-    mmh_homework_render($conn, $baseUrl, $userId, $course, $selection, $itemId, $resource, $course_resource_plan_context);
+    mmh_homework_render($conn, $baseUrl, $userId, $course, $selection, $itemId, $resource, $course_resource_plan_context, $gateway);
 }
 if (($resource['action'] ?? '') === 'embed' && !empty($resource['embed_url'])) {
-    course_resource_render_viewer($conn, $baseUrl, $userId, $course, $selection, $itemId, $resource, $course_resource_plan_context);
+    course_resource_render_viewer($conn, $baseUrl, $userId, $course, $selection, $itemId, $resource, $course_resource_plan_context, $gateway);
 }
 if (($resource['action'] ?? '') === 'redirect' && !empty($resource['url'])) {
     course_resource_record_open($conn, $userId, $course, $sectionId, $itemId, $resource);

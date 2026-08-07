@@ -35,9 +35,11 @@ if (!function_exists('course_resource_navigation')) {
             return [
                 'previous' => $previous,
                 'next' => $next,
+                'current' => $current !== null ? $items[$current] : null,
                 'position' => $current !== null ? $current + 1 : 0,
                 'total' => count($items),
                 'plan' => true,
+                'mode' => 'recovery',
             ];
         }
 
@@ -52,8 +54,10 @@ if (!function_exists('course_resource_navigation')) {
         return [
             'previous' => $current !== null && $current > 0 ? $items[$current - 1] : null,
             'next' => $current !== null && $current < count($items) - 1 ? $items[$current + 1] : null,
+            'current' => $current !== null ? $items[$current] : null,
             'position' => $current !== null ? $current + 1 : 0,
             'total' => count($items),
+            'mode' => 'course',
         ];
     }
 }

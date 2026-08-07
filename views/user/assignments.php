@@ -4,6 +4,7 @@ require_once '__init.php';
 require_once 'inc/functions.php';
 require_once 'inc/learning_schema.php';
 require_once 'inc/LiveAssignmentRepair.php';
+require_once 'inc/StudentResourceGateway.php';
 
 // LiteSpeed installations may keep included PHP files in OPcache while the
 // deploy checkout is updated. Invalidate the small resolver cluster before
@@ -109,10 +110,9 @@ foreach ($courseRows as $course) {
                             $state = $assignment['_state'] ?? [];
                             $stateClass = str_replace('_', '-', preg_replace('/[^a-z0-9_-]+/', '-', strtolower((string) ($state['state'] ?? 'not_started'))));
                             $itemId = trim((string) ($assignment['item_id'] ?? ''));
-                            $link = rtrim((string) $baseUrl, '/') . '/user/course/' . rawurlencode((string) $assignment['course_id']);
-                            if ($itemId !== '') {
-                                $link .= '?lesson=' . rawurlencode($itemId);
-                            }
+                            $link = $itemId !== ''
+                                ? mmh_student_resource_url($baseUrl, (string) $assignment['course_id'], $itemId)
+                                : rtrim((string) $baseUrl, '/') . '/user/course/' . rawurlencode((string) $assignment['course_id']);
                             ?>
                             <article class="assignment-progress-card <?= student_assignments_html($stateClass); ?>">
                                 <div class="assignment-progress-card-main">

@@ -6,6 +6,7 @@ require_once 'inc/StudentCourseAccess.php';
 require_once 'inc/LiveSessions.php';
 require_once 'inc/LearningEvents.php';
 require_once 'inc/CourseResourceResolver.php';
+require_once 'inc/StudentResourceGateway.php';
 
 $pageName = 'live_sessions';
 $username = $_SESSION['username'];
@@ -221,7 +222,7 @@ $groups = live_user_group($sessions, $recordingsByOccurrence);
                                     <div class="live-session-card-actions">
                                         <?php if (!$isEnded): ?><span class="student-upcoming-status <?=live_user_html($session['status'])?>"><?=live_user_html($statusLabel)?></span><?php endif; ?>
                                         <?php if ($isRecordingGroup && $recording): ?>
-                                            <a class="student-dashboard-btn secondary live-session-join-button" href="<?=live_user_html(rtrim((string)$baseUrl, '/'))?>/user/course/resource/<?=live_user_html($recording['course_id'])?>/<?=live_user_html($recording['item_id'])?>"><span class="fas fa-play-circle" aria-hidden="true"></span> Watch Recording</a>
+                                            <a class="student-dashboard-btn secondary live-session-join-button" href="<?=live_user_html(mmh_student_resource_url($baseUrl, (string) $recording['course_id'], (string) $recording['item_id']))?>"><span class="fas fa-play-circle" aria-hidden="true"></span> Watch Recording</a>
                                         <?php elseif (!empty($joinState['active'])): ?>
                                             <a class="student-dashboard-btn primary live-session-join-button" href="<?=live_user_html($liveJoinBase)?><?=live_user_html($session['occurrence_id'])?>"><span class="fas fa-video" aria-hidden="true"></span> Join Live</a>
                                         <?php elseif (!$isEnded): ?>
