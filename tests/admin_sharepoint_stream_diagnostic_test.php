@@ -12,7 +12,7 @@ foreach ([$requiredRoute, 'mmh_admin_require_admin();'] as $needle) {
         throw new RuntimeException('Missing diagnostic route guard: ' . $needle);
     }
 }
-foreach (['https://alexuuni-my.sharepoint.com/:v:/g/personal/es_yehia_shehata2024_alexu_edu_eg/IQAiQHosEWtMT53dhX-s-ysCARMXHL-GKGNtrptp1_qQAKU', '<iframe', 'allowfullscreen', 'Test A — Anonymous Share Link Embedded', 'Test B — Anonymous Share Link External', 'Open exact anonymous URL in new tab'] as $needle) {
+foreach (['https://alexuuni-my.sharepoint.com/:v:/g/personal/es_yehia_shehata2024_alexu_edu_eg/IQAiQHosEWtMT53dhX-s-ysCARMXHL-GKGNtrptp1_qQAKU', '<iframe', 'src="<?=$escapedUrl?>"', 'href="<?=$escapedUrl?>"', 'allowfullscreen', 'Test A — Anonymous Share Link Embedded', 'Test B — Anonymous Share Link External', 'Open exact anonymous URL in new tab'] as $needle) {
     if (strpos($view, $needle) === false) {
         throw new RuntimeException('Missing diagnostic view requirement: ' . $needle);
     }
