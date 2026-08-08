@@ -609,12 +609,7 @@ $result = mysqli_query($conn,$query);
 $(".update-teacher-status").change(function () {
       // var teacher_status = $(this).val();
       // var teacher_status = $(this).val();
-      var Toast = Swal.mixin({
-      toast: true,
-      position: 'bottom-end',
-      showConfirmButton: false,
-      timer: 10000
-      });
+      var Toast = { fire: function (options) { return window.mmhAdminFeedback ? window.mmhAdminFeedback.show(options.icon, options.title) : null; } };
 
       var update_status = 1;
       $.ajax({

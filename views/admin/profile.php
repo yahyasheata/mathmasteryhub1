@@ -188,12 +188,7 @@ $full_name = $user_data['full_name'];
         <script type="text/javascript">
 $(document).ready(function() {
 
-    var Toast = Swal.mixin({
-      toast: true,
-      position: 'top-end',
-      showConfirmButton: false,
-      timer: 10000
-      });
+    var Toast = { fire: function (options) { return window.mmhAdminFeedback ? window.mmhAdminFeedback.show(options.icon, options.title) : null; } };
 
     //*** Send Edit Request
     $(".updateSettings").on("submit", function (e) {

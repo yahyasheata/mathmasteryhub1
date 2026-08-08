@@ -280,44 +280,20 @@ $result = $submission_stmt->get_result();
         },
         success: function(response) {
           if (response.status == 1) {
-            Swal.fire({
-              toast: true,
-              position: 'top-end',
-              icon: 'success',
-              title: response.message || "Feedback file uploaded successfully",
-              showConfirmButton: false,
-              timer: 3000,
-              timerProgressBar: true
-            });
+            if (window.mmhAdminFeedback) window.mmhAdminFeedback.success(response.message || "Feedback file uploaded successfully");
             setTimeout(function() {
               form.reset();
               location.reload();
             }, 2000);
           } else {
-            Swal.fire({
-              toast: true,
-              position: 'top-end',
-              icon: 'error',
-              title: response.message || "An error occurred while uploading the file",
-              showConfirmButton: false,
-              timer: 4000,
-              timerProgressBar: true
-            });
+            if (window.mmhAdminFeedback) window.mmhAdminFeedback.error(response.message || "An error occurred while uploading the file");
           }
           $(form).css("opacity", "");
           $submitBtns.prop('disabled', false);
           $progressDiv.hide();
         },
         error: function() {
-          Swal.fire({
-            toast: true,
-            position: 'top-end',
-            icon: 'error',
-            title: 'A server connection error occurred',
-            showConfirmButton: false,
-            timer: 4000,
-            timerProgressBar: true
-          });
+          if (window.mmhAdminFeedback) window.mmhAdminFeedback.error('A server connection error occurred');
           $(form).css("opacity", "");
           $submitBtns.prop('disabled', false);
           $progressDiv.hide();

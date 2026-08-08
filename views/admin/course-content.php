@@ -180,16 +180,15 @@ $admin_base = rtrim((string) $baseUrl, '/') . '/admin/';
   var editorDirty = false;
   var pickerSectionId = '';
   var listStateKey = 'mmh:course-manager:' + courseId + ':collapsed';
-  var Toast = Swal.mixin({ toast: true, position: 'top-end', showConfirmButton: false, timer: 4200 });
 
   function responseOk(response) {
     return response && (response.success === true || Number(response.status) === 1);
   }
   function responseMessage(response, fallback) {
-    return (response && (response.message || response.reason)) || fallback || 'Unexpected server error.';
+    return (response && response.message) || fallback || 'Unexpected server error.';
   }
   function notify(type, message) {
-    Toast.fire({ icon: type, title: message });
+    if (window.mmhAdminFeedback) window.mmhAdminFeedback.show(type, message);
   }
   function setButtonLoading($button, loading, label) {
     if (!$button || !$button.length) { return; }

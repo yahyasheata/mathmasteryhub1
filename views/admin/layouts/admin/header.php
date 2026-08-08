@@ -95,6 +95,9 @@ if ($themeStmt) {
 
     <script type="text/javascript" src="<?=mmh_site_public_url('resources/js/sweetalert2.min.js')?>"></script>
 
+    <?php $adminFeedbackJsVersion = $adminAssetVersion(__DIR__ . '/../../../../resources/js/admin-feedback.js'); ?>
+    <script defer src="<?=mmh_site_public_url('resources/js/admin-feedback.js')?>?v=<?=rawurlencode($adminFeedbackJsVersion)?>"></script>
+
     <link rel="stylesheet" href="<?=mmh_site_public_url('resources/css/sweetalert2.min.css')?>" />
 
     <script src="https://cdnjs.cloudflare.com/ajax/libs/nprogress/0.2.0/nprogress.min.js" integrity="sha512-bUg5gaqBVaXIJNuebamJ6uex//mjxPk8kljQTdM1SwkNrQD7pjS+PerntUSD+QRWPNJ0tq54/x4zRV8bLrLhZg==" crossorigin="anonymous" referrerpolicy="no-referrer"></script>

@@ -924,7 +924,7 @@ $(".update-course-state").change(function () {
   var form = this;
   var select = $(form).find('select');
   var previous = select.data('previous-value') || select.val();
-  var Toast = Swal.mixin({toast:true, position:'top-end', showConfirmButton:false, timer:5000});
+  var Toast = { fire: function (options) { return window.mmhAdminFeedback ? window.mmhAdminFeedback.show(options.icon, options.title) : null; } };
   $.ajax({
     type: 'POST', url: 'requests/course/status', data: new FormData(form), dataType: 'json',
     contentType: false, cache: false, processData: false,
@@ -1138,12 +1138,7 @@ jQuery(document).ready(function($) {
   var sortingSaveTimer = null;
   var selectedBuilderItem = null;
   var inlineTitleSaving = false;
-  var Toast = Swal.mixin({
-    toast: true,
-    position: 'top-end',
-    showConfirmButton: false,
-    timer: 5000
-  });
+  var Toast = { fire: function (options) { return window.mmhAdminFeedback ? window.mmhAdminFeedback.show(options.icon, options.title) : null; } };
 
   function responseOk(response) {
     return response && (response.success === true || response.status == 1);
@@ -1153,7 +1148,7 @@ jQuery(document).ready(function($) {
     if (!response) {
       return fallback || 'Unexpected server error';
     }
-    return response.message || response.reason || fallback || 'Unexpected server error';
+    return response.message || fallback || 'Unexpected server error';
   }
 
   function showToast(icon, message) {
@@ -1161,12 +1156,8 @@ jQuery(document).ready(function($) {
   }
 
   function showError(response, fallback) {
-    Swal.fire({
-      icon: 'error',
-      title: responseMessage(response, fallback),
-      text: response && response.reason ? response.reason : '',
-      showConfirmButton: true
-    });
+    var message = responseMessage(response, fallback);
+    if (window.mmhAdminFeedback) window.mmhAdminFeedback.error(message);
   }
 
   function cleanModalArtifacts(force) {
