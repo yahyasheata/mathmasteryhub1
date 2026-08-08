@@ -174,6 +174,15 @@ $router->mount('/admin', function() use ($router) {
         require __DIR__ . '/views/admin/requests/download-timed-exam-answer.php';
     });
 
+    // Temporary, admin-only diagnostic for validating the exact SharePoint
+    // Stream URL supplied by the administrator. This intentionally bypasses
+    // all course/resource handling so the existing viewer remains untouched.
+    $router->get('/diagnostics/sharepoint-stream-test', function() {
+        require_once '__init.php';
+        mmh_admin_require_admin();
+        require __DIR__ . '/views/admin/diagnostics/sharepoint-stream-test.php';
+    });
+
     // Parent Reports renders and processes the same page so Preview, comments,
     // and PDF output retain the existing Admin form workflow.
     $router->post('/parent-reports', function() {
