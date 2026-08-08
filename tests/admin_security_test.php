@@ -15,7 +15,7 @@ if (mmh_admin_allowed_handler('course', 'add') !== 'add-course.php') throw new R
 if (mmh_admin_allowed_handler('course', 'not-real') !== null) throw new RuntimeException('Unknown admin handler was allowed.');
 
 $htaccess = file_get_contents(__DIR__ . '/../.htaccess');
-if (!str_contains((string) $htaccess, 'views|connection|inc|database|vendor')) throw new RuntimeException('Internal PHP blocking rule is missing.');
+if (!str_contains((string) $htaccess, 'views|connection|inc|database|scripts|vendor')) throw new RuntimeException('Internal PHP blocking rule is missing.');
 $notificationCourse = file_get_contents(__DIR__ . '/../views/admin/requests/notification-course.php');
 if (str_contains((string) $notificationCourse, 'course_id = 33')) throw new RuntimeException('Notification handler still contains the hardcoded course.');
 

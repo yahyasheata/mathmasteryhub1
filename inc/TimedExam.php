@@ -60,6 +60,57 @@ if (!function_exists('mmh_timed_exam_table_available')) {
     }
 }
 
+if (!function_exists('mmh_timed_exam_lifecycle_schema_available')) {
+    function mmh_timed_exam_lifecycle_schema_available(mysqli $conn): bool
+    {
+        static $cache = [];
+        $key = spl_object_id($conn);
+        if (array_key_exists($key, $cache)) return $cache[$key];
+        $stmt = $conn->prepare("SELECT COUNT(*) AS total FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_SCHEMA = DATABASE() AND ((TABLE_NAME = 'timed_exam_attempts' AND COLUMN_NAME = 'attempt_scope') OR (TABLE_NAME = 'timed_exams' AND COLUMN_NAME = 'roster_finalized_at_utc'))");
+        if (!$stmt) return $cache[$key] = false;
+        $stmt->execute();
+        $cache[$key] = (int) (($stmt->get_result()->fetch_assoc()['total'] ?? 0)) === 2;
+        $stmt->close();
+        return $cache[$key];
+    }
+}
+
+if (!function_exists('mmh_timed_exam_terminal_states')) {
+    function mmh_timed_exam_terminal_states(): array
+    {
+        return ['submitted', 'auto_submitted', 'no_submission', 'graded'];
+    }
+}
+
+if (!function_exists('mmh_timed_exam_state_completes_learning')) {
+    function mmh_timed_exam_state_completes_learning(string $state): bool
+    {
+        return in_array($state, ['submitted', 'auto_submitted', 'graded'], true);
+    }
+}
+
+if (!function_exists('mmh_timed_exam_attempt_scope')) {
+    function mmh_timed_exam_attempt_scope(array $exam): string
+    {
+        $scope = trim((string) ($exam['_attempt_scope'] ?? 'primary'));
+        return preg_match('/\A(?:primary|recovery:[0-9]+:[0-9]+|legacy:[0-9]+)\z/', $scope) ? $scope : 'primary';
+    }
+}
+
+if (!function_exists('mmh_timed_exam_log_lifecycle_error')) {
+    function mmh_timed_exam_log_lifecycle_error(string $operation, array $context, Throwable $exception): void
+    {
+        error_log(sprintf(
+            'Timed Exam lifecycle failure operation=%s exam_id=%d attempt_id=%d student_id=%d error=%s',
+            preg_replace('/[^a-z0-9_-]+/i', '_', $operation),
+            (int) ($context['exam_id'] ?? 0),
+            (int) ($context['attempt_id'] ?? 0),
+            (int) ($context['student_id'] ?? 0),
+            preg_replace('/[\r\n]+/', ' ', $exception->getMessage())
+        ));
+    }
+}
+
 if (!function_exists('mmh_timed_exam_parse_allowed_types')) {
     function mmh_timed_exam_parse_allowed_types(string $value): array
     {
@@ -186,7 +237,9 @@ if (!function_exists('mmh_timed_exam_resolve_recovery')) {
             $now = new DateTimeImmutable('now', new DateTimeZone('UTC'));
             $startDate = new DateTimeImmutable($start, new DateTimeZone('UTC')); $endDate = new DateTimeImmutable($end, new DateTimeZone('UTC'));
             if ($now < $startDate || $now > $endDate) return null;
-            return ['plan' => $plan, 'task' => $task, 'exam' => mmh_timed_exam_with_window($exam, $start, $end)];
+            $recoveryExam = mmh_timed_exam_with_window($exam, $start, $end);
+            $recoveryExam['_attempt_scope'] = 'recovery:' . $planId . ':' . $taskId;
+            return ['plan' => $plan, 'task' => $task, 'exam' => $recoveryExam];
         } catch (Throwable $e) { return null; }
     }
 }
@@ -198,7 +251,7 @@ if (!function_exists('mmh_timed_exam_state')) {
         $window = mmh_timed_exam_window($exam);
         if (!$window['opens_at']) return ['key' => 'unavailable', 'label' => 'Not scheduled', 'remaining_seconds' => 0, 'window' => $window];
         if ($now < $window['opens_at']) return ['key' => 'before', 'label' => 'Upcoming', 'remaining_seconds' => max(0, $window['opens_at']->getTimestamp() - $now->getTimestamp()), 'window' => $window];
-        if ($attempt && in_array((string) ($attempt['state'] ?? ''), ['submitted', 'auto_submitted', 'graded', 'no_submission'], true)) {
+        if ($attempt && in_array((string) ($attempt['state'] ?? ''), mmh_timed_exam_terminal_states(), true)) {
             $key = (string) $attempt['state'];
             return ['key' => $key, 'label' => ucwords(str_replace('_', ' ', $key)), 'remaining_seconds' => 0, 'window' => $window];
         }
@@ -211,12 +264,17 @@ if (!function_exists('mmh_timed_exam_state')) {
 }
 
 if (!function_exists('mmh_timed_exam_student_attempt')) {
-    function mmh_timed_exam_student_attempt(mysqli $conn, int $studentId, int $examId, bool $create = false): ?array
+    function mmh_timed_exam_student_attempt(mysqli $conn, int $studentId, int $examId, bool $create = false, string $scope = 'primary'): ?array
     {
         if ($studentId <= 0 || $examId <= 0 || !mmh_timed_exam_table_available($conn)) return null;
-        $stmt = $conn->prepare('SELECT * FROM timed_exam_attempts WHERE timed_exam_id = ? AND student_id = ? ORDER BY id DESC LIMIT 1');
+        $scope = preg_match('/\A(?:primary|recovery:[0-9]+:[0-9]+|legacy:[0-9]+)\z/', $scope) ? $scope : 'primary';
+        $sql = mmh_timed_exam_lifecycle_schema_available($conn)
+            ? 'SELECT * FROM timed_exam_attempts WHERE timed_exam_id = ? AND student_id = ? AND attempt_scope = ? ORDER BY id DESC LIMIT 1'
+            : 'SELECT * FROM timed_exam_attempts WHERE timed_exam_id = ? AND student_id = ? ORDER BY id DESC LIMIT 1';
+        $stmt = $conn->prepare($sql);
         if (!$stmt) return null;
-        $stmt->bind_param('ii', $examId, $studentId);
+        if (mmh_timed_exam_lifecycle_schema_available($conn)) $stmt->bind_param('iis', $examId, $studentId, $scope);
+        else $stmt->bind_param('ii', $examId, $studentId);
         $stmt->execute();
         $attempt = $stmt->get_result()->fetch_assoc() ?: null;
         $stmt->close();
@@ -229,16 +287,23 @@ if (!function_exists('mmh_timed_exam_create_attempt')) {
     function mmh_timed_exam_create_attempt(mysqli $conn, array $exam, int $studentId): ?array
     {
         if ($studentId <= 0 || (int) ($exam['id'] ?? 0) <= 0) return null;
+        $courseId = trim((string) ($exam['course_id'] ?? ''));
+        if ($courseId === '' || !student_course_access_enrolled($conn, $studentId, $courseId)) return null;
         $window = mmh_timed_exam_window($exam);
         if (!$window['opens_at']) return null;
         $now = new DateTimeImmutable('now', new DateTimeZone('UTC'));
         if ($now < $window['opens_at']) return null;
+        $scope = mmh_timed_exam_attempt_scope($exam);
         try {
             $conn->begin_transaction();
-            $lock = $conn->prepare('SELECT * FROM timed_exam_attempts WHERE timed_exam_id = ? AND student_id = ? AND active_key IS NOT NULL ORDER BY id DESC LIMIT 1 FOR UPDATE');
+            $lockSql = mmh_timed_exam_lifecycle_schema_available($conn)
+                ? 'SELECT * FROM timed_exam_attempts WHERE timed_exam_id = ? AND student_id = ? AND attempt_scope = ? ORDER BY id DESC LIMIT 1 FOR UPDATE'
+                : 'SELECT * FROM timed_exam_attempts WHERE timed_exam_id = ? AND student_id = ? ORDER BY id DESC LIMIT 1 FOR UPDATE';
+            $lock = $conn->prepare($lockSql);
             if (!$lock) throw new RuntimeException('Unable to lock exam attempt.');
             $examId = (int) $exam['id'];
-            $lock->bind_param('ii', $examId, $studentId);
+            if (mmh_timed_exam_lifecycle_schema_available($conn)) $lock->bind_param('iis', $examId, $studentId, $scope);
+            else $lock->bind_param('ii', $examId, $studentId);
             $lock->execute();
             $existing = $lock->get_result()->fetch_assoc() ?: null;
             $lock->close();
@@ -249,32 +314,34 @@ if (!function_exists('mmh_timed_exam_create_attempt')) {
             $countStmt->execute();
             $attemptNumber = ((int) ($countStmt->get_result()->fetch_assoc()['total'] ?? 0)) + 1;
             $countStmt->close();
-            $maxAttempts = max(1, (int) ($exam['max_attempts'] ?? 1));
-            if ($attemptNumber > $maxAttempts) { $conn->commit(); return null; }
             $opens = $window['opens_at']->format('Y-m-d H:i:s');
             $closes = $window['closes_at']->format('Y-m-d H:i:s');
             $grace = $window['grace_closes_at']->format('Y-m-d H:i:s');
             $activeKey = bin2hex(random_bytes(16));
             $state = 'in_progress';
-            $stmt = $conn->prepare('INSERT INTO timed_exam_attempts (timed_exam_id, student_id, attempt_number, active_key, state, opens_at_utc, closes_at_utc, grace_closes_at_utc, started_at_utc) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)');
+            $insertSql = mmh_timed_exam_lifecycle_schema_available($conn)
+                ? 'INSERT INTO timed_exam_attempts (timed_exam_id, student_id, attempt_number, attempt_scope, active_key, state, opens_at_utc, closes_at_utc, grace_closes_at_utc, started_at_utc) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)'
+                : 'INSERT INTO timed_exam_attempts (timed_exam_id, student_id, attempt_number, active_key, state, opens_at_utc, closes_at_utc, grace_closes_at_utc, started_at_utc) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)';
+            $stmt = $conn->prepare($insertSql);
             if (!$stmt) throw new RuntimeException('Unable to prepare exam attempt.');
             $started = $now->format('Y-m-d H:i:s');
-            $stmt->bind_param('iiissssss', $examId, $studentId, $attemptNumber, $activeKey, $state, $opens, $closes, $grace, $started);
+            if (mmh_timed_exam_lifecycle_schema_available($conn)) $stmt->bind_param('iiisssssss', $examId, $studentId, $attemptNumber, $scope, $activeKey, $state, $opens, $closes, $grace, $started);
+            else $stmt->bind_param('iiissssss', $examId, $studentId, $attemptNumber, $activeKey, $state, $opens, $closes, $grace, $started);
             if (!$stmt->execute()) {
                 $error = $stmt->error;
                 $stmt->close();
                 if (str_contains(strtolower($error), 'duplicate')) {
                     $conn->rollback();
-                    return mmh_timed_exam_student_attempt($conn, $studentId, $examId, false);
+                    return mmh_timed_exam_student_attempt($conn, $studentId, $examId, false, $scope);
                 }
                 throw new RuntimeException($error ?: 'Unable to start exam attempt.');
             }
             $newId = $stmt->insert_id;
             $stmt->close();
             $conn->commit();
-            $result = mmh_timed_exam_student_attempt($conn, $studentId, $examId, false);
+            $result = mmh_timed_exam_student_attempt($conn, $studentId, $examId, false, $scope);
             if (!$result && $newId > 0) {
-                $result = ['id' => $newId, 'timed_exam_id' => $examId, 'student_id' => $studentId, 'attempt_number' => $attemptNumber, 'state' => $state, 'opens_at_utc' => $opens, 'closes_at_utc' => $closes, 'grace_closes_at_utc' => $grace, 'started_at_utc' => $started, 'active_key' => $activeKey];
+                $result = ['id' => $newId, 'timed_exam_id' => $examId, 'student_id' => $studentId, 'attempt_number' => $attemptNumber, 'attempt_scope' => $scope, 'state' => $state, 'opens_at_utc' => $opens, 'closes_at_utc' => $closes, 'grace_closes_at_utc' => $grace, 'started_at_utc' => $started, 'active_key' => $activeKey];
             }
             return $result;
         } catch (Throwable $e) {
@@ -287,7 +354,7 @@ if (!function_exists('mmh_timed_exam_create_attempt')) {
 if (!function_exists('mmh_timed_exam_latest_version')) {
     function mmh_timed_exam_latest_version(mysqli $conn, int $attemptId, bool $forUpdate = false): ?array
     {
-        $sql = 'SELECT * FROM timed_exam_submission_versions WHERE attempt_id = ? ORDER BY version_number DESC, id DESC LIMIT 1';
+        $sql = "SELECT * FROM timed_exam_submission_versions WHERE attempt_id = ? AND status <> 'removed' ORDER BY version_number DESC, id DESC LIMIT 1";
         if ($forUpdate) $sql .= ' FOR UPDATE';
         $stmt = $conn->prepare($sql);
         if (!$stmt) return null;
@@ -299,74 +366,428 @@ if (!function_exists('mmh_timed_exam_latest_version')) {
     }
 }
 
-if (!function_exists('mmh_timed_exam_refresh_attempt')) {
-    function mmh_timed_exam_refresh_attempt(mysqli $conn, array $exam, ?array $attempt): ?array
+if (!function_exists('mmh_timed_exam_upload_version_count')) {
+    function mmh_timed_exam_upload_version_count(mysqli $conn, int $attemptId, bool $forUpdate = false): int
     {
-        if (!$attempt || (int) ($attempt['id'] ?? 0) <= 0) return $attempt;
-        $state = (string) ($attempt['state'] ?? '');
-        if (in_array($state, ['submitted', 'auto_submitted', 'graded', 'no_submission'], true)) return $attempt;
-        $now = new DateTimeImmutable('now', new DateTimeZone('UTC'));
+        if ($attemptId <= 0) return 0;
+        $sql = $forUpdate
+            ? 'SELECT id FROM timed_exam_submission_versions WHERE attempt_id = ? FOR UPDATE'
+            : 'SELECT COUNT(*) AS total FROM timed_exam_submission_versions WHERE attempt_id = ?';
+        $stmt = $conn->prepare($sql);
+        if (!$stmt) return 0;
+        $stmt->bind_param('i', $attemptId);
+        $stmt->execute();
+        $result = $stmt->get_result();
+        $total = $forUpdate ? $result->num_rows : (int) ($result->fetch_assoc()['total'] ?? 0);
+        $stmt->close();
+        return $total;
+    }
+}
+
+if (!function_exists('mmh_timed_exam_attempt_deadline')) {
+    function mmh_timed_exam_attempt_deadline(array $exam, ?array $attempt = null): array
+    {
         $window = mmh_timed_exam_window($exam);
-        if (!$window['grace_closes_at'] || $now <= $window['grace_closes_at']) return $attempt;
+        if ($attempt && !empty($attempt['opens_at_utc']) && !empty($attempt['closes_at_utc']) && !empty($attempt['grace_closes_at_utc'])) {
+            try {
+                $window = [
+                    'opens_at' => new DateTimeImmutable((string) $attempt['opens_at_utc'], new DateTimeZone('UTC')),
+                    'closes_at' => new DateTimeImmutable((string) $attempt['closes_at_utc'], new DateTimeZone('UTC')),
+                    'grace_closes_at' => new DateTimeImmutable((string) $attempt['grace_closes_at_utc'], new DateTimeZone('UTC')),
+                ];
+            } catch (Throwable $exception) {
+                return mmh_timed_exam_window($exam);
+            }
+        }
+        return $window;
+    }
+}
+
+if (!function_exists('mmh_timed_exam_effective_deadline')) {
+    function mmh_timed_exam_effective_deadline(array $exam, ?array $attempt = null): ?DateTimeImmutable
+    {
+        $window = mmh_timed_exam_attempt_deadline($exam, $attempt);
+        if (!$window['closes_at']) return null;
+        return (int) ($exam['grace_minutes'] ?? 0) > 0 && !empty($exam['late_submission_allowed'])
+            ? $window['grace_closes_at']
+            : $window['closes_at'];
+    }
+}
+
+if (!function_exists('mmh_timed_exam_utc_datetime')) {
+    function mmh_timed_exam_utc_datetime(?string $value): ?DateTimeImmutable
+    {
+        $value = trim((string) $value);
+        if ($value === '') return null;
+        try {
+            return new DateTimeImmutable($value, new DateTimeZone('UTC'));
+        } catch (Throwable $exception) {
+            return null;
+        }
+    }
+}
+
+if (!function_exists('mmh_timed_exam_upload_capacity')) {
+    function mmh_timed_exam_upload_capacity(mysqli $conn, array $exam, int $attemptId, bool $forUpdate = false): array
+    {
+        $limit = max(1, (int) ($exam['max_attempts'] ?? 1));
+        $used = mmh_timed_exam_upload_version_count($conn, $attemptId, $forUpdate);
+        return ['limit' => $limit, 'used' => $used, 'remaining' => max(0, $limit - $used), 'allowed' => $used < $limit];
+    }
+}
+
+if (!function_exists('mmh_timed_exam_insert_notification')) {
+    function mmh_timed_exam_insert_notification(mysqli $conn, int $studentId, string $title, string $message): void
+    {
+        $check = $conn->prepare('SELECT id FROM notifications WHERE user_id = ? AND title = ? AND message = ? LIMIT 1');
+        if (!$check) throw new RuntimeException('Unable to verify Timed Exam notification state.');
+        $check->bind_param('iss', $studentId, $title, $message);
+        $check->execute();
+        $exists = $check->get_result()->num_rows > 0;
+        $check->close();
+        if ($exists) return;
+        $insert = $conn->prepare('INSERT INTO notifications (user_id, title, message, status) VALUES (?, ?, ?, 0)');
+        if (!$insert) throw new RuntimeException('Unable to create Timed Exam notification.');
+        $insert->bind_param('iss', $studentId, $title, $message);
+        if (!$insert->execute()) {
+            $error = $insert->error;
+            $insert->close();
+            throw new RuntimeException($error ?: 'Unable to create Timed Exam notification.');
+        }
+        $insert->close();
+    }
+}
+
+if (!function_exists('mmh_timed_exam_finalize_attempt')) {
+    /** Canonical, idempotent expiry transition for one primary or Recovery attempt scope. */
+    function mmh_timed_exam_finalize_attempt(mysqli $conn, array $exam, int $studentId, ?int $attemptId = null, ?DateTimeImmutable $now = null, bool $dryRun = false): array
+    {
+        $examId = (int) ($exam['id'] ?? 0);
+        $scope = mmh_timed_exam_attempt_scope($exam);
+        $now = $now ?: new DateTimeImmutable('now', new DateTimeZone('UTC'));
+        if ($examId <= 0 || $studentId <= 0) return ['success' => false, 'state' => '', 'changed' => false, 'message' => 'Invalid Timed Exam finalization context.'];
+        $courseId = trim((string) ($exam['course_id'] ?? ''));
+        if ($courseId === '' || !student_course_access_enrolled($conn, $studentId, $courseId)) {
+            return ['success' => false, 'state' => '', 'changed' => false, 'message' => 'Student is not eligible for this Timed Exam.'];
+        }
         try {
             $conn->begin_transaction();
-            $lock = $conn->prepare('SELECT * FROM timed_exam_attempts WHERE id = ? FOR UPDATE');
-            if (!$lock) throw new RuntimeException('Unable to lock attempt.');
-            $id = (int) $attempt['id'];
-            $lock->bind_param('i', $id);
+            if ($attemptId !== null && $attemptId > 0) {
+                $lockSql = mmh_timed_exam_lifecycle_schema_available($conn)
+                    ? 'SELECT * FROM timed_exam_attempts WHERE id = ? AND timed_exam_id = ? AND student_id = ? AND attempt_scope = ? FOR UPDATE'
+                    : 'SELECT * FROM timed_exam_attempts WHERE id = ? AND timed_exam_id = ? AND student_id = ? FOR UPDATE';
+                $lock = $conn->prepare($lockSql);
+                if (!$lock) throw new RuntimeException('Unable to lock Timed Exam attempt.');
+                if (mmh_timed_exam_lifecycle_schema_available($conn)) $lock->bind_param('iiis', $attemptId, $examId, $studentId, $scope);
+                else $lock->bind_param('iii', $attemptId, $examId, $studentId);
+            } else {
+                $lockSql = mmh_timed_exam_lifecycle_schema_available($conn)
+                    ? 'SELECT * FROM timed_exam_attempts WHERE timed_exam_id = ? AND student_id = ? AND attempt_scope = ? ORDER BY id DESC LIMIT 1 FOR UPDATE'
+                    : 'SELECT * FROM timed_exam_attempts WHERE timed_exam_id = ? AND student_id = ? ORDER BY id DESC LIMIT 1 FOR UPDATE';
+                $lock = $conn->prepare($lockSql);
+                if (!$lock) throw new RuntimeException('Unable to lock Timed Exam attempt.');
+                if (mmh_timed_exam_lifecycle_schema_available($conn)) $lock->bind_param('iis', $examId, $studentId, $scope);
+                else $lock->bind_param('ii', $examId, $studentId);
+            }
             $lock->execute();
             $fresh = $lock->get_result()->fetch_assoc() ?: null;
             $lock->close();
-            if (!$fresh || in_array((string) ($fresh['state'] ?? ''), ['submitted', 'auto_submitted', 'graded', 'no_submission'], true)) { $conn->commit(); return $fresh ?: $attempt; }
+            if ($attemptId !== null && $attemptId > 0 && !$fresh) {
+                throw new RuntimeException('Timed Exam attempt does not match the requested lifecycle scope.');
+            }
+            if ($fresh && in_array((string) ($fresh['state'] ?? ''), mmh_timed_exam_terminal_states(), true)) {
+                $dryRun ? $conn->rollback() : $conn->commit();
+                return ['success' => true, 'state' => (string) $fresh['state'], 'changed' => false, 'already_terminal' => true, 'attempt' => $fresh];
+            }
+
+            $window = mmh_timed_exam_attempt_deadline($exam, $fresh);
+            $deadline = mmh_timed_exam_effective_deadline($exam, $fresh);
+            if (!$deadline || $now <= $deadline) {
+                $conn->rollback();
+                return ['success' => true, 'state' => (string) ($fresh['state'] ?? 'not_started'), 'changed' => false, 'not_due' => true, 'attempt' => $fresh];
+            }
+
+            if (!$fresh) {
+                $countStmt = $conn->prepare('SELECT COUNT(*) AS total FROM timed_exam_attempts WHERE timed_exam_id = ? AND student_id = ?');
+                if (!$countStmt) throw new RuntimeException('Unable to count Timed Exam attempts.');
+                $countStmt->bind_param('ii', $examId, $studentId);
+                $countStmt->execute();
+                $attemptNumber = ((int) ($countStmt->get_result()->fetch_assoc()['total'] ?? 0)) + 1;
+                $countStmt->close();
+                $opens = $window['opens_at']->format('Y-m-d H:i:s');
+                $closes = $window['closes_at']->format('Y-m-d H:i:s');
+                $graceCloses = $window['grace_closes_at']->format('Y-m-d H:i:s');
+                $expiredAt = $deadline->format('Y-m-d H:i:s');
+                $insertSql = mmh_timed_exam_lifecycle_schema_available($conn)
+                    ? "INSERT INTO timed_exam_attempts (timed_exam_id, student_id, attempt_number, attempt_scope, active_key, state, opens_at_utc, closes_at_utc, grace_closes_at_utc, expired_at_utc) VALUES (?, ?, ?, ?, NULL, 'no_submission', ?, ?, ?, ?)"
+                    : "INSERT INTO timed_exam_attempts (timed_exam_id, student_id, attempt_number, active_key, state, opens_at_utc, closes_at_utc, grace_closes_at_utc, expired_at_utc) VALUES (?, ?, ?, NULL, 'no_submission', ?, ?, ?, ?)";
+                $insert = $conn->prepare($insertSql);
+                if (!$insert) throw new RuntimeException('Unable to create no-submission Timed Exam outcome.');
+                if (mmh_timed_exam_lifecycle_schema_available($conn)) $insert->bind_param('iiisssss', $examId, $studentId, $attemptNumber, $scope, $opens, $closes, $graceCloses, $expiredAt);
+                else $insert->bind_param('iiissss', $examId, $studentId, $attemptNumber, $opens, $closes, $graceCloses, $expiredAt);
+                if (!$insert->execute()) {
+                    $error = $insert->error;
+                    $insert->close();
+                    if (str_contains(strtolower($error), 'duplicate')) {
+                        $conn->rollback();
+                        return mmh_timed_exam_finalize_attempt($conn, $exam, $studentId, null, $now, $dryRun);
+                    }
+                    throw new RuntimeException($error ?: 'Unable to create no-submission Timed Exam outcome.');
+                }
+                $newId = (int) $insert->insert_id;
+                $insert->close();
+                $fresh = ['id' => $newId, 'timed_exam_id' => $examId, 'student_id' => $studentId, 'attempt_number' => $attemptNumber, 'attempt_scope' => $scope, 'state' => 'no_submission', 'opens_at_utc' => $opens, 'closes_at_utc' => $closes, 'grace_closes_at_utc' => $graceCloses, 'expired_at_utc' => $expiredAt];
+                $dryRun ? $conn->rollback() : $conn->commit();
+                return ['success' => true, 'state' => 'no_submission', 'changed' => true, 'created' => true, 'attempt' => $fresh];
+            }
+
+            $id = (int) $fresh['id'];
             $version = mmh_timed_exam_latest_version($conn, $id, true);
-            $effectiveAt = $window['closes_at'];
             $late = 0;
-            if ($version && (int) strtotime((string) $version['uploaded_at_utc']) > (int) $window['closes_at']->getTimestamp()) { $effectiveAt = $window['grace_closes_at']; $late = 1; }
-            if ($version && (string) ($exam['expiry_policy'] ?? 'auto_submit_latest') === 'auto_submit_latest') {
-                $versionId = (int) $version['id'];
-                $versionStmt = $conn->prepare("UPDATE timed_exam_submission_versions SET status = 'auto_submitted', is_late = ?, submitted_at_utc = ? WHERE id = ? AND status = 'uploaded'");
-                if (!$versionStmt) throw new RuntimeException('Unable to finalize expired upload.');
-                $submittedAt = $effectiveAt->format('Y-m-d H:i:s');
-                $versionStmt->bind_param('isi', $late, $submittedAt, $versionId);
-                if (!$versionStmt->execute()) throw new RuntimeException($versionStmt->error);
-                $versionStmt->close();
-                $newState = 'auto_submitted';
-                $submitted = $submittedAt;
+            $uploadedAt = $version ? mmh_timed_exam_utc_datetime((string) ($version['uploaded_at_utc'] ?? '')) : null;
+            if ($uploadedAt && $uploadedAt > $window['closes_at']) $late = 1;
+            $versionState = (string) ($version['status'] ?? '');
+            if ($version && in_array($versionState, ['final', 'auto_submitted'], true)) {
+                $newState = $versionState === 'final' ? 'submitted' : 'auto_submitted';
+                $submitted = (string) ($version['submitted_at_utc'] ?? '') ?: $deadline->format('Y-m-d H:i:s');
+                $late = (int) ($version['is_late'] ?? $late);
+            } elseif ($version && $versionState === 'uploaded' && (string) ($exam['expiry_policy'] ?? 'auto_submit_latest') === 'auto_submit_latest') {
+                $storageKey = trim((string) ($version['storage_key'] ?? ''));
+                $storagePath = dirname(__DIR__) . '/' . ltrim($storageKey, '/');
+                if ($storageKey === '' || str_contains($storageKey, '..') || !is_file($storagePath)) {
+                    error_log(sprintf('Timed Exam invalid uploaded answer exam_id=%d attempt_id=%d student_id=%d', $examId, $id, $studentId));
+                    $newState = 'no_submission';
+                    $submitted = null;
+                } else {
+                    $versionId = (int) $version['id'];
+                    $versionStmt = $conn->prepare("UPDATE timed_exam_submission_versions SET status = 'auto_submitted', is_late = ?, submitted_at_utc = ? WHERE id = ? AND status = 'uploaded'");
+                    if (!$versionStmt) throw new RuntimeException('Unable to finalize expired upload.');
+                    $submittedAt = $deadline->format('Y-m-d H:i:s');
+                    $versionStmt->bind_param('isi', $late, $submittedAt, $versionId);
+                    if (!$versionStmt->execute() || $versionStmt->affected_rows !== 1) throw new RuntimeException($versionStmt->error ?: 'Expired upload was not finalized.');
+                    $versionStmt->close();
+                    $newState = 'auto_submitted';
+                    $submitted = $submittedAt;
+                }
             } else {
                 $newState = 'no_submission';
                 $submitted = null;
             }
             $update = $conn->prepare('UPDATE timed_exam_attempts SET state = ?, submitted_at_utc = ?, expired_at_utc = ?, active_key = NULL, is_late = ? WHERE id = ?');
             if (!$update) throw new RuntimeException('Unable to expire exam attempt.');
-            $expired = $now->format('Y-m-d H:i:s');
+            $expired = $deadline->format('Y-m-d H:i:s');
             $update->bind_param('sssii', $newState, $submitted, $expired, $late, $id);
             if (!$update->execute()) throw new RuntimeException($update->error);
             $update->close();
-            $conn->commit();
-            $attempt['state'] = $newState; $attempt['submitted_at_utc'] = $submitted; $attempt['expired_at_utc'] = $expired; $attempt['is_late'] = $late; $attempt['active_key'] = null;
-            return $attempt;
+            if ($newState === 'auto_submitted') {
+                mmh_timed_exam_insert_notification($conn, $studentId, 'Timed Exam submitted automatically', 'Your latest uploaded answer for ' . (string) ($exam['title'] ?? 'your Timed Exam') . ' was submitted automatically when the exam window ended.');
+            }
+            $fresh['state'] = $newState; $fresh['submitted_at_utc'] = $submitted; $fresh['expired_at_utc'] = $expired; $fresh['is_late'] = $late; $fresh['active_key'] = null;
+            $dryRun ? $conn->rollback() : $conn->commit();
+            return ['success' => true, 'state' => $newState, 'changed' => true, 'attempt' => $fresh, 'version' => $version];
         } catch (Throwable $e) {
             $conn->rollback();
-            return $attempt;
+            mmh_timed_exam_log_lifecycle_error('finalize_attempt', ['exam_id' => $examId, 'attempt_id' => $attemptId, 'student_id' => $studentId], $e);
+            return ['success' => false, 'state' => '', 'changed' => false, 'message' => 'Timed Exam finalization failed. The operation has been logged for review.'];
         }
+    }
+}
+
+if (!function_exists('mmh_timed_exam_finalize_exam_roster')) {
+    /** Finalize every student enrolled on or before the primary exam deadline. */
+    function mmh_timed_exam_finalize_exam_roster(mysqli $conn, array $exam, bool $dryRun = false, ?DateTimeImmutable $now = null): array
+    {
+        $counts = ['eligible' => 0, 'submitted' => 0, 'auto_submitted' => 0, 'no_submission' => 0, 'already_terminal' => 0, 'failed' => 0, 'changed' => 0];
+        $window = mmh_timed_exam_window($exam);
+        $now = $now ?: new DateTimeImmutable('now', new DateTimeZone('UTC'));
+        $deadlineAt = mmh_timed_exam_effective_deadline($exam);
+        if (($exam['status'] ?? '') !== 'published' || !$deadlineAt || $now <= $deadlineAt) return $counts + ['due' => false];
+        $courseId = (string) ($exam['course_id'] ?? '');
+        $itemId = (string) ($exam['item_id'] ?? '');
+        $deadline = $deadlineAt->format('Y-m-d H:i:s');
+        $eligibility = $conn->prepare("SELECT c.course_id FROM courses c INNER JOIN course_items i ON i.course_id = c.course_id AND i.item_id = ? WHERE c.course_id = ? AND (c.archived_at IS NULL OR c.archived_at > ?) AND c.course_state IN ('public','private') AND (i.archived_at IS NULL OR i.archived_at > ?) AND (i.status IS NULL OR i.status = '' OR i.status = 'published') LIMIT 1");
+        if (!$eligibility) return $counts + ['due' => true, 'failed' => 1, 'errors' => ['Unable to validate Timed Exam publication eligibility.']];
+        $eligibility->bind_param('ssss', $itemId, $courseId, $deadline, $deadline);
+        $eligibility->execute();
+        $eligibleExam = $eligibility->get_result()->num_rows === 1;
+        $eligibility->close();
+        if (!$eligibleExam) return $counts + ['due' => false];
+        $stmt = $conn->prepare("SELECT DISTINCT u.user_id FROM course_logs cl INNER JOIN users u ON u.user_id = cl.user_id WHERE cl.course_id = ? AND u.role = 'user' AND ((u.status = '1' AND u.archived_at IS NULL) OR u.archived_at > ?) AND (cl.purchase_date IS NULL OR cl.purchase_date <= ?) ORDER BY u.user_id ASC");
+        if (!$stmt) return $counts + ['due' => true, 'failed' => 1, 'errors' => ['Unable to load the eligible Timed Exam roster.']];
+        $stmt->bind_param('sss', $courseId, $deadline, $deadline);
+        $stmt->execute();
+        $students = array_map('intval', array_column($stmt->get_result()->fetch_all(MYSQLI_ASSOC), 'user_id'));
+        $stmt->close();
+        $counts['eligible'] = count($students);
+        $errors = [];
+        $primaryExam = $exam;
+        $primaryExam['_attempt_scope'] = 'primary';
+        foreach ($students as $studentId) {
+            $result = mmh_timed_exam_finalize_attempt($conn, $primaryExam, $studentId, null, $now, $dryRun);
+            if (empty($result['success'])) {
+                $counts['failed']++;
+                $errors[] = 'student_id=' . $studentId;
+                continue;
+            }
+            $state = (string) ($result['state'] ?? '');
+            if (isset($counts[$state])) $counts[$state]++;
+            if (!empty($result['already_terminal'])) $counts['already_terminal']++;
+            if (!empty($result['changed'])) $counts['changed']++;
+        }
+        if (!$dryRun && $counts['failed'] === 0 && mmh_timed_exam_lifecycle_schema_available($conn)) {
+            $examId = (int) ($exam['id'] ?? 0);
+            $mark = $conn->prepare('UPDATE timed_exams SET roster_finalized_at_utc = COALESCE(roster_finalized_at_utc, ?) WHERE id = ?');
+            if ($mark) {
+                $finalizedAt = $now->format('Y-m-d H:i:s');
+                $mark->bind_param('si', $finalizedAt, $examId);
+                if (!$mark->execute()) { $counts['failed']++; $errors[] = 'roster_marker'; }
+                $mark->close();
+            } else { $counts['failed']++; $errors[] = 'roster_marker'; }
+        }
+        return $counts + ['due' => true, 'errors' => $errors];
+    }
+}
+
+if (!function_exists('mmh_timed_exam_release_result')) {
+    /** Release one graded result and its notification exactly once. */
+    function mmh_timed_exam_release_result(mysqli $conn, array $exam, int $attemptId, bool $force = false, bool $dryRun = false, ?DateTimeImmutable $now = null): array
+    {
+        $now = $now ?: new DateTimeImmutable('now', new DateTimeZone('UTC'));
+        $examId = (int) ($exam['id'] ?? 0);
+        try {
+            $conn->begin_transaction();
+            $stmt = $conn->prepare('SELECT * FROM timed_exam_attempts WHERE id = ? AND timed_exam_id = ? FOR UPDATE');
+            if (!$stmt) throw new RuntimeException('Unable to lock the graded Timed Exam attempt.');
+            $stmt->bind_param('ii', $attemptId, $examId);
+            $stmt->execute();
+            $attempt = $stmt->get_result()->fetch_assoc() ?: null;
+            $stmt->close();
+            if (!$attempt || (string) ($attempt['state'] ?? '') !== 'graded') throw new RuntimeException('Only a graded Timed Exam can be released.');
+            if (!empty($attempt['results_released_at_utc'])) {
+                $dryRun ? $conn->rollback() : $conn->commit();
+                return ['success' => true, 'released' => false, 'already_released' => true, 'attempt' => $attempt];
+            }
+            $scheduled = mmh_timed_exam_utc_datetime((string) ($exam['results_release_at_utc'] ?? ''));
+            $due = $scheduled !== null && $now >= $scheduled;
+            if (!$force && !$due) {
+                $conn->rollback();
+                return ['success' => true, 'released' => false, 'not_due' => true, 'attempt' => $attempt];
+            }
+            $releasedAt = $now->format('Y-m-d H:i:s');
+            $update = $conn->prepare('UPDATE timed_exam_attempts SET results_released_at_utc = ? WHERE id = ? AND results_released_at_utc IS NULL');
+            if (!$update) throw new RuntimeException('Unable to release the Timed Exam result.');
+            $update->bind_param('si', $releasedAt, $attemptId);
+            if (!$update->execute() || $update->affected_rows !== 1) throw new RuntimeException('Unable to persist the Timed Exam result release.');
+            $update->close();
+            mmh_timed_exam_insert_notification($conn, (int) $attempt['student_id'], 'Timed Exam result available', 'Your result for ' . (string) ($exam['title'] ?? 'your Timed Exam') . ' is now available.');
+            $dryRun ? $conn->rollback() : $conn->commit();
+            return ['success' => true, 'released' => true, 'released_at_utc' => $releasedAt, 'attempt' => $attempt];
+        } catch (Throwable $exception) {
+            $conn->rollback();
+            mmh_timed_exam_log_lifecycle_error('release_result', ['exam_id' => $examId, 'attempt_id' => $attemptId, 'student_id' => 0], $exception);
+            return ['success' => false, 'released' => false, 'message' => 'Timed Exam result release failed. The operation has been logged for review.'];
+        }
+    }
+}
+
+if (!function_exists('mmh_timed_exam_save_grade')) {
+    /** Save a review without implicitly releasing it to the student. */
+    function mmh_timed_exam_save_grade(mysqli $conn, array $exam, int $attemptId, ?float $grade, string $feedback): array
+    {
+        $examId = (int) ($exam['id'] ?? 0);
+        $maxMarks = $exam['max_marks'] ?? null;
+        if ($examId <= 0 || $attemptId <= 0 || ($grade !== null && $grade < 0) || ($maxMarks !== null && $grade !== null && $grade > (float) $maxMarks)) {
+            return ['success' => false, 'message' => 'Invalid Timed Exam grade.'];
+        }
+        try {
+            $conn->begin_transaction();
+            $lock = $conn->prepare('SELECT * FROM timed_exam_attempts WHERE id = ? AND timed_exam_id = ? FOR UPDATE');
+            if (!$lock) throw new RuntimeException('Unable to lock the submitted Timed Exam attempt.');
+            $lock->bind_param('ii', $attemptId, $examId);
+            $lock->execute();
+            $attempt = $lock->get_result()->fetch_assoc() ?: null;
+            $lock->close();
+            if (!$attempt || !in_array((string) ($attempt['state'] ?? ''), ['submitted', 'auto_submitted', 'graded'], true)) {
+                throw new RuntimeException('Only a submitted Timed Exam can be graded.');
+            }
+            $update = $conn->prepare("UPDATE timed_exam_attempts SET state = 'graded', grade = ?, feedback = ? WHERE id = ? AND timed_exam_id = ?");
+            if (!$update) throw new RuntimeException('Unable to save the Timed Exam grade.');
+            $update->bind_param('dsii', $grade, $feedback, $attemptId, $examId);
+            if (!$update->execute() || $update->affected_rows > 1) throw new RuntimeException($update->error ?: 'Unable to save the Timed Exam grade.');
+            $update->close();
+            $conn->commit();
+            return ['success' => true, 'attempt_id' => $attemptId, 'released' => !empty($attempt['results_released_at_utc'])];
+        } catch (Throwable $exception) {
+            $conn->rollback();
+            mmh_timed_exam_log_lifecycle_error('save_grade', ['exam_id' => $examId, 'attempt_id' => $attemptId, 'student_id' => 0], $exception);
+            return ['success' => false, 'message' => $exception->getMessage() ?: 'The Timed Exam grade could not be saved.'];
+        }
+    }
+}
+
+if (!function_exists('mmh_timed_exam_release_due_results')) {
+    function mmh_timed_exam_release_due_results(mysqli $conn, array $exam, bool $dryRun = false, ?DateTimeImmutable $now = null): array
+    {
+        $counts = ['eligible' => 0, 'released' => 0, 'already_released' => 0, 'failed' => 0];
+        $scheduled = mmh_timed_exam_utc_datetime((string) ($exam['results_release_at_utc'] ?? ''));
+        $now = $now ?: new DateTimeImmutable('now', new DateTimeZone('UTC'));
+        if ($scheduled === null || $now < $scheduled) return $counts + ['due' => false];
+        $stmt = $conn->prepare("SELECT id FROM timed_exam_attempts WHERE timed_exam_id = ? AND state = 'graded' ORDER BY id ASC");
+        if (!$stmt) return $counts + ['due' => true, 'failed' => 1];
+        $examId = (int) ($exam['id'] ?? 0);
+        $stmt->bind_param('i', $examId);
+        $stmt->execute();
+        $attemptIds = array_map('intval', array_column($stmt->get_result()->fetch_all(MYSQLI_ASSOC), 'id'));
+        $stmt->close();
+        $counts['eligible'] = count($attemptIds);
+        foreach ($attemptIds as $attemptId) {
+            $result = mmh_timed_exam_release_result($conn, $exam, $attemptId, false, $dryRun, $now);
+            if (empty($result['success'])) $counts['failed']++;
+            elseif (!empty($result['released'])) $counts['released']++;
+            elseif (!empty($result['already_released'])) $counts['already_released']++;
+        }
+        return $counts + ['due' => true];
+    }
+}
+
+if (!function_exists('mmh_timed_exam_refresh_attempt')) {
+    /** Backward-compatible read fallback; canonical expiry logic lives in finalize_attempt(). */
+    function mmh_timed_exam_refresh_attempt(mysqli $conn, array $exam, ?array $attempt): ?array
+    {
+        if (!$attempt) return null;
+        $result = mmh_timed_exam_finalize_attempt($conn, $exam, (int) ($attempt['student_id'] ?? 0), (int) ($attempt['id'] ?? 0));
+        return !empty($result['success']) && is_array($result['attempt'] ?? null) ? $result['attempt'] : $attempt;
     }
 }
 
 if (!function_exists('mmh_timed_exam_student_context')) {
     function mmh_timed_exam_student_context(mysqli $conn, array $exam, int $studentId): array
     {
-        $attempt = mmh_timed_exam_student_attempt($conn, $studentId, (int) $exam['id'], false);
+        $scope = mmh_timed_exam_attempt_scope($exam);
+        $attempt = mmh_timed_exam_student_attempt($conn, $studentId, (int) $exam['id'], false, $scope);
         $state = mmh_timed_exam_state($exam, $attempt);
         if ($state['key'] === 'open' || $state['key'] === 'grace') {
             $attempt = $attempt ?: mmh_timed_exam_create_attempt($conn, $exam, $studentId);
-            $attempt = mmh_timed_exam_refresh_attempt($conn, $exam, $attempt);
             $state = mmh_timed_exam_state($exam, $attempt);
-        } elseif ($state['key'] === 'expired' && $attempt) {
-            $attempt = mmh_timed_exam_refresh_attempt($conn, $exam, $attempt);
-            $state = mmh_timed_exam_state($exam, $attempt);
+        } elseif ($state['key'] === 'expired') {
+            $finalized = mmh_timed_exam_finalize_attempt($conn, $exam, $studentId, $attempt ? (int) $attempt['id'] : null);
+            if (!empty($finalized['success'])) {
+                $attempt = $finalized['attempt'] ?? mmh_timed_exam_student_attempt($conn, $studentId, (int) $exam['id'], false, $scope);
+                $state = mmh_timed_exam_state($exam, $attempt);
+            } else {
+                $state = ['key' => 'finalization_error', 'label' => 'Finalization pending', 'remaining_seconds' => 0, 'window' => mmh_timed_exam_window($exam)];
+            }
+        }
+        if ($attempt && (string) ($attempt['state'] ?? '') === 'graded' && empty($attempt['results_released_at_utc'])) {
+            $release = mmh_timed_exam_release_result($conn, $exam, (int) $attempt['id']);
+            if (!empty($release['released'])) {
+                $attempt = mmh_timed_exam_student_attempt($conn, $studentId, (int) $exam['id'], false, $scope) ?: $attempt;
+            }
         }
         $latest = $attempt ? mmh_timed_exam_latest_version($conn, (int) $attempt['id']) : null;
-        return ['exam' => $exam, 'attempt' => $attempt, 'latest_version' => $latest, 'state' => $state];
+        $uploadLimit = max(1, (int) ($exam['max_attempts'] ?? 1));
+        $uploadCount = $attempt ? mmh_timed_exam_upload_version_count($conn, (int) $attempt['id']) : 0;
+        return ['exam' => $exam, 'attempt' => $attempt, 'latest_version' => $latest, 'state' => $state, 'upload_version_limit' => $uploadLimit, 'upload_version_count' => $uploadCount, 'upload_versions_remaining' => max(0, $uploadLimit - $uploadCount)];
     }
 }
 
@@ -374,6 +795,7 @@ if (!function_exists('mmh_timed_exam_upload')) {
     function mmh_timed_exam_upload(mysqli $conn, array $exam, int $studentId, array $file): array
     {
         if ($studentId <= 0) return [false, 'You must be signed in.'];
+        if (!student_course_access_enrolled($conn, $studentId, (string) ($exam['course_id'] ?? ''))) return [false, 'This Timed Exam is not available.'];
         $context = mmh_timed_exam_student_context($conn, $exam, $studentId);
         $state = $context['state']['key'] ?? '';
         if (!in_array($state, ['open', 'grace'], true)) return [false, 'Uploads are closed for this exam.'];
@@ -407,6 +829,9 @@ if (!function_exists('mmh_timed_exam_upload')) {
             if (!$fresh) throw new RuntimeException('Exam attempt not found.');
             $freshContext = mmh_timed_exam_state($exam, $fresh);
             if (!in_array($freshContext['key'], ['open', 'grace'], true)) throw new RuntimeException('The exam window has closed.');
+            if (in_array((string) ($fresh['state'] ?? ''), mmh_timed_exam_terminal_states(), true)) throw new RuntimeException('This exam has already been finalized.');
+            $capacity = mmh_timed_exam_upload_capacity($conn, $exam, $attemptId, true);
+            if (empty($capacity['allowed'])) throw new RuntimeException('You have used all available answer uploads for this exam.');
             $count = $conn->prepare('SELECT COALESCE(MAX(version_number), 0) AS last_version FROM timed_exam_submission_versions WHERE attempt_id = ?');
             if (!$count) throw new RuntimeException('Unable to count answer versions.');
             $count->bind_param('i', $attemptId); $count->execute();
@@ -420,11 +845,11 @@ if (!function_exists('mmh_timed_exam_upload')) {
             if (!$insert->execute()) throw new RuntimeException($insert->error);
             $insert->close();
             $versionId = (int) $conn->insert_id;
-            $update = $conn->prepare('UPDATE timed_exam_attempts SET latest_version_id = ?, is_late = ?, state = \'in_progress\' WHERE id = ?');
+            $update = $conn->prepare("UPDATE timed_exam_attempts SET latest_version_id = ?, is_late = ?, state = 'uploaded' WHERE id = ?");
             if (!$update) throw new RuntimeException('Unable to update attempt.');
             $update->bind_param('iii', $versionId, $late, $attemptId); if (!$update->execute()) throw new RuntimeException($update->error); $update->close();
             $conn->commit();
-            return [true, 'Answer uploaded. Review it and submit the exam.', ['version_id' => $versionId, 'late' => $late]];
+            return [true, 'Answer uploaded. Review it and submit the exam.', ['version_id' => $versionId, 'late' => $late, 'upload_versions_remaining' => max(0, (int) $capacity['remaining'] - 1)]];
         } catch (Throwable $e) {
             $conn->rollback();
             @unlink($path);
@@ -436,6 +861,7 @@ if (!function_exists('mmh_timed_exam_upload')) {
 if (!function_exists('mmh_timed_exam_submit')) {
     function mmh_timed_exam_submit(mysqli $conn, array $exam, int $studentId): array
     {
+        if (!student_course_access_enrolled($conn, $studentId, (string) ($exam['course_id'] ?? ''))) return [false, 'This Timed Exam is not available.'];
         $context = mmh_timed_exam_student_context($conn, $exam, $studentId);
         $attempt = $context['attempt'];
         if (!$attempt) return [false, 'Upload an answer before submitting the exam.'];
@@ -473,6 +899,7 @@ if (!function_exists('mmh_timed_exam_remove_latest_upload')) {
     /** Remove only the current replaceable upload; finalized submissions are immutable. */
     function mmh_timed_exam_remove_latest_upload(mysqli $conn, array $exam, int $studentId): array
     {
+        if (!student_course_access_enrolled($conn, $studentId, (string) ($exam['course_id'] ?? ''))) return [false, 'This Timed Exam is not available.'];
         $context = mmh_timed_exam_student_context($conn, $exam, $studentId);
         $attempt = $context['attempt'] ?? null;
         if (!$attempt) return [false, 'There is no uploaded answer to remove.'];
@@ -490,17 +917,17 @@ if (!function_exists('mmh_timed_exam_remove_latest_upload')) {
             $version = mmh_timed_exam_latest_version($conn, $id, true);
             if (!$version || (string) ($version['status'] ?? '') !== 'uploaded') throw new RuntimeException('There is no replaceable uploaded answer.');
             $versionId = (int) $version['id'];
-            $delete = $conn->prepare("DELETE FROM timed_exam_submission_versions WHERE id = ? AND attempt_id = ? AND status = 'uploaded'");
+            $delete = $conn->prepare("UPDATE timed_exam_submission_versions SET status = 'removed' WHERE id = ? AND attempt_id = ? AND status = 'uploaded'");
             if (!$delete) throw new RuntimeException('Unable to remove uploaded answer.');
             $delete->bind_param('ii', $versionId, $id); if (!$delete->execute() || $delete->affected_rows !== 1) throw new RuntimeException('The uploaded answer could not be removed.'); $delete->close();
             $previous = mmh_timed_exam_latest_version($conn, $id, true);
             if ($previous) {
                 $latestId = (int) $previous['id']; $late = (int) ($previous['is_late'] ?? 0);
-                $update = $conn->prepare('UPDATE timed_exam_attempts SET latest_version_id = ?, is_late = ? WHERE id = ?');
+                $update = $conn->prepare("UPDATE timed_exam_attempts SET latest_version_id = ?, is_late = ?, state = 'uploaded' WHERE id = ?");
                 if (!$update) throw new RuntimeException('Unable to update exam attempt.');
                 $update->bind_param('iii', $latestId, $late, $id);
             } else {
-                $update = $conn->prepare('UPDATE timed_exam_attempts SET latest_version_id = NULL, is_late = 0 WHERE id = ?');
+                $update = $conn->prepare("UPDATE timed_exam_attempts SET latest_version_id = NULL, is_late = 0, state = 'in_progress' WHERE id = ?");
                 if (!$update) throw new RuntimeException('Unable to update exam attempt.');
                 $update->bind_param('i', $id);
             }
@@ -564,6 +991,8 @@ if (!function_exists('mmh_timed_exam_save_config')) {
         if ($status === 'published' && $scheduled === null) throw new InvalidArgumentException('A published Timed Exam needs a scheduled start time.');
         $duration = max(1, min(1440, (int) ($data['duration_minutes'] ?? 60)));
         $grace = max(0, min(1440, (int) ($data['grace_minutes'] ?? 0)));
+        // Backward-compatible column name: max_attempts now consistently
+        // means successful answer upload/replacement versions.
         $maxAttempts = max(1, min(20, (int) ($data['max_attempts'] ?? 1)));
         $types = mmh_timed_exam_parse_allowed_types((string) ($data['allowed_answer_types'] ?? 'pdf,jpg,jpeg,png'));
         $maxSize = max(1024, min(524288000, (int) ($data['max_file_size_bytes'] ?? 10485760)));
@@ -613,6 +1042,13 @@ if (!function_exists('mmh_timed_exam_save_config')) {
             $stmt->bind_param('sssssiiisissssssssiiiisdsssiii', $title, $instructions, $status, $timingMode, $scheduled, $duration, $grace, $maxAttempts, $jsonTypes, $maxSize, $paperSource, $externalUrl, $externalPreviewUrl, $externalDownloadUrl, $fallbackInstructions, $storageKey, $paperName, $paperMime, $paperSize, $viewAllowed, $downloadAllowed, $lateAllowed, $expiryPolicy, $maxMarks, $release, $recoveryStart, $recoveryEnd, $recoveryAllowed, $createdBy, $id);
             if (!$stmt->execute()) { $error = $stmt->error; $stmt->close(); throw new RuntimeException($error); }
             $stmt->close();
+            if (mmh_timed_exam_lifecycle_schema_available($conn)) {
+                $resetRoster = $conn->prepare('UPDATE timed_exams SET roster_finalized_at_utc = NULL WHERE id = ?');
+                if (!$resetRoster) throw new RuntimeException('Unable to reset Timed Exam roster finalization after configuration changed.');
+                $resetRoster->bind_param('i', $id);
+                if (!$resetRoster->execute()) { $error = $resetRoster->error; $resetRoster->close(); throw new RuntimeException($error); }
+                $resetRoster->close();
+            }
             return $id;
         }
         $stmt = $conn->prepare('INSERT INTO timed_exams (course_id, item_id, title, instructions, status, timing_mode, scheduled_start_at_utc, duration_minutes, grace_minutes, max_attempts, allowed_answer_types, max_file_size_bytes, paper_source, paper_external_url, paper_external_preview_url, paper_external_download_url, paper_fallback_instructions, paper_storage_key, paper_original_name, paper_mime, paper_size_bytes, paper_view_allowed, paper_download_allowed, late_submission_allowed, expiry_policy, max_marks, results_release_at_utc, recovery_window_start_at_utc, recovery_window_end_at_utc, recovery_allowed, created_by, updated_by) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)');
@@ -627,6 +1063,24 @@ if (!function_exists('mmh_timed_exam_save_config')) {
 if (!function_exists('mmh_timed_exam_admin_attempts')) {
     function mmh_timed_exam_admin_attempts(mysqli $conn, int $examId): array
     {
+        $examStmt = $conn->prepare('SELECT * FROM timed_exams WHERE id = ? AND deleted_at IS NULL LIMIT 1');
+        $exam = null;
+        if ($examStmt) {
+            $examStmt->bind_param('i', $examId);
+            $examStmt->execute();
+            $exam = $examStmt->get_result()->fetch_assoc() ?: null;
+            $examStmt->close();
+        }
+        if ($exam && (string) ($exam['status'] ?? '') === 'published') {
+            $roster = mmh_timed_exam_finalize_exam_roster($conn, $exam);
+            if (($roster['failed'] ?? 0) > 0) {
+                error_log('Timed Exam admin roster fallback had failures exam_id=' . $examId . ' failed=' . (int) $roster['failed']);
+            }
+            $release = mmh_timed_exam_release_due_results($conn, $exam);
+            if (($release['failed'] ?? 0) > 0) {
+                error_log('Timed Exam admin release fallback had failures exam_id=' . $examId . ' failed=' . (int) $release['failed']);
+            }
+        }
         $stmt = $conn->prepare('SELECT a.*, u.username, u.full_name, v.id AS version_id, v.original_filename, v.storage_key, v.mime_type, v.file_size_bytes, v.uploaded_at_utc, v.submitted_at_utc AS version_submitted_at_utc, v.status AS version_status FROM timed_exam_attempts a INNER JOIN users u ON u.user_id = a.student_id LEFT JOIN timed_exam_submission_versions v ON v.id = a.latest_version_id WHERE a.timed_exam_id = ? ORDER BY u.full_name ASC, u.username ASC, a.attempt_number ASC');
         if (!$stmt) return [];
         $stmt->bind_param('i', $examId); $stmt->execute(); $rows = $stmt->get_result()->fetch_all(MYSQLI_ASSOC); $stmt->close(); return $rows;
@@ -634,15 +1088,42 @@ if (!function_exists('mmh_timed_exam_admin_attempts')) {
 }
 
 if (!function_exists('mmh_timed_exam_course_states')) {
-    function mmh_timed_exam_course_states(mysqli $conn, int $studentId, string $courseId): array
+    function mmh_timed_exam_course_states(mysqli $conn, int $studentId, string $courseId, bool $includeRecoveryCompletion = false): array
     {
         if ($studentId <= 0 || $courseId === '' || !mmh_timed_exam_table_available($conn)) return [];
-        $stmt = $conn->prepare('SELECT e.*, a.id AS attempt_id, a.state AS attempt_state, a.submitted_at_utc, a.is_late, a.grade, a.feedback FROM timed_exams e LEFT JOIN timed_exam_attempts a ON a.id = (SELECT MAX(a2.id) FROM timed_exam_attempts a2 WHERE a2.timed_exam_id = e.id AND a2.student_id = ?) WHERE e.course_id = ? AND e.deleted_at IS NULL AND e.status = \'published\'');
+        $lifecycleSchema = mmh_timed_exam_lifecycle_schema_available($conn);
+        $scopeFilter = $lifecycleSchema
+            ? ($includeRecoveryCompletion
+                ? " AND (a2.attempt_scope = 'primary' OR a2.state IN ('submitted','auto_submitted','graded'))"
+                : " AND a2.attempt_scope = 'primary'")
+            : '';
+        $attemptOrder = $includeRecoveryCompletion
+            ? " ORDER BY CASE WHEN a2.state IN ('submitted','auto_submitted','graded') THEN 0 ELSE 1 END, a2.id DESC LIMIT 1"
+            : ' ORDER BY a2.id DESC LIMIT 1';
+        $stmt = $conn->prepare('SELECT e.*, a.id AS attempt_id, a.state AS attempt_state, a.submitted_at_utc, a.is_late, a.grade, a.feedback, a.results_released_at_utc AS attempt_results_released_at_utc FROM timed_exams e LEFT JOIN timed_exam_attempts a ON a.id = (SELECT a2.id FROM timed_exam_attempts a2 WHERE a2.timed_exam_id = e.id AND a2.student_id = ?' . $scopeFilter . $attemptOrder . ') WHERE e.course_id = ? AND e.deleted_at IS NULL AND e.status = \'published\'');
         if (!$stmt) return [];
         $stmt->bind_param('is', $studentId, $courseId); $stmt->execute(); $rows = $stmt->get_result()->fetch_all(MYSQLI_ASSOC); $stmt->close();
         $map = [];
         foreach ($rows as $row) {
-            $state = mmh_timed_exam_state($row, $row['attempt_id'] ? ['state' => $row['attempt_state']] : null);
+            $attempt = $row['attempt_id'] ? ['id' => (int) $row['attempt_id'], 'student_id' => $studentId, 'state' => $row['attempt_state'], 'results_released_at_utc' => $row['attempt_results_released_at_utc'] ?? null] : null;
+            $state = mmh_timed_exam_state($row, $attempt);
+            if (($state['key'] ?? '') === 'expired') {
+                $finalized = mmh_timed_exam_finalize_attempt($conn, $row, $studentId, $attempt ? (int) $attempt['id'] : null);
+                if (!empty($finalized['success'])) {
+                    $attempt = $finalized['attempt'] ?? mmh_timed_exam_student_attempt($conn, $studentId, (int) $row['id'], false, 'primary');
+                    $state = mmh_timed_exam_state($row, $attempt);
+                    $row['attempt_id'] = $attempt['id'] ?? null;
+                    $row['attempt_state'] = $attempt['state'] ?? null;
+                    $row['submitted_at_utc'] = $attempt['submitted_at_utc'] ?? null;
+                    $row['is_late'] = $attempt['is_late'] ?? 0;
+                } else {
+                    $state = ['key' => 'finalization_error', 'label' => 'Finalization pending'];
+                }
+            }
+            if (($attempt['state'] ?? '') === 'graded' && empty($attempt['results_released_at_utc'])) {
+                $released = mmh_timed_exam_release_result($conn, $row, (int) $attempt['id']);
+                if (!empty($released['released'])) $row['attempt_results_released_at_utc'] = $released['released_at_utc'];
+            }
             $map[(string) $row['item_id']] = array_merge($row, ['state_key' => $state['key'], 'state_label' => $state['label']]);
         }
         return $map;

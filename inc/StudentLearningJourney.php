@@ -111,7 +111,9 @@ function mmh_learning_journey_item_records(mysqli $conn, int $userId, string $co
     $items = mmh_learning_journey_visible_items($conn, $courseId);
     $progress = student_course_progress_load($conn, $userId, $courseId);
     $assignments = mmh_assignment_progress_load_course($conn, $userId, $courseId);
-    $timedExams = mmh_timed_exam_course_states($conn, $userId, $courseId);
+    // An explicitly configured Recovery window still represents genuine exam
+    // completion; My Courses continues to request only the primary window.
+    $timedExams = mmh_timed_exam_course_states($conn, $userId, $courseId, true);
     $evidence = mmh_learning_journey_load_evidence($conn, $userId, $courseId);
     $records = [];
     foreach ($items as $item) {
@@ -131,7 +133,7 @@ function mmh_learning_journey_item_records(mysqli $conn, int $userId, string $co
         $timedExam = $kind === 'timed_exam' ? ($timedExams[$itemId] ?? null) : null;
         if ($timedExam) {
             $timedState = (string) ($timedExam['state_key'] ?? 'not_completed');
-            if (in_array($timedState, ['submitted', 'auto_submitted', 'graded'], true)) { $lmsComplete = true; $lmsState = 'completed'; }
+            if (mmh_timed_exam_state_completes_learning($timedState)) { $lmsComplete = true; $lmsState = 'completed'; }
             elseif ($timedState === 'in_progress' || $timedState === 'open' || $timedState === 'grace') { $lmsState = 'in_progress'; }
         }
         $historical = $evidence[$key] ?? ($assignmentId !== '' ? ($evidence['assignment:' . $assignmentId] ?? null) : null);
