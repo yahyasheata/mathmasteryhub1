@@ -5,10 +5,10 @@ $root = dirname(__DIR__);
 $renderer = file_get_contents($root . '/views/admin/requests/items-item.php');
 $css = file_get_contents($root . '/resources/css/course-manager.css');
 
-foreach (['course-manager-assignment-row', 'course-manager-assignment-stat', 'course-manager-assignment-submissions', 'course-manager-assignment-edit', 'course-manager-action-label'] as $marker) {
+foreach (['course-manager-assignment-row', 'course-manager-assignment-title-row', 'course-manager-assignment-stat', 'course-manager-assignment-submissions', 'course-manager-assignment-edit', 'course-manager-assignment-link'] as $marker) {
     if (!str_contains((string) $renderer, $marker)) throw new RuntimeException("Assignment card marker missing: {$marker}.");
 }
-foreach (['course-manager-assignment-row .course-manager-edit-link', 'course-manager-assignment-stat + .course-manager-assignment-stat', 'course-manager-assignment-row .course-manager-row-actions > .btn'] as $marker) {
+foreach (['course-manager-assignment-title-row .course-manager-edit-link', 'course-manager-assignment-stat + .course-manager-assignment-stat', 'course-manager-assignment-title-row .course-manager-row-actions > .btn'] as $marker) {
     if (!str_contains((string) $css, $marker)) throw new RuntimeException("Assignment card CSS marker missing: {$marker}.");
 }
 if (!str_contains((string) $renderer, "data-manager-action='edit-item'")) throw new RuntimeException('Assignment edit action is missing.');

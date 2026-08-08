@@ -88,11 +88,22 @@
 .course-manager-assignment-actions { margin-top: .35rem; }
 .course-manager-assignment-row { align-items: flex-start; gap: .6rem; padding-bottom: .55rem; padding-top: .55rem; }
 .course-manager-assignment-row .course-manager-row-main { padding-top: .05rem; }
-.course-manager-assignment-row .course-manager-edit-link { line-height: 1.35; overflow-wrap: anywhere; white-space: normal; }
+.course-manager-assignment-title-row { align-items: flex-start; display: flex; gap: .75rem; min-width: 0; }
+.course-manager-assignment-title-row .course-manager-edit-link { flex: 1 1 auto; font-size: .98rem; font-weight: 800; line-height: 1.35; min-width: 0; overflow-wrap: anywhere; white-space: normal; }
+.course-manager-assignment-title-row .course-manager-row-actions { align-items: flex-start; flex: 0 0 auto; margin-left: auto; }
 .course-manager-assignment-row .course-manager-assignment-meta { column-gap: 0; row-gap: .35rem; }
 .course-manager-assignment-row .course-manager-assignment-stat { align-items: center; display: inline-flex; gap: .3rem; min-height: 1.25rem; }
 .course-manager-assignment-row .course-manager-assignment-stat + .course-manager-assignment-stat { border-left: 1px solid var(--border-strong); margin-left: .8rem; padding-left: .8rem; }
-.course-manager-assignment-row .course-manager-assignment-actions .btn { font-weight: 750; }
+.course-manager-assignment-row .course-manager-row-meta { gap: .15rem 0; }
+.course-manager-assignment-row .course-manager-row-badge { background: transparent; border: 0; border-radius: 0; font-size: .72rem; font-weight: 700; padding: 0; }
+.course-manager-assignment-row .course-manager-row-badge + .course-manager-row-badge::before { color: var(--text-muted); content: '·'; margin: 0 .45rem 0 .3rem; }
+.course-manager-assignment-row .course-manager-type-badge { color: var(--text-secondary); }
+.course-manager-assignment-row .course-manager-status-published { color: var(--success); }
+.course-manager-assignment-row .course-manager-status-draft { color: var(--warning); }
+.course-manager-assignment-row .course-manager-row-badge-locked { color: var(--text-muted); }
+.course-manager-assignment-row .course-manager-row-icon { background: transparent; color: var(--text-muted); height: 22px; width: 22px; }
+.course-manager-assignment-row .course-manager-assignment-link { align-items: center; color: var(--primary); display: inline-flex; font-size: .76rem; font-weight: 750; gap: .3rem; text-decoration: none; }
+.course-manager-assignment-row .course-manager-assignment-link:hover, .course-manager-assignment-row .course-manager-assignment-link:focus-visible { color: var(--primary); text-decoration: underline; }
 .course-manager-assignment-row .course-manager-action-label { margin-left: .3rem; }
 .course-manager-row-badge-warning { background: var(--warning-soft); border-color: color-mix(in srgb, var(--warning) 30%, var(--border)); color: var(--warning); }
 .course-manager-status-published { background: var(--success-soft); border-color: color-mix(in srgb, var(--success) 30%, var(--border)); color: var(--success); }
@@ -112,9 +123,10 @@
 @media (max-width: 640px) {
   .course-manager-assignment-row { flex-wrap: wrap; }
   .course-manager-assignment-row .course-manager-row-main { flex: 1 1 calc(100% - 6rem); }
-  .course-manager-assignment-row .course-manager-row-actions { margin-left: auto; }
-  .course-manager-assignment-row .course-manager-row-actions > .btn { display: inline-flex; }
-  .course-manager-assignment-row .course-manager-assignment-actions { flex-basis: 100%; margin-left: 4.75rem; }
+  .course-manager-assignment-title-row { display: block; }
+  .course-manager-assignment-title-row .course-manager-row-actions { margin: .45rem 0 0; }
+  .course-manager-assignment-title-row .course-manager-row-actions > .btn { display: inline-flex; }
+  .course-manager-assignment-row .course-manager-assignment-actions { margin-left: 0; }
   .course-manager-assignment-row .course-manager-assignment-stat + .course-manager-assignment-stat { border-left: 0; margin-left: 0; padding-left: 0; }
 }
 
