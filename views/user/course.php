@@ -388,7 +388,7 @@ if ($coures_result && mysqli_num_rows($coures_result) > 0) {
     if ($is_related_model_answer) {
       continue;
     }
-    $resource_direct = in_array($resource_action, ['embed', 'redirect', 'unavailable', 'homework', 'timed_exam'], true);
+    $resource_direct = in_array($resource_action, ['embed', 'redirect', 'recording_external', 'recording_unavailable', 'unavailable', 'homework', 'timed_exam'], true);
     $resource_external = $resource_action === 'redirect' && !empty($resource_resolution['open_in_new_tab']);
     $timed_exam_for_item = $template_type === 'timed_exam'
       ? mmh_timed_exam_load_for_item($conn, $course_id, (string) ($courses_data['item_id'] ?? ''), false)

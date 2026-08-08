@@ -24,6 +24,7 @@ if ($recovery !== 'https://example.test/user/course/resource/math-ol/lesson-1?re
 }
 
 if (mmh_student_resource_adapter(['action' => 'embed']) !== 'course_resource_viewer'
+    || mmh_student_resource_adapter(['action' => 'recording_external']) !== 'course_resource_viewer'
     || mmh_student_resource_adapter(['action' => 'homework']) !== 'homework'
     || mmh_student_resource_adapter(['action' => 'timed_exam']) !== 'timed_exam'
     || mmh_student_resource_adapter(['action' => 'redirect']) !== 'external_redirect'

@@ -155,6 +155,10 @@ function crm_plan(array $item, bool $notesOnly = false, bool $videosOnly = false
         }
         $url = crm_video_legacy_url($item, $data);
         if ($url === null) return ['state' => 'manual_review', 'reason' => 'Legacy Video has no single safe playback target.'];
+        $microsoftStatus = mmh_course_resource_microsoft_recording_status($url);
+        if (!empty($microsoftStatus['is_microsoft']) && ($microsoftStatus['state'] ?? '') !== 'external') {
+            return ['state' => 'manual_review', 'reason' => 'Microsoft embed or unsupported link requires a real external sharing URL; no URL was guessed.'];
+        }
         return [
             'state' => 'convert',
             'reason' => 'Verified legacy Video with one canonical playback target.',
@@ -192,6 +196,10 @@ function crm_plan(array $item, bool $notesOnly = false, bool $videosOnly = false
     $url = mmh_course_resource_simple_legacy_url($source, (string) ($item['item_title'] ?? ''));
     if ($url === null) {
         return ['state' => preg_match('/https?:\/\//i', $source) ? 'manual_review' : 'skipped', 'reason' => preg_match('/https?:\/\//i', $source) ? 'Rich, multiple-target, or ambiguous content was preserved.' : 'No safe resource URL was found.'];
+    }
+    $microsoftStatus = mmh_course_resource_microsoft_recording_status($url);
+    if (!empty($microsoftStatus['is_microsoft']) && ($microsoftStatus['state'] ?? '') !== 'external') {
+        return ['state' => 'manual_review', 'reason' => 'Microsoft embed or unsupported link requires a real external sharing URL; no URL was guessed.'];
     }
     return ['state' => 'convert', 'reason' => 'Single safe resource with generated boilerplate only.', 'profile' => crm_profile($item, $url), 'data' => $data];
 }

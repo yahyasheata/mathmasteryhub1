@@ -388,7 +388,7 @@ if ($has_sections) {
 }
 
 $template_cards = [
-    'recording' => ['fas fa-play-circle', 'Recording', 'Paste a SharePoint recording link.'],
+    'recording' => ['fas fa-play-circle', 'Recording', 'Paste a SharePoint / Microsoft Stream sharing link.'],
     'notes' => ['far fa-file-alt', 'Notes', 'Add a structured Notes resource for the LMS viewer.'],
     'classified_assignment' => ['fas fa-clipboard-list', 'Classified Assignment', 'Create one Homework lesson with resources and upload workflow.'],
     'custom_lesson' => ['fas fa-puzzle-piece', 'Custom Lesson', 'Build any flexible lesson with a label, icon, and content.'],
@@ -431,6 +431,10 @@ $legacy_content = $item['item_description'];
 $notes_content = $template_type === 'notes' ? ($template_data['content'] ?? $item['item_description']) : '';
 $assignment_instructions = $template_type === 'classified_assignment' ? ($template_data['instructions'] ?? $template_data['description'] ?? $assignment_record['assignment_description'] ?? '') : '';
 $recording_url = $template_type === 'recording' ? ($template_data['url'] ?? form_item_first_href($item['item_description'])) : '';
+$recording_link_status = $template_type === 'recording' ? mmh_course_resource_microsoft_recording_status($recording_url) : ['state' => ''];
+$recording_warning = ($recording_link_status['state'] ?? '') === 'legacy_embed'
+    ? "<div class='alert alert-warning mt-2 mb-0'>This is a legacy Microsoft embed link. Replace it with a normal SharePoint / Microsoft Stream sharing link before saving.</div>"
+    : '';
 $assignment_url = $template_type === 'classified_assignment' ? ($template_data['homework_resource']['url'] ?? $template_data['url'] ?? form_item_first_href($item['item_description'])) : '';
 $model_answer_url = $template_type === 'classified_assignment'
     ? ($template_data['model_answer_resource']['url'] ?? '')
@@ -856,8 +860,10 @@ $html_response = "
             <div class='{$pane_class['recording']}' data-template-pane='recording'>
               <div class='row'>
                 <div class='col-12 col-lg-8 p-2'>
-                  <div>SharePoint URL</div>
-                  <input type='url' class='form-control' name='recording_url' data-template-required='recording' value='" . form_item_json_value(['url' => $recording_url], 'url') . "' placeholder='https://...sharepoint.com/...'>
+                  <label for='{$form_id}-recording-url'>Microsoft Recording Link</label>
+                  <input id='{$form_id}-recording-url' type='url' class='form-control' name='recording_url' data-template-required='recording' value='" . form_item_json_value(['url' => $recording_url], 'url') . "' placeholder='https://...sharepoint.com/...'>
+                  <small class='text-muted d-block mt-2'>Paste the SharePoint / Microsoft Stream sharing link students can open. Do not paste iframe HTML or an embed.aspx URL.</small>
+                  {$recording_warning}
                 </div>
                 {$recording_lesson_number_field}
               </div>

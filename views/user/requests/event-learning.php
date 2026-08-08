@@ -5,6 +5,7 @@ require_once 'inc/functions.php';
 require_once 'inc/LearningEvents.php';
 require_once 'inc/StudentCourseAccess.php';
 require_once 'inc/StudentCourseCsrf.php';
+require_once 'inc/StudentCourseProgress.php';
 
 header('Content-Type: application/json; charset=utf-8');
 
@@ -151,6 +152,12 @@ try {
         'assignment_id' => $assignmentId,
         'exam_id' => $examId,
     ]);
+    // Opening an external Recording is a real viewed/opened action, not a
+    // completion claim. Keep the same viewed-progress semantics as the old
+    // protected viewer without inventing watch duration or completion.
+    if ($recorded && $eventType === 'recording_started' && student_course_progress_available($conn)) {
+        student_course_progress_record_viewed($conn, $userId, $courseId, $itemId);
+    }
 
     learning_event_response($recorded, $recorded ? 'Learning event recorded.' : 'Learning event was not recorded.', [], $recorded ? 200 : 500);
 } catch (Throwable $e) {

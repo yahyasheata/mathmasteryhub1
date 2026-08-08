@@ -74,6 +74,7 @@ function course_resource_record_open(mysqli $conn, $userId, array $course, $sect
 function course_resource_render_viewer(mysqli $conn, $baseUrl, $userId, array $course, array $selection, $itemId, array $resource, array $planContext = [], ?array $gatewayContext = null)
 {
     $gatewayContext = $gatewayContext ?: (is_array($planContext['_gateway_context'] ?? null) ? $planContext['_gateway_context'] : null);
+    $isExternalRecording = ($resource['action'] ?? '') === 'recording_external';
     $item = $selection['item'];
     $section = $selection['section_state']['section'] ?? null;
     $sectionTitle = $section ? trim((string) ($section['title'] ?? '')) : 'General';
@@ -95,12 +96,13 @@ function course_resource_render_viewer(mysqli $conn, $baseUrl, $userId, array $c
     $nextUrl = $next ? course_resource_plan_url($baseUrl, $course['course_id'], $next['item_id'], $planContext, (int) ($next['id'] ?? 0)) : '';
     $description = trim(strip_tags((string) ($resource['description'] ?? '')));
     $embedUrl = (string) ($resource['embed_url'] ?? '');
-    $openUrl = (string) ($resource['open_url'] ?? '');
+    $openUrl = (string) ($resource['open_url'] ?? ($resource['url'] ?? ''));
     $downloadUrl = trim((string) ($resource['download_url'] ?? ''));
     $kind = (string) ($resource['embed_kind'] ?? 'resource');
     $primaryActionLabel = 'View resource';
     $primaryActionIcon = 'fas fa-external-link-alt';
-    if (in_array($kind, ['recording', 'microsoft_stream'], true)) {
+    if ($isExternalRecording || in_array($kind, ['recording', 'microsoft_stream'], true)) {
+        $kind = 'recording_external';
         $primaryActionLabel = 'Watch recording';
         $primaryActionIcon = 'fas fa-play';
     } elseif (in_array($kind, ['youtube', 'video'], true)) {
@@ -123,7 +125,12 @@ function course_resource_render_viewer(mysqli $conn, $baseUrl, $userId, array $c
     $completionIcon = $isCompleted ? 'fas fa-check-circle' : 'far fa-circle';
     $manualCompletion = !$isCompleted && student_course_progress_manual_completion_eligible($selection['item']);
 
-    course_resource_record_open($conn, $userId, $course, (string) ($selection['section_id'] ?? ''), $itemId, $resource);
+    // External recordings record the truthful event when the student clicks
+    // Open Recording below. Embedded resources keep their existing open event
+    // behavior because the protected viewer itself is the opening action.
+    if (!$isExternalRecording) {
+        course_resource_record_open($conn, $userId, $course, (string) ($selection['section_id'] ?? ''), $itemId, $resource);
+    }
     ?>
 <!doctype html>
 <html lang="en" dir="ltr">
@@ -167,6 +174,17 @@ function course_resource_render_viewer(mysqli $conn, $baseUrl, $userId, array $c
         <section class="course-resource-viewer-description"><h2>About this resource</h2><p><?= course_resource_escape($description); ?></p></section>
     <?php endif; ?>
 
+<?php if ($isExternalRecording): ?>
+    <section class="course-resource-recording-card" aria-labelledby="recording-card-title">
+        <div class="course-resource-recording-icon"><span class="fas fa-play-circle" aria-hidden="true"></span></div>
+        <div class="course-resource-recording-copy">
+            <p class="course-resource-recording-eyebrow">Recording</p>
+            <h2 id="recording-card-title">Watch this recording in Microsoft Stream / SharePoint</h2>
+            <p>This recording opens in a new tab so you can watch it directly through Microsoft.</p>
+            <a class="course-btn course-btn-primary course-resource-recording-open" href="<?= course_resource_escape($openUrl); ?>" target="_blank" rel="noopener noreferrer" data-recording-open data-recording-course-id="<?= course_resource_escape($course['course_id']); ?>" data-recording-section-id="<?= course_resource_escape((string) ($selection['section_id'] ?? '')); ?>" data-recording-item-id="<?= course_resource_escape($itemId); ?>" data-recording-csrf="<?= course_resource_escape(student_course_csrf_token()); ?>"><span class="fas fa-external-link-alt" aria-hidden="true"></span> Open Recording</a>
+        </div>
+    </section>
+<?php else: ?>
     <section class="course-resource-viewer-toolbar" aria-label="Resource viewer controls">
         <div class="course-resource-viewer-tool-group course-resource-viewer-tool-group-view">
             <span class="course-resource-viewer-tool-label">Viewing</span>
@@ -189,13 +207,35 @@ function course_resource_render_viewer(mysqli $conn, $baseUrl, $userId, array $c
         <iframe data-resource-viewer-frame data-resource-viewer-src="<?= course_resource_escape($embedUrl); ?>" title="<?= course_resource_escape($title); ?>" loading="eager" referrerpolicy="no-referrer" allow="fullscreen; picture-in-picture" allowfullscreen></iframe>
     </section>
     <p class="course-resource-viewer-provider-notice" data-resource-viewer-notice role="status" aria-live="polite" hidden></p>
+<?php endif; ?>
 
     <nav class="course-resource-viewer-navigation" aria-label="Lesson navigation">
         <div><?php if ($previousUrl !== ''): ?><a class="course-resource-viewer-nav-link" href="<?= course_resource_escape($previousUrl); ?>"><span class="fas fa-arrow-left" aria-hidden="true"></span> Previous resource</a><?php endif; ?></div>
         <div><?php if (!empty($planContext['plan']['id']) && !empty($navigation['plan']) && empty($next) && (string) ($planContext['plan']['status'] ?? '') === 'completed'): ?><a class="course-resource-viewer-nav-link" href="<?= course_resource_escape(mmh_recovery_plan_workspace_url($baseUrl, (string) $course['course_id'], (int) $planContext['plan']['id'])); ?>">Finish Recovery Plan <span class="fas fa-check" aria-hidden="true"></span></a><?php elseif ($nextUrl !== ''): ?><a class="course-resource-viewer-nav-link" href="<?= course_resource_escape($nextUrl); ?>">Next task <span class="fas fa-arrow-right" aria-hidden="true"></span></a><?php elseif (!empty($planContext['plan']['id'])): ?><a class="course-resource-viewer-nav-link" href="<?= course_resource_escape(mmh_recovery_plan_workspace_url($baseUrl, (string) $course['course_id'], (int) $planContext['plan']['id'])); ?>">Back to Recovery Plan <span class="fas fa-arrow-right" aria-hidden="true"></span></a><?php else: ?><a class="course-resource-viewer-nav-link" href="<?= course_resource_escape($courseUrl); ?>">Continue learning <span class="fas fa-arrow-right" aria-hidden="true"></span></a><?php endif; ?></div>
     </nav>
 </main>
-<script src="<?= course_resource_escape(rtrim((string) $baseUrl, '/') . '/resources/js/course-resource-viewer.js'); ?>" defer></script>
+<?php if (!$isExternalRecording): ?><script src="<?= course_resource_escape(rtrim((string) $baseUrl, '/') . '/resources/js/course-resource-viewer.js'); ?>" defer></script><?php endif; ?>
+<?php if ($isExternalRecording): ?><script>
+(function () {
+    var link = document.querySelector('[data-recording-open]');
+    if (!link) return;
+    link.addEventListener('click', function () {
+        var values = new URLSearchParams({
+            event_type: 'recording_started',
+            course_id: link.dataset.recordingCourseId || '',
+            section_id: link.dataset.recordingSectionId || '',
+            item_id: link.dataset.recordingItemId || '',
+            csrf_token: link.dataset.recordingCsrf || ''
+        });
+        var payload = new Blob([values.toString()], {type: 'application/x-www-form-urlencoded;charset=UTF-8'});
+        if (navigator.sendBeacon) {
+            navigator.sendBeacon('<?= course_resource_escape(rtrim((string) $baseUrl, '/') . '/user/requests/learning/event'); ?>', payload);
+        } else {
+            fetch('<?= course_resource_escape(rtrim((string) $baseUrl, '/') . '/user/requests/learning/event'); ?>', {method: 'POST', credentials: 'same-origin', keepalive: true, headers: {'Content-Type': 'application/x-www-form-urlencoded'}, body: values.toString()});
+        }
+    });
+}());
+</script><?php endif; ?>
 <?php if ($manualCompletion): ?><script>document.querySelector('[data-resource-complete]')?.addEventListener('click',function(){var b=this;b.disabled=true;var d=new URLSearchParams({action:'complete',course_id:b.dataset.courseId,item_id:b.dataset.itemId,section_id:b.dataset.sectionId,csrf_token:b.dataset.csrf});fetch('<?= course_resource_escape(rtrim((string) $baseUrl, '/') . '/user/requests/progress/item'); ?>',{method:'POST',headers:{'Content-Type':'application/x-www-form-urlencoded'},body:d}).then(function(r){return r.json();}).then(function(x){if(x&&x.success){window.location.reload();}else{b.disabled=false;}}).catch(function(){b.disabled=false;});});</script><?php endif; ?>
 </body>
 </html>
@@ -302,7 +342,7 @@ if (($resource['action'] ?? '') === 'homework') {
     }
     mmh_homework_render($conn, $baseUrl, $userId, $course, $selection, $itemId, $resource, $course_resource_plan_context, $gateway);
 }
-if (($resource['action'] ?? '') === 'embed' && !empty($resource['embed_url'])) {
+if (($resource['action'] ?? '') === 'recording_external' || (($resource['action'] ?? '') === 'embed' && !empty($resource['embed_url']))) {
     course_resource_render_viewer($conn, $baseUrl, $userId, $course, $selection, $itemId, $resource, $course_resource_plan_context, $gateway);
 }
 if (($resource['action'] ?? '') === 'redirect' && !empty($resource['url'])) {

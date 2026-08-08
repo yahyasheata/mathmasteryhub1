@@ -24,11 +24,8 @@ if (!function_exists('mmh_course_resource_safe_url')) {
 }
 
 if (!function_exists('mmh_course_resource_is_microsoft_stream_embed_url')) {
-    /**
-     * Microsoft Stream recordings are embeddable only through SharePoint's
-     * official embed endpoint. Normal SharePoint pages intentionally remain
-     * protected external links because they are not safe iframe targets.
-     */
+    /** Identify the legacy SharePoint iframe endpoint so Recording items can
+     * be reported for manual replacement instead of being framed. */
     function mmh_course_resource_is_microsoft_stream_embed_url($value): bool
     {
         $url = mmh_course_resource_safe_url($value);
@@ -36,8 +33,12 @@ if (!function_exists('mmh_course_resource_is_microsoft_stream_embed_url')) {
             return false;
         }
 
-        $host = strtolower((string) parse_url($url, PHP_URL_HOST));
-        $path = (string) parse_url($url, PHP_URL_PATH);
+        $parts = parse_url($url) ?: [];
+        if (($parts['user'] ?? '') !== '' || ($parts['pass'] ?? '') !== '') {
+            return false;
+        }
+        $host = strtolower((string) ($parts['host'] ?? ''));
+        $path = (string) ($parts['path'] ?? '');
         if (!($host === 'sharepoint.com' || str_ends_with($host, '.sharepoint.com'))
             || stripos($path, '/_layouts/15/embed.aspx') === false) {
             return false;
@@ -51,6 +52,62 @@ if (!function_exists('mmh_course_resource_is_microsoft_stream_embed_url')) {
             }
         }
         return false;
+    }
+}
+
+if (!function_exists('mmh_course_resource_microsoft_recording_status')) {
+    /**
+     * Classify a Microsoft recording URL without attempting to manufacture a
+     * sharing link. Only HTTPS SharePoint/Teams URLs that are not the legacy
+     * iframe endpoint are usable as external recording targets.
+     */
+    function mmh_course_resource_microsoft_recording_status($value): array
+    {
+        $url = mmh_course_resource_safe_url($value);
+        if ($url === null) {
+            return ['state' => 'malformed', 'url' => null, 'is_microsoft' => false];
+        }
+
+        $parts = parse_url($url) ?: [];
+        $host = strtolower((string) ($parts['host'] ?? ''));
+        $path = (string) ($parts['path'] ?? '');
+        $isSharePoint = $host === 'sharepoint.com' || str_ends_with($host, '.sharepoint.com');
+        $isTeams = $host === 'teams.microsoft.com' || str_ends_with($host, '.teams.microsoft.com');
+        if (($parts['user'] ?? '') !== '' || ($parts['pass'] ?? '') !== '') {
+            return ['state' => 'malformed', 'url' => null, 'is_microsoft' => $isSharePoint || $isTeams];
+        }
+        if (strtolower((string) ($parts['scheme'] ?? '')) !== 'https') {
+            return ['state' => 'insecure', 'url' => $url, 'is_microsoft' => $isSharePoint || $isTeams];
+        }
+        if (!$isSharePoint && !$isTeams) {
+            return ['state' => 'unsupported', 'url' => $url, 'is_microsoft' => false];
+        }
+        if ($isSharePoint && stripos($path, '/_layouts/15/embed.aspx') !== false) {
+            return ['state' => 'legacy_embed', 'url' => $url, 'is_microsoft' => true];
+        }
+        return ['state' => 'external', 'url' => $url, 'provider' => $isTeams ? 'teams' : 'sharepoint', 'is_microsoft' => true];
+    }
+}
+
+if (!function_exists('mmh_course_resource_external_recording')) {
+    /** Build the canonical external-recording resolution used by all viewers. */
+    function mmh_course_resource_external_recording($url, $description = ''): ?array
+    {
+        $status = mmh_course_resource_microsoft_recording_status($url);
+        if (($status['state'] ?? '') !== 'external') {
+            return null;
+        }
+        return [
+            'action' => 'recording_external',
+            'url' => $status['url'],
+            'open_url' => $status['url'],
+            'description' => (string) $description,
+            'label' => 'Recording',
+            'icon' => 'fas fa-play-circle',
+            'event_type' => 'recording_started',
+            'provider' => $status['provider'] ?? 'sharepoint',
+            'open_in_new_tab' => true,
+        ];
     }
 }
 
@@ -522,6 +579,22 @@ if (!function_exists('mmh_course_resource_resolve_core')) {
         if ($type === 'resource' && $nativeResourceUrl !== null) {
             $nativeResourceType = $nativeResourceType !== '' ? $nativeResourceType : 'external_link';
             [$label, $icon] = mmh_course_resource_display_meta($nativeResourceType, $nativeResourceProvider, $nativeResourceUrl);
+            if (in_array($nativeResourceType, ['recording', 'video'], true)
+                || in_array($nativeResourceProvider, ['sharepoint', 'microsoft_stream', 'teams'], true)) {
+                $recordingStatus = mmh_course_resource_microsoft_recording_status($nativeResourceUrl);
+                if (($recordingStatus['state'] ?? '') === 'external') {
+                    return mmh_course_resource_external_recording($nativeResourceUrl, $data['description'] ?? '');
+                }
+                if (!empty($recordingStatus['is_microsoft']) || in_array($nativeResourceProvider, ['sharepoint', 'microsoft_stream', 'teams'], true)) {
+                    return [
+                        'action' => 'recording_unavailable',
+                        'label' => 'Recording',
+                        'icon' => 'fas fa-play-circle',
+                        'reason' => 'Recording link needs to be updated.',
+                        'recording_link_state' => $recordingStatus['state'],
+                    ];
+                }
+            }
             $embed = !empty($data['embed_enabled']) ? mmh_course_resource_embed_details($nativeResourceUrl, $nativeResourceType) : null;
             $eventType = mmh_lesson_open_event($nativeResourceType);
             if ($embed !== null) {
@@ -629,7 +702,22 @@ if (!function_exists('mmh_course_resource_resolve_core')) {
                 $url = mmh_course_resource_simple_legacy_url($item['item_description'] ?? '', $title);
             }
             if ($url === null && $effectiveType === 'recording') {
-                return ['action' => 'unavailable', 'label' => $label, 'icon' => $icon, 'reason' => 'This recording has not been uploaded yet.'];
+                return ['action' => 'recording_unavailable', 'label' => 'Recording', 'icon' => 'fas fa-play-circle', 'reason' => 'Recording link needs to be updated.'];
+            }
+            if ($url !== null && in_array($effectiveType, ['recording', 'video'], true)) {
+                $recordingStatus = mmh_course_resource_microsoft_recording_status($url);
+                if (($recordingStatus['state'] ?? '') === 'external') {
+                    return mmh_course_resource_external_recording($url, $structuredDescription);
+                }
+                if (!empty($recordingStatus['is_microsoft'])) {
+                    return [
+                        'action' => 'recording_unavailable',
+                        'label' => 'Recording',
+                        'icon' => 'fas fa-play-circle',
+                        'reason' => 'Recording link needs to be updated.',
+                        'recording_link_state' => $recordingStatus['state'],
+                    ];
+                }
             }
         }
 
