@@ -423,11 +423,18 @@ $admin_base = rtrim((string) $baseUrl, '/') . '/admin/';
   }
   function openSection(data, $button) {
     setButtonLoading($button, true, 'Loading…');
-    $.ajax({ type: 'POST', url: 'requests/section/form', data: data, dataType: 'json' }).done(mountEditor).fail(function() { notify('error', 'The section editor could not be reached.'); }).always(function() { setButtonLoading($button, false); });
+    data = $.extend({}, data, { _token: adminCsrfToken });
+    $.ajax({ type: 'POST', url: 'requests/section/form', data: data, dataType: 'json' }).done(mountEditor).fail(function(xhr) {
+      var message = xhr && xhr.responseJSON && xhr.responseJSON.message;
+      notify('error', message || 'The section editor could not be reached.');
+    }).always(function() { setButtonLoading($button, false); });
   }
   function openSectionIntegrity($button) {
     setButtonLoading($button, true, 'Loading…');
-    $.ajax({ type: 'POST', url: 'requests/section/integrity', data: { course_id: courseId, _method: 'GET' }, dataType: 'json' }).done(mountEditor).fail(function() { notify('error', 'Section integrity could not be loaded.'); }).always(function() { setButtonLoading($button, false); });
+    $.ajax({ type: 'POST', url: 'requests/section/integrity', data: { course_id: courseId, _method: 'GET', _token: adminCsrfToken }, dataType: 'json' }).done(mountEditor).fail(function(xhr) {
+      var message = xhr && xhr.responseJSON && xhr.responseJSON.message;
+      notify('error', message || 'Section integrity could not be loaded.');
+    }).always(function() { setButtonLoading($button, false); });
   }
   function saveEditorForm(form) {
     if (typeof window.tinymce !== 'undefined') { tinymce.triggerSave(); }
