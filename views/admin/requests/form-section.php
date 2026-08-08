@@ -250,6 +250,7 @@ if (!$course_data) {
 }
 
 $is_edit = isset($_POST['section_id']) && trim($_POST['section_id']) !== '' && trim($_POST['section_id']) !== '__general__';
+$section_id = '';
 $section = [
     'section_id' => '',
     'section_type' => 'lecture',
