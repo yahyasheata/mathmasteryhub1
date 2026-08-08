@@ -86,6 +86,14 @@
 .course-manager-row-meta { align-items: center; display: flex; flex-wrap: wrap; gap: .3rem; margin-top: .18rem; }
 .course-manager-assignment-meta { align-items: center; color: var(--text-muted); display: flex; flex-wrap: wrap; font-size: .72rem; gap: .65rem; margin-top: .3rem; }
 .course-manager-assignment-actions { margin-top: .35rem; }
+.course-manager-assignment-row { align-items: flex-start; gap: .6rem; padding-bottom: .55rem; padding-top: .55rem; }
+.course-manager-assignment-row .course-manager-row-main { padding-top: .05rem; }
+.course-manager-assignment-row .course-manager-edit-link { line-height: 1.35; overflow-wrap: anywhere; white-space: normal; }
+.course-manager-assignment-row .course-manager-assignment-meta { column-gap: 0; row-gap: .35rem; }
+.course-manager-assignment-row .course-manager-assignment-stat { align-items: center; display: inline-flex; gap: .3rem; min-height: 1.25rem; }
+.course-manager-assignment-row .course-manager-assignment-stat + .course-manager-assignment-stat { border-left: 1px solid var(--border-strong); margin-left: .8rem; padding-left: .8rem; }
+.course-manager-assignment-row .course-manager-assignment-actions .btn { font-weight: 750; }
+.course-manager-assignment-row .course-manager-action-label { margin-left: .3rem; }
 .course-manager-row-badge-warning { background: var(--warning-soft); border-color: color-mix(in srgb, var(--warning) 30%, var(--border)); color: var(--warning); }
 .course-manager-status-published { background: var(--success-soft); border-color: color-mix(in srgb, var(--success) 30%, var(--border)); color: var(--success); }
 .course-manager-status-draft { background: var(--warning-soft); border-color: color-mix(in srgb, var(--warning) 30%, var(--border)); color: var(--warning); }
@@ -101,6 +109,14 @@
 @media (max-width: 1199px) { .course-manager-template-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); } .course-manager-page { padding-left: 1rem; padding-right: 1rem; } }
 @media (max-width: 899px) { .course-manager-page { margin-top: 60px; } .course-manager-page-header, .course-manager-toolbar { align-items: stretch; flex-direction: column; } .course-manager-summary { align-self: flex-start; } .course-manager-toolbar-search { min-width: 100%; } .course-manager-filter-result { margin-left: 0; } .course-manager-section-header { align-items: stretch; flex-direction: column; } .course-manager-section-actions { justify-content: flex-end; } }
 @media (max-width: 640px) { .course-manager-page { padding: 1rem .7rem 2rem; } .course-manager-template-grid { grid-template-columns: 1fr; } .course-manager-filter-bar > label { flex: 1 1 calc(50% - .4rem); } .course-manager-filter-bar select { min-width: 0; width: 100%; } .course-manager-bulk-bar { position: static; } .course-manager-bulk-bar select { max-width: none; min-width: 100%; order: 2; } .course-manager-bulk-copy { flex-basis: 100%; } .course-manager-section-leading { align-items: flex-start; } .course-manager-section-meta { flex-basis: 100%; margin-left: 2.2rem; } .course-manager-section-description { margin-left: 2.2rem; } .course-manager-section-actions { justify-content: space-between; width: 100%; } .course-manager-add-to-section { flex: 1; } .lesson-manager-row { gap: .35rem; } .course-manager-row-actions .dropdown .btn { min-width: 34px; } .course-manager-row-actions > .btn { display: none; } .course-manager-row-meta { max-width: 100%; } }
+@media (max-width: 640px) {
+  .course-manager-assignment-row { flex-wrap: wrap; }
+  .course-manager-assignment-row .course-manager-row-main { flex: 1 1 calc(100% - 6rem); }
+  .course-manager-assignment-row .course-manager-row-actions { margin-left: auto; }
+  .course-manager-assignment-row .course-manager-row-actions > .btn { display: inline-flex; }
+  .course-manager-assignment-row .course-manager-assignment-actions { flex-basis: 100%; margin-left: 4.75rem; }
+  .course-manager-assignment-row .course-manager-assignment-stat + .course-manager-assignment-stat { border-left: 0; margin-left: 0; padding-left: 0; }
+}
 
 /* Admin-only student-view preview. Kept in the Course Manager stylesheet so
    all content types share the same shell and visual rhythm. */
