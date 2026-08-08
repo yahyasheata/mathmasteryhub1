@@ -7,6 +7,7 @@ $site_name = $site_settings['website_name'] ?? 'Math Mastery Hub';
 <!doctype html>
 <html lang="en" dir="ltr">
 <head>
+<?php include __DIR__ . '/../partials/favicon.php'; ?>
   <meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
   <title><?=htmlspecialchars($site_name, ENT_QUOTES, 'UTF-8')?> · Blog</title>
   <link rel="stylesheet" href="<?=rtrim((string)$baseUrl, '/')?>/resources/css/design-system.css">

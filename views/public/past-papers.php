@@ -43,6 +43,7 @@ $cssVersion = @filemtime('resources/css/past-papers-frontend.css') ?: time();
 <!doctype html>
 <html lang="en" dir="ltr">
 <head>
+<?php include __DIR__ . '/../partials/favicon.php'; ?>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>Past Papers | <?=pastpapers_html($site_name)?></title>

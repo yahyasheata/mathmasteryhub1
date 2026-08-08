@@ -8,6 +8,7 @@ $maintenanceReopen = trim((string) ($siteSettings['maintenance_reopen_at'] ?? ''
 <head>
   <meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
   <title><?=htmlspecialchars($maintenanceTitle, ENT_QUOTES, 'UTF-8')?></title>
+  <?php include __DIR__ . '/../partials/favicon.php'; ?>
   <link rel="stylesheet" href="<?=rtrim((string) $baseUrl, '/')?>/resources/css/design-system.css">
   <link rel="stylesheet" href="<?=rtrim((string) $baseUrl, '/')?>/resources/css/fontawsome5.min.css">
   <style>

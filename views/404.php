@@ -20,9 +20,7 @@ $site_settings = getSiteSettings();
 ما اِستَعصى عَلى قَومٍ مَن الٌإِذا الإِقدامُ كانَ لَهُم رِكابا
 أحمد شوقي
 ---> 
-<link rel="icon" type="image/png" href="<?=$baseUrl?>/resources/images/default/favicon.png" /> 
-<link rel="icon" type="image/png" sizes="512x512" href="<?=$baseUrl?>/resources/images/default/favicon.png" />
-<link rel="manifest" href="<?=$baseUrl?>/resources/manifest.json">
+<?php include __DIR__ . '/partials/favicon.php'; ?>
 <meta name="theme-color" content="#F15A22">
 <meta name="mobile-web-app-capable" content="no">
 <meta name="application-name" content="<?=$site_name;?>">
@@ -32,19 +30,6 @@ $site_settings = getSiteSettings();
 <meta name="apple-mobile-web-app-capable" content="no">
 <meta name="apple-mobile-web-app-status-bar-style" content="default">
 <meta name="apple-mobile-web-app-title" content="<?=$site_name;?>">
-<link rel="apple-touch-icon" href="<?=$baseUrl?>/resources/images/default/favicon.png?v=2">
-
-<link href="<?=$baseUrl?>/resources/images/default/favicon.png" media="(device-width: 320px) and (device-height: 568px) and (-webkit-device-pixel-ratio: 2)" rel="apple-touch-startup-image" />
-<link href="<?=$baseUrl?>/resources/images/default/favicon.png" media="(device-width: 375px) and (device-height: 667px) and (-webkit-device-pixel-ratio: 2)" rel="apple-touch-startup-image" />
-<link href="<?=$baseUrl?>/resources/images/default/favicon.png" media="(device-width: 621px) and (device-height: 1104px) and (-webkit-device-pixel-ratio: 3)" rel="apple-touch-startup-image" />
-<link href="<?=$baseUrl?>/resources/images/default/favicon.png" media="(device-width: 375px) and (device-height: 812px) and (-webkit-device-pixel-ratio: 3)" rel="apple-touch-startup-image" />
-<link href="<?=$baseUrl?>/resources/images/default/favicon.png" media="(device-width: 414px) and (device-height: 896px) and (-webkit-device-pixel-ratio: 2)" rel="apple-touch-startup-image" />
-<link href="<?=$baseUrl?>/resources/images/default/favicon.png" media="(device-width: 414px) and (device-height: 896px) and (-webkit-device-pixel-ratio: 3)" rel="apple-touch-startup-image" />
-<link href="<?=$baseUrl?>/resources/images/default/favicon.png" media="(device-width: 768px) and (device-height: 1024px) and (-webkit-device-pixel-ratio: 2)" rel="apple-touch-startup-image" />
-<link href="<?=$baseUrl?>/resources/images/default/favicon.png" media="(device-width: 834px) and (device-height: 1112px) and (-webkit-device-pixel-ratio: 2)" rel="apple-touch-startup-image" />
-<link href="<?=$baseUrl?>/resources/images/default/favicon.png" media="(device-width: 834px) and (device-height: 1194px) and (-webkit-device-pixel-ratio: 2)" rel="apple-touch-startup-image" />
-<link href="<?=$baseUrl?>/resources/images/default/favicon.png" media="(device-width: 1024px) and (device-height: 1366px) and (-webkit-device-pixel-ratio: 2)" rel="apple-touch-startup-image" /> 
-
 <link rel='alternate' href="<?=$baseUrl?>/resources/dashboard/a" hreflang='x-default' />
 
 <meta name="author" content="<?=$site_name;?>" />
@@ -53,12 +38,11 @@ $site_settings = getSiteSettings();
 
 
 <meta name="msapplication-TileColor" content="#F15A22">
-<meta name="msapplication-TileImage" content="<?=$baseUrl?>/resources/images/default/favicon.png">
+<meta name="msapplication-TileImage" content="<?=$baseUrl?>/favicon-96x96.png">
 <meta name="msapplication-square70x70logo" content="<?=$baseUrl?>/resources/images/default/cover.png" />
 <meta name="msapplication-square150x150logo" content="<?=$baseUrl?>/resources/images/default/cover.png" />
 <meta name="msapplication-wide310x150logo" content="<?=$baseUrl?>/resources/images/default/cover.png" />
 <meta name="msapplication-square310x310logo" content="<?=$baseUrl?>/resources/images/default/cover.png" />
-<link rel="apple-touch-icon-precomposed" href="<?=$baseUrl?>/resources/images/default/cover.png" />
 
 <meta property="og:type"               content="website" />
 <meta property="og:site_name"          content="<?=$site_name;?>" />
@@ -92,7 +76,7 @@ $site_settings = getSiteSettings();
     "@type": "Organization",
     "name": "<?=$site_name;?>",
     "url": "http://127.0.0.1:8000",
-    "logo": "<?=$baseUrl?>/resources/images/default/favicon.png",
+    "logo": "<?=$baseUrl?>/web-app-manifest-512x512.png",
             "sameAs": [
        
                                     "<?=$baseUrl?>/resources/admin/settings" 

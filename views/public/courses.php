@@ -27,6 +27,7 @@ if ($result instanceof mysqli_result) {
 <!doctype html>
 <html lang="en" dir="ltr">
 <head>
+<?php include __DIR__ . '/../partials/favicon.php'; ?>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>Courses | <?=public_courses_html($site_name)?></title>

@@ -96,9 +96,7 @@ trackTraffic();
     <?=$schema?> 
 
 
-    <!-- Favicon -->
-    <link rel="icon" type="image/png" href="<?=$authFaviconUrl?>">
-    <link rel="apple-touch-icon" href="<?=$authFaviconUrl?>">
+    <?php include __DIR__ . '/../partials/favicon.php'; ?>
     <script>
       (function() {
         try {

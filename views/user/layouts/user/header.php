@@ -34,9 +34,7 @@ $userFaviconUrl = mmh_site_settings_asset_url($userBrandSettings, 'website_icon'
     <?=$openGraph?>
 
     <?=$schema?> 
-<link rel="icon" type="image/png" href="<?=$userFaviconUrl?>" /> 
-<link rel="icon" type="image/png" sizes="512x512" href="<?=mmh_site_public_url('resources/images/default/favicon.png')?>" />
-<link rel="manifest" href="<?=mmh_site_public_url('resources/manifest.json')?>">
+<?php include __DIR__ . '/../../../partials/favicon.php'; ?>
 <meta name="theme-color" content="#F15A22">
 <meta name="mobile-web-app-capable" content="no">
 <meta name="application-name" content="<?=$site_name;?>">
@@ -46,7 +44,6 @@ $userFaviconUrl = mmh_site_settings_asset_url($userBrandSettings, 'website_icon'
 <meta name="apple-mobile-web-app-capable" content="no">
 <meta name="apple-mobile-web-app-status-bar-style" content="default">
 <meta name="apple-mobile-web-app-title" content="<?=$site_name;?>">
-<link rel="apple-touch-icon" href="<?=mmh_site_public_url('resources/images/default/favicon.png')?>?v=2">
 
 
 <link rel='alternate' href="<?=$baseUrl?>/resources/dashboard" hreflang='x-default' />

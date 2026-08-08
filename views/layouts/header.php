@@ -1,6 +1,4 @@
-<link rel="icon" type="image/png" href="<?=$baseUrl?>/resources/images/default/favicon.png" /> 
-<link rel="icon" type="image/png" sizes="512x512" href="<?=$baseUrl?>/resources/images/default/favicon.png" />
-<link rel="manifest" href="<?=$baseUrl?>/resources/manifest.json">
+<?php include __DIR__ . '/../partials/favicon.php'; ?>
 <meta name="theme-color" content="#F15A22">
 <meta name="mobile-web-app-capable" content="no">
 <meta name="application-name" content="<?=$site_name;?>">
@@ -10,7 +8,6 @@
 <meta name="apple-mobile-web-app-capable" content="no">
 <meta name="apple-mobile-web-app-status-bar-style" content="default">
 <meta name="apple-mobile-web-app-title" content="<?=$site_name;?>">
-<link rel="apple-touch-icon" href="<?=$baseUrl?>/resources/images/default/favicon.png?v=2">
 
 
 <link rel='alternate' href="<?=$baseUrl?>/resources/dashboard" hreflang='x-default' />

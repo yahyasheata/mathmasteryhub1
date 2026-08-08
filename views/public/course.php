@@ -293,6 +293,7 @@ $public_course_enrolled = $publicCourseEnrolled;
 <!DOCTYPE html>
 <html lang="en" dir="ltr">
 <head>
+<?php include __DIR__ . '/../partials/favicon.php'; ?>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title><?=$categorie_title ?? 'Course Details'?> | <?=$site_name;?></title>

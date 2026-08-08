@@ -105,8 +105,7 @@ trackTraffic();
   <?= ($keywords ?? '') . "\n" ?>
   <?= $openGraph ?? '' ?>
   <?= $schema ?? '' ?>
-  <link rel="icon" type="image/png" href="<?= $e($homeFaviconUrl); ?>">
-  <link rel="apple-touch-icon" href="<?= $e($homeFaviconUrl); ?>">
+  <?php include __DIR__ . '/partials/favicon.php'; ?>
   <link rel="stylesheet" href="<?= $e(mmh_site_public_url('resources/css/fontawsome5.min.css')); ?>">
   <link rel="stylesheet" href="<?= $e(mmh_site_public_url('resources/css/design-system.css')); ?>" data-design-system="mathhub">
   <link rel="stylesheet" href="<?= $e($landingCssUrl); ?>">

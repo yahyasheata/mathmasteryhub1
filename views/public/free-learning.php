@@ -118,6 +118,7 @@ elseif ($freeLearningMode === 'missing') { $freeLearningTitle = 'Resource not fo
 <!doctype html>
 <html lang="en" dir="ltr">
 <head>
+<?php include __DIR__ . '/../partials/favicon.php'; ?>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title><?= free_learning_html($freeLearningTitle) ?> | <?= free_learning_html($site_name) ?></title>

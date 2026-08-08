@@ -8,9 +8,7 @@
         
     ?>
    
-    <link rel="icon" type="image/png" href="<?=$baseUrl?>/<?=$site_settings['website_icon']?>" />
-    <link rel="icon" type="image/png" sizes="512x512" href="<?=$baseUrl?>/resources/images/default/favicon.png" />
-    <link rel="manifest" href="<?=$baseUrl?>/resources/manifest.json">
+    <?php include __DIR__ . '/../../partials/favicon.php'; ?>
 
 
 

@@ -63,16 +63,11 @@ if ($themeStmt) {
     <?=$adminOpenGraph?>
 
     <?=$adminSchema?>
-<link rel="icon" type="image/png" href="<?=$adminFaviconUrl?>" />
-    <link rel="icon" type="image/png" sizes="512x512" href="<?=$adminFaviconUrl?>" />
+    <?php include __DIR__ . '/../../../partials/favicon.php'; ?>
     <meta name="theme-color" content="#F15A22">
     <meta name="mobile-web-app-capable" content="no">
     <meta name="application-name" content="<?=htmlspecialchars($adminSiteName, ENT_QUOTES, 'UTF-8')?>">
     <meta name="csrf-token" content="<?=htmlspecialchars($adminCsrfToken, ENT_QUOTES, 'UTF-8')?>">
-
-    <link href="<?=$adminFaviconUrl?>"
-        media="(device-width: 320px) and (device-height: 568px) and (-webkit-device-pixel-ratio: 2)"
-        rel="apple-touch-startup-image" />
 
     <link rel="preload" as="style" href="<?=mmh_site_public_url('resources/build/assets/dashboard-1fcbed15.css')?>" />
     <link rel="stylesheet" href="<?=mmh_site_public_url('resources/build/assets/dashboard-1fcbed15.css')?>" data-navigate-track="reload" />
