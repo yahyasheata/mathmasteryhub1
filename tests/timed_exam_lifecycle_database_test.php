@@ -21,6 +21,14 @@ $answerFiles = [];
 $assert = static function (bool $condition, string $message): void {
     if (!$condition) throw new RuntimeException($message);
 };
+$adminSubmissionsView = file_get_contents(dirname(__DIR__) . '/views/admin/timed-exam-submissions.php');
+$assert(
+    is_string($adminSubmissionsView)
+        && strpos($adminSubmissionsView, "require_once 'inc/functions.php';") !== false
+        && strpos($adminSubmissionsView, "include 'layouts/admin/header.php';") !== false
+        && strpos($adminSubmissionsView, "require_once 'inc/functions.php';") < strpos($adminSubmissionsView, "include 'layouts/admin/header.php';"),
+    'Timed Exam submissions must load the canonical admin helpers before the shared header.'
+);
 $query = static function (mysqli $conn, string $sql): mysqli_result|bool {
     $result = $conn->query($sql);
     if ($result === false) throw new RuntimeException($conn->error ?: 'Database test query failed.');
