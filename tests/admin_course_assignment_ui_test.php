@@ -16,6 +16,6 @@ if (!str_contains((string) $renderer, "data-manager-action='edit-item'")) throw 
 if (!str_contains((string) $renderer, 'assignment-submissions?assignment_id=')) throw new RuntimeException('Assignment submissions link is missing.');
 if (!str_contains((string) $renderer, 'course-manager-drag course-builder-sort-handle')) throw new RuntimeException('Assignment drag handle is missing.');
 if (!str_contains((string) $renderer, 'course-manager-select')) throw new RuntimeException('Assignment bulk-selection control is missing.');
-if (!str_contains((string) $courseContent, 'course-manager.css?v=assignment-card-compact-20260809-r3')) throw new RuntimeException('Assignment card stylesheet cache-bust is missing.');
+if (!str_contains((string) $courseContent, 'course-manager.css?v=assignment-card-compact-20260809-r4')) throw new RuntimeException('Assignment card stylesheet cache-bust is missing.');
 
 echo "Admin Course Content assignment UI regression checks passed.\n";
