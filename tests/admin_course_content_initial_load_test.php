@@ -13,6 +13,9 @@ if (!is_string($handler) || !str_contains($handler, '$items_request_method === \
     || !str_contains($handler, "'html' => " . '$manager_html')) {
     throw new RuntimeException('Course Content list handler does not preserve its GET response contract.');
 }
+if (!is_string($handler) || !str_contains($handler, '$status_icon = items_item_status_icon($status_key);')) {
+    throw new RuntimeException('Assignment cards do not initialize their status icon before rendering the JSON payload.');
+}
 if (!is_string($index) || !str_contains($index, "\$router->get('/requests/item/items'")
     || !str_contains($index, "\$router->post('/requests/item/items'")) {
     throw new RuntimeException('Course Content list routes are not explicitly registered.');

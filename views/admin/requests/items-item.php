@@ -330,6 +330,7 @@ function items_item_manager_render_lesson($row, $section_locked = false, array $
     $template_type = $template_type !== '' ? $template_type : strtolower(trim((string) ($row['item_type'] ?? 'legacy')));
     $template_class = items_item_html(preg_replace('/[^a-z0-9_-]+/', '-', $template_type));
     [$status_key, $status_label] = items_item_status_meta($row['status'] ?? 'published');
+    $status_icon = items_item_status_icon($status_key);
     $status_key = items_item_html($status_key);
     $visibility = $status_key === 'published' ? 'visible' : 'not-visible';
     $icon = items_item_icon($row);
