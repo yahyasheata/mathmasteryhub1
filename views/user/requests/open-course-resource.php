@@ -97,6 +97,8 @@ function course_resource_render_viewer(mysqli $conn, $baseUrl, $userId, array $c
     $description = trim(strip_tags((string) ($resource['description'] ?? '')));
     $embedUrl = (string) ($resource['embed_url'] ?? '');
     $openUrl = (string) ($resource['open_url'] ?? ($resource['url'] ?? ''));
+    $courseLearningStylesheet = rtrim((string) $baseUrl, '/') . '/resources/css/course-learning.css'
+        . ($isExternalRecording ? '?v=recording-card-20260809' : '');
     $downloadUrl = trim((string) ($resource['download_url'] ?? ''));
     $kind = (string) ($resource['embed_kind'] ?? 'resource');
     $primaryActionLabel = 'View resource';
@@ -148,7 +150,7 @@ function course_resource_render_viewer(mysqli $conn, $baseUrl, $userId, array $c
     </script>
     <link rel="stylesheet" href="<?= course_resource_escape(rtrim((string) $baseUrl, '/') . '/resources/css/fontawsome5.min.css'); ?>">
     <link rel="stylesheet" href="<?= course_resource_escape(rtrim((string) $baseUrl, '/') . '/resources/css/design-system.css'); ?>">
-    <link rel="stylesheet" href="<?= course_resource_escape(rtrim((string) $baseUrl, '/') . '/resources/css/course-learning.css'); ?>">
+    <link rel="stylesheet" href="<?= course_resource_escape($courseLearningStylesheet); ?>">
 </head>
 <body class="course-learning-page course-resource-viewer-page">
 <main class="course-resource-viewer" data-resource-viewer data-resource-viewer-key="<?= course_resource_escape($viewerKey); ?>" data-resource-viewer-kind="<?= course_resource_escape($kind); ?>">

@@ -60,6 +60,7 @@ if (!is_string($route) || !str_contains($route, "'recording_external'") || !str_
 }
 $css = file_get_contents(dirname(__DIR__) . '/resources/css/course-learning.css');
 if (!is_string($route) || !str_contains($route, 'Microsoft Recording') || !str_contains($route, 'Watch the lesson recording')
+    || !str_contains($route, 'recording-card-20260809')
     || !is_string($css) || !str_contains($css, "data-resource-viewer-kind='recording_external'") || !str_contains($css, 'course-resource-recording-card')) {
     throw new RuntimeException('Recording Launch Card presentation is not wired.');
 }
