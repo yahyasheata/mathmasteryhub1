@@ -117,6 +117,7 @@
 .course-manager-assignment-title-row .course-manager-row-actions .btn { min-height: 36px; }
 .course-manager-assignment-row .course-manager-row-meta { gap: .35rem; margin-top: .6rem; }
 .course-manager-assignment-row .course-manager-row-badge { align-items: center; background: var(--surface-hover); border: 1px solid var(--border); border-radius: var(--radius-pill); display: inline-flex; font-size: .7rem; font-weight: 750; gap: .28rem; line-height: 1; padding: .34rem .55rem; }
+.course-manager-assignment-row .course-manager-row-badge + .course-manager-row-badge::before { content: none; margin: 0; }
 .course-manager-assignment-row .course-manager-type-badge { color: var(--text-secondary); }
 .course-manager-assignment-row .course-manager-status-published { background: var(--success-soft); border-color: color-mix(in srgb, var(--success) 34%, var(--border)); color: var(--success); }
 .course-manager-assignment-row .course-manager-status-draft { background: var(--warning-soft); border-color: color-mix(in srgb, var(--warning) 34%, var(--border)); color: var(--warning); }
