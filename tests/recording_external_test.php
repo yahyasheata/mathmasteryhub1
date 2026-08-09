@@ -58,6 +58,11 @@ $legacyMigration = file_get_contents(dirname(__DIR__) . '/scripts/migrate-course
 if (!is_string($route) || !str_contains($route, "'recording_external'") || !str_contains($route, 'data-recording-open')) {
     throw new RuntimeException('Protected Recording card route is not wired.');
 }
+$css = file_get_contents(dirname(__DIR__) . '/resources/css/course-learning.css');
+if (!is_string($route) || !str_contains($route, 'Microsoft Recording') || !str_contains($route, 'Watch the lesson recording')
+    || !is_string($css) || !str_contains($css, "data-resource-viewer-kind='recording_external'") || !str_contains($css, 'course-resource-recording-card')) {
+    throw new RuntimeException('Recording Launch Card presentation is not wired.');
+}
 $course = file_get_contents(dirname(__DIR__) . '/views/user/course.php');
 if (!is_string($course) || !str_contains($course, "'recording_external'") || !str_contains($course, "'recording_unavailable'")) {
     throw new RuntimeException('Course navigation does not treat Recording cards as direct resources.');

@@ -170,7 +170,7 @@ function course_resource_render_viewer(mysqli $conn, $baseUrl, $userId, array $c
         </div>
     </header>
 
-    <?php if ($description !== '' && mmh_course_resource_has_meaningful_description($description, $title)): ?>
+    <?php if (!$isExternalRecording && $description !== '' && mmh_course_resource_has_meaningful_description($description, $title)): ?>
         <section class="course-resource-viewer-description"><h2>About this resource</h2><p><?= course_resource_escape($description); ?></p></section>
     <?php endif; ?>
 
@@ -178,9 +178,10 @@ function course_resource_render_viewer(mysqli $conn, $baseUrl, $userId, array $c
     <section class="course-resource-recording-card" aria-labelledby="recording-card-title">
         <div class="course-resource-recording-icon"><span class="fas fa-play-circle" aria-hidden="true"></span></div>
         <div class="course-resource-recording-copy">
-            <p class="course-resource-recording-eyebrow">Recording</p>
-            <h2 id="recording-card-title">Watch this recording in Microsoft Stream / SharePoint</h2>
-            <p>This recording opens in a new tab so you can watch it directly through Microsoft.</p>
+            <p class="course-resource-recording-eyebrow">Microsoft Recording</p>
+            <h2 id="recording-card-title">Watch the lesson recording</h2>
+            <p>This recording opens in Microsoft Stream / SharePoint in a new tab.</p>
+            <?php if ($description !== '' && mmh_course_resource_has_meaningful_description($description, $title)): ?><p class="course-resource-recording-description"><?= course_resource_escape($description); ?></p><?php endif; ?>
             <a class="course-btn course-btn-primary course-resource-recording-open" href="<?= course_resource_escape($openUrl); ?>" target="_blank" rel="noopener noreferrer" data-recording-open data-recording-course-id="<?= course_resource_escape($course['course_id']); ?>" data-recording-section-id="<?= course_resource_escape((string) ($selection['section_id'] ?? '')); ?>" data-recording-item-id="<?= course_resource_escape($itemId); ?>" data-recording-csrf="<?= course_resource_escape(student_course_csrf_token()); ?>"><span class="fas fa-external-link-alt" aria-hidden="true"></span> Open Recording</a>
         </div>
     </section>
