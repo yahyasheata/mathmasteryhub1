@@ -63,6 +63,7 @@ jobs:
             php database/migrations/20260811_finalize_timed_exam_lifecycle.php
             php database/migrations/20260808_add_course_visibility.php
             php database/migrations/20260809_add_course_state.php
+            php database/migrations/20260812_create_password_reset_tokens.php
             php database/migrations/verify_student_learning_evidence.php
             php scripts/finalize-timed-exams.php --dry-run
             php -l index.php

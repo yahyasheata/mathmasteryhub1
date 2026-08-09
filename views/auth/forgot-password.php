@@ -1,0 +1,19 @@
+<?php
+require_once 'connection/config.php';
+require_once '__init.php';
+require_once 'inc/functions.php';
+require_once 'inc/Auth.php';
+require_once 'inc/PasswordReset.php';
+mmh_password_reset_no_store_headers();
+$site_settings = getSiteSettings();
+$site_name = (string) ($site_settings['website_name'] ?? 'Math Mastery Hub');
+$authRootUrl = mmh_site_public_base_path() ?: '/';
+$authBaseUrl = rtrim(mmh_site_public_base_path(), '/') . '/auth';
+$authBrandLogoUrl = mmh_site_settings_asset_url($site_settings, 'website_logo', 'resources/images/default/wide-logo.png');
+$authDarkLogoUrl = mmh_site_public_url('resources/images/branding/mathhub-logo-white.png');
+$authMessage = mmh_auth_flash('password_reset');
+$authError = mmh_auth_flash('password_reset_error');
+$authCsrfToken = mmh_auth_csrf_token();
+?><!doctype html>
+<html lang="en"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>Forgot your password? · <?=htmlspecialchars($site_name, ENT_QUOTES, 'UTF-8')?></title><?php include __DIR__ . '/../partials/favicon.php'; ?><link rel="stylesheet" href="<?=mmh_site_public_url('resources/css/design-system.css')?>"><style>body{font-family:system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif}.password-reset-shell{min-height:100vh;display:grid;place-items:center;padding:2rem 1rem}.password-reset-card{width:min(100%,30rem);padding:2rem;border:1px solid var(--border);border-radius:1rem;background:var(--surface);box-shadow:var(--shadow-lg)}.password-reset-card label{display:block;font-weight:600;margin-bottom:.45rem}.password-reset-card input{width:100%;padding:.75rem;border:1px solid var(--border);border-radius:.55rem;background:var(--bg-primary);color:var(--text-primary)}.password-reset-card input:focus{outline:2px solid var(--primary);outline-offset:2px}.password-reset-logo{width:9rem;height:auto;margin:0 auto 1.5rem;display:block}.password-reset-logo--dark{display:none}.dark .password-reset-logo--light{display:none}.dark .password-reset-logo--dark{display:block}</style></head>
+<body class="ds-bg-primary ds-text-primary"><main class="password-reset-shell"><section class="password-reset-card" aria-labelledby="forgot-title"><a href="<?=$authRootUrl?>" aria-label="Back to home"><img class="password-reset-logo password-reset-logo--light" src="<?=htmlspecialchars($authBrandLogoUrl, ENT_QUOTES, 'UTF-8')?>" alt="<?=htmlspecialchars($site_name, ENT_QUOTES, 'UTF-8')?>"><img class="password-reset-logo password-reset-logo--dark" src="<?=htmlspecialchars($authDarkLogoUrl, ENT_QUOTES, 'UTF-8')?>" alt="<?=htmlspecialchars($site_name, ENT_QUOTES, 'UTF-8')?>"></a><h1 id="forgot-title" class="text-2xl font-bold text-center mb-2">Forgot your password?</h1><p class="ds-text-secondary text-center mb-6">Enter your email and we'll send you a secure reset link.</p><?php if ($authMessage): ?><div class="mb-4 rounded-lg border border-green-500/40 bg-green-500/10 px-3 py-2 text-sm" role="status"><?=htmlspecialchars($authMessage, ENT_QUOTES, 'UTF-8')?></div><?php endif; ?><?php if ($authError): ?><div class="mb-4 rounded-lg border border-red-500/40 bg-red-500/10 px-3 py-2 text-sm" role="alert"><?=htmlspecialchars($authError, ENT_QUOTES, 'UTF-8')?></div><?php endif; ?><form method="post" action="<?=$authBaseUrl?>/forgot-password"><input type="hidden" name="csrf_token" value="<?=htmlspecialchars($authCsrfToken, ENT_QUOTES, 'UTF-8')?>"><label for="reset-email">Email address</label><input id="reset-email" name="email" type="email" autocomplete="email" required maxlength="190"><button class="mt-5 w-full rounded-lg bg-primary px-4 py-3 font-semibold ds-text-inverse" type="submit">Send reset link</button></form><p class="mt-4 text-center text-sm ds-text-muted">If you do not have an email linked to your account, contact support.</p><p class="mt-4 text-center"><a class="text-primary hover:underline" href="<?=$authBaseUrl?>/login">Back to login</a></p></section></main></body></html>

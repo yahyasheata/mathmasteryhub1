@@ -93,7 +93,8 @@ $router->match('GET|POST', '/auth/{provider}/callback', function($provider) {
     include('views/auth/oauth_callback.php');
 });
 $router->get('/auth/{authPage}', function($authPage) {
-    if (!in_array($authPage, ['login', 'register'], true)) {
+    $authPages = ['login' => 'login.php', 'register' => 'register.php', 'forgot-password' => 'forgot-password.php', 'reset-password' => 'reset-password.php'];
+    if (!isset($authPages[$authPage])) {
         header('HTTP/1.1 404 Not Found');
         include('views/404.php');
         return;
@@ -101,23 +102,26 @@ $router->get('/auth/{authPage}', function($authPage) {
     require_once '__init.php';
     require_once 'connection/config.php';
     require_once 'inc/Auth.php';
-    if (isset($_SESSION['admin'])) {
+    if (in_array($authPage, ['login', 'register'], true) && isset($_SESSION['admin'])) {
         header('Location: ' . mmh_auth_destination(db(), (string) $_SESSION['admin'], 'admin', mmh_current_request_base_url()));
         exit();
     }
-    if (isset($_SESSION['username'])) {
+    if (in_array($authPage, ['login', 'register'], true) && isset($_SESSION['username'])) {
         header('Location: ' . mmh_auth_destination(db(), (string) $_SESSION['username'], 'user', mmh_current_request_base_url()));
         exit();
     }
-    include("views/auth/{$authPage}.php");
+    require_once 'inc/PasswordReset.php';
+    include('views/auth/' . $authPages[$authPage]);
 });
 $router->post('/auth/{authPage}', function($authPage) {
-    if (!in_array($authPage, ['login', 'register'], true)) {
+    $authHandlers = ['login' => 'login_request.php', 'register' => 'register_request.php', 'forgot-password' => 'forgot-password_request.php', 'reset-password' => 'reset-password_request.php'];
+    if (!isset($authHandlers[$authPage])) {
         header('HTTP/1.1 404 Not Found');
         exit();
     }
     require_once '__init.php';
-    include("views/auth/{$authPage}_request.php");
+    require_once 'inc/PasswordReset.php';
+    include('views/auth/' . $authHandlers[$authPage]);
 });
 
 // =======================
