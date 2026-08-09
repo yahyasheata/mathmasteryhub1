@@ -164,21 +164,23 @@ function form_item_status_value($value)
     return 'published';
 }
 
-if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
-    form_item_response(false, 'Invalid request method.');
-}
-
-if (!isset($_POST['_method']) || $_POST['_method'] !== 'GET') {
+// Form rendering is read-only. The current route uses GET; accept the
+// previous POST + _method=GET shape only for compatibility with open tabs.
+$form_item_request_method = strtoupper((string) ($_SERVER['REQUEST_METHOD'] ?? 'GET'));
+$form_item_legacy_read = $form_item_request_method === 'POST' && (string) ($_POST['_method'] ?? '') === 'GET';
+if ($form_item_request_method !== 'GET' && !$form_item_legacy_read) {
     form_item_response(false, 'Invalid lesson form request.');
 }
 
-if (!isset($_POST['course_id']) || trim($_POST['course_id']) === '') {
+$form_item_request_data = $form_item_request_method === 'GET' ? $_GET : $_POST;
+
+if (!isset($form_item_request_data['course_id']) || trim((string) $form_item_request_data['course_id']) === '') {
     form_item_response(false, 'Validation failed. Course ID is missing.');
 }
 
 $conn = db();
 $schema_ready = mmh_ensure_learning_schema($conn);
-$course_id = trim($_POST['course_id']);
+$course_id = trim((string) $form_item_request_data['course_id']);
 $course_stmt = $conn->prepare('SELECT course_title, default_homework_score_mode FROM courses WHERE course_id = ? LIMIT 1');
 $course_stmt->bind_param('s', $course_id);
 $course_stmt->execute();
@@ -189,7 +191,7 @@ if (!$course_data) {
     form_item_response(false, 'Course not found.');
 }
 
-$is_edit = isset($_POST['item_id']) && trim($_POST['item_id']) !== '';
+$is_edit = isset($form_item_request_data['item_id']) && trim((string) $form_item_request_data['item_id']) !== '';
 $item = [
     'item_id' => '',
     'item_title' => '',
@@ -207,7 +209,7 @@ $item = [
 ];
 
 if ($is_edit) {
-    $item_id = trim($_POST['item_id']);
+    $item_id = trim((string) $form_item_request_data['item_id']);
     $item_stmt = $conn->prepare('SELECT * FROM course_items WHERE item_id = ? AND course_id = ? LIMIT 1');
     $item_stmt->bind_param('ss', $item_id, $course_id);
     $item_stmt->execute();
@@ -243,7 +245,7 @@ $teacher_templates = ['recording', 'notes', 'classified_assignment', 'custom_les
 $creation_templates = array_merge($teacher_templates, ['resource']);
 $editor_templates = array_merge($teacher_templates, ['assignment_model_answer', 'resource']);
 $raw_template_type = $item['template_type'] ?: '';
-$requested_template_type = isset($_POST['template_type']) ? trim((string) $_POST['template_type']) : '';
+$requested_template_type = isset($form_item_request_data['template_type']) ? trim((string) $form_item_request_data['template_type']) : '';
 $template_type = $is_edit ? ($raw_template_type ?: 'custom_html') : ($requested_template_type ?: 'recording');
 $legacy_resource_adapter = null;
 
@@ -344,7 +346,7 @@ if ($has_duration_minutes) {
 $section_field = '';
 $has_sections = form_item_column_exists($conn, 'section_id') && form_item_table_exists($conn, 'course_sections');
 if ($has_sections) {
-    $current_section_id = $is_edit ? (string) ($item['section_id'] ?? '') : (string) ($_POST['section_id'] ?? '');
+    $current_section_id = $is_edit ? (string) ($item['section_id'] ?? '') : (string) ($form_item_request_data['section_id'] ?? '');
     if ($current_section_id === '__general__') {
         $current_section_id = '';
     }

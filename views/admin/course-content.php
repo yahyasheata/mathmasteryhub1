@@ -419,7 +419,10 @@ $admin_base = rtrim((string) $baseUrl, '/') . '/admin/';
   }
   function openItem(data, $button) {
     setButtonLoading($button, true, 'Loading…');
-    $.ajax({ type: 'POST', url: 'requests/item/form', data: data, dataType: 'json' }).done(mountEditor).fail(function() { notify('error', 'The lesson editor could not be reached.'); }).always(function() { setButtonLoading($button, false); });
+    $.ajax({ type: 'GET', url: 'requests/item/form', data: data, dataType: 'json' }).done(mountEditor).fail(function(xhr) {
+      var message = xhr && xhr.responseJSON && xhr.responseJSON.message;
+      notify('error', message || 'The lesson editor could not be reached.');
+    }).always(function() { setButtonLoading($button, false); });
   }
   function openSection(data, $button) {
     setButtonLoading($button, true, 'Loading…');
@@ -480,7 +483,7 @@ $admin_base = rtrim((string) $baseUrl, '/') . '/admin/';
     if (action === 'close-picker') { closePicker(); return; }
     if (action === 'add-section') { closePicker(); openSection({ course_id: courseId, _method: 'GET' }, $button); return; }
     if (action === 'section-integrity') { closePicker(); openSectionIntegrity($button); return; }
-    if (action === 'edit-item') { openItem({ course_id: courseId, item_id: $button.data('item-id'), _method: 'GET' }, $button); return; }
+    if (action === 'edit-item') { openItem({ course_id: courseId, item_id: $button.data('item-id') }, $button); return; }
     if (action === 'preview-item') { event.preventDefault(); window.location.assign(baseUrl + '/admin/courses/' + encodeURIComponent(courseId) + '/content/' + encodeURIComponent(String($button.data('item-id'))) + '/preview'); return; }
     if (action === 'toggle-item-status') { bulkAction(String($button.data('status')) === 'published' ? 'unpublish' : 'publish', [String($button.data('item-id'))], '', $button); return; }
     if (action === 'duplicate-item') { bulkAction('duplicate', [String($button.data('item-id'))], '', $button); return; }
@@ -490,7 +493,7 @@ $admin_base = rtrim((string) $baseUrl, '/') . '/admin/';
     if (action === 'delete-section') { Swal.fire({ icon: 'warning', title: 'Delete this section?', text: 'Lessons will never be orphaned.', showCancelButton: true, confirmButtonText: 'Continue' }).then(function(result) { if (result.isConfirmed) { deleteSection(String($button.data('section-id')), $button); } }); return; }
     if (action === 'move-section') { var $sectionToMove = $button.closest('.course-manager-section'); var direction = $button.data('direction'); var $target = direction === 'up' ? $sectionToMove.prev('.course-manager-section') : $sectionToMove.next('.course-manager-section'); if ($target.length) { direction === 'up' ? $sectionToMove.insertBefore($target) : $sectionToMove.insertAfter($target); queueSortingSave(); } return; }
   });
-  $(document).on('click.courseManager', '.course-manager-template', function() { openItem({ course_id: courseId, section_id: pickerSectionId, template_type: $(this).data('template'), _method: 'GET' }, $(this)); });
+  $(document).on('click.courseManager', '.course-manager-template', function() { openItem({ course_id: courseId, section_id: pickerSectionId, template_type: $(this).data('template') }, $(this)); });
   $(document).on('change.courseManager', '#course-manager-list .course-manager-select', updateBulkBar);
   $(document).on('input.courseManager change.courseManager', '#lesson-manager-search, #lesson-manager-status, #lesson-manager-type, #lesson-manager-visibility, #lesson-manager-locked', applyFilters);
   $(document).on('click.courseManager', '[data-manager-bulk]', function() {

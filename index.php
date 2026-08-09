@@ -174,6 +174,23 @@ $router->mount('/admin', function() use ($router) {
         require __DIR__ . '/views/admin/requests/items-item.php';
     });
 
+    // The item editor only renders a form; it is a read-only request. Use a
+    // normal GET so it does not pass through the mutation/CSRF middleware.
+    $router->get('/requests/item/form', function() {
+        require_once '__init.php';
+        mmh_admin_require_admin();
+        require __DIR__ . '/views/admin/requests/form-item.php';
+    });
+
+    // Compatibility for already-open Course Content pages that still issue
+    // the former POST + _method=GET editor request. The handler accepts only
+    // that explicit read marker and performs no mutation.
+    $router->post('/requests/item/form', function() {
+        require_once '__init.php';
+        mmh_admin_require_admin(false);
+        require __DIR__ . '/views/admin/requests/form-item.php';
+    });
+
     $router->get('/free-learning/resource-search', function() {
         require_once '__init.php';
         mmh_admin_require_admin(false);
