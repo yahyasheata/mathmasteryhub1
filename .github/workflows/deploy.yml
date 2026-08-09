@@ -66,9 +66,4 @@ jobs:
             php database/migrations/20260812_create_password_reset_tokens.php
             php database/migrations/verify_student_learning_evidence.php
             php scripts/finalize-timed-exams.php --dry-run
-            diagnostic_marker="/home/mathqclj/.mmh-password-reset-resend-diagnostic-done"
-            if [ -f scripts/diagnostics/password_reset_resend_once.php ] && [ ! -f "$diagnostic_marker" ]; then
-              RESET_DIAGNOSTIC_USER_ID=80027340 php scripts/diagnostics/password_reset_resend_once.php
-              touch "$diagnostic_marker"
-            fi
             php -l index.php
