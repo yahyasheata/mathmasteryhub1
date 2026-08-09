@@ -57,7 +57,7 @@ $admin_base = rtrim((string) $baseUrl, '/') . '/admin/';
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Lesson Manager | <?=$site_name;?></title>
     <?php include 'layouts/admin/header.php'; ?>
-    <link rel="stylesheet" href="<?=$baseUrl?>/resources/css/course-manager.css?v=assignment-card-compact-20260809">
+    <link rel="stylesheet" href="<?=$baseUrl?>/resources/css/course-manager.css?v=assignment-card-compact-20260809-r2">
     <script src="<?=$baseUrl?>/resources/js/jquery-ui.min.js"></script>
     <script src="<?=$baseUrl?>/resources/js/jquery.ui.touch-punch.min.js"></script>
 </head>
