@@ -541,14 +541,33 @@ if (!function_exists('mmh_live_occurrence_timestamp')) {
     }
 }
 
+if (!function_exists('mmh_live_join_window')) {
+    /**
+     * Return the server-authoritative student join window for an occurrence.
+     * Both boundaries are inclusive: students may join at the opening instant
+     * and through the exact grace cutoff (scheduled end + two hours).
+     */
+    function mmh_live_join_window(array $occurrence)
+    {
+        $start = mmh_live_occurrence_timestamp($occurrence, 'scheduled_start_at');
+        $end = mmh_live_occurrence_timestamp($occurrence, 'scheduled_end_at');
+        if ($start === false || $end === false) {
+            return ['opens_at' => false, 'closes_at' => false];
+        }
+        return [
+            'opens_at' => $start - 1800,
+            'closes_at' => $end + (2 * 60 * 60),
+        ];
+    }
+}
+
 if (!function_exists('mmh_live_join_state')) {
     function mmh_live_join_state(array $occurrence, $now = null)
     {
         $now = $now === null ? time() : (int) $now;
         $status = strtolower(trim((string) ($occurrence['status'] ?? 'scheduled')));
-        $start = mmh_live_occurrence_timestamp($occurrence, 'scheduled_start_at');
-        $end = mmh_live_occurrence_timestamp($occurrence, 'scheduled_end_at');
         $target = mmh_live_sanitize_teams_url((string) (($occurrence['replacement_url'] ?? '') ?: ($occurrence['teams_url_snapshot'] ?? '')));
+        $window = mmh_live_join_window($occurrence);
 
         if (in_array($status, ['cancelled', 'deleted'], true)) {
             return ['active' => false, 'state' => $status, 'label' => $status === 'deleted' ? 'Session Removed' : 'Session Cancelled'];
@@ -556,26 +575,34 @@ if (!function_exists('mmh_live_join_state')) {
         if ($target === null) {
             return ['active' => false, 'state' => 'missing_link', 'label' => 'Meeting link not available'];
         }
-        if ($start === false || $end === false) {
+        if ($window['opens_at'] === false || $window['closes_at'] === false) {
             return ['active' => false, 'state' => 'invalid_time', 'label' => 'Session time unavailable'];
         }
-        if ($status === 'completed' || $now > $end) {
-            return ['active' => false, 'state' => 'ended', 'label' => 'Session Ended'];
+        $stateContext = [
+            'opens_at' => $window['opens_at'],
+            'closes_at' => $window['closes_at'],
+        ];
+        if ($now > $window['closes_at']) {
+            return array_merge(['active' => false, 'state' => 'ended', 'label' => 'Session Ended'], $stateContext);
         }
-        if ($now < ($start - 1800)) {
-            return ['active' => false, 'state' => 'opens_soon', 'label' => 'Join opens 30 minutes before'];
+        if ($now < $window['opens_at']) {
+            return array_merge(['active' => false, 'state' => 'opens_soon', 'label' => 'Join opens 30 minutes before'], $stateContext);
         }
+        $start = mmh_live_occurrence_timestamp($occurrence, 'scheduled_start_at');
+        $end = mmh_live_occurrence_timestamp($occurrence, 'scheduled_end_at');
         if ($now >= $start && $now <= $end) {
-            return ['active' => true, 'state' => 'live', 'label' => 'Join Live Session'];
+            return array_merge(['active' => true, 'state' => 'live', 'label' => 'Join Live Session'], $stateContext);
         }
-        return ['active' => true, 'state' => 'ready', 'label' => 'Join Session'];
+        return array_merge(['active' => true, 'state' => 'ready', 'label' => 'Join Session'], $stateContext);
     }
 }
 
 if (!function_exists('mmh_live_current_priority')) {
     function mmh_live_current_priority(mysqli $conn, $userId)
     {
-        $sessions = mmh_live_occurrences($conn, '', 0, 7, (int) $userId);
+        // Include the recent past so a student can re-enter during the
+        // canonical two-hour post-end join window.
+        $sessions = mmh_live_occurrences($conn, '', -1, 7, (int) $userId);
         foreach ($sessions as $session) {
             $joinState = mmh_live_join_state($session);
             if (!empty($joinState['active'])) {

@@ -56,7 +56,7 @@ function live_user_group(array $sessions, array $recordingsByOccurrence)
 
         $joinState = mmh_live_join_state($session, $now);
         $state = (string) ($joinState['state'] ?? '');
-        $isEnded = $state === 'ended' || in_array(strtolower((string) ($session['status'] ?? '')), ['completed'], true);
+        $isEnded = $state === 'ended';
         $isCancelled = $state === 'cancelled' || strtolower((string) ($session['status'] ?? '')) === 'cancelled';
         $occurrenceId = (string) ($session['occurrence_id'] ?? '');
 
