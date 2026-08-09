@@ -322,7 +322,7 @@ $admin_base = rtrim((string) $baseUrl, '/') . '/admin/';
   function loadList() {
     if (listRequest && listRequest.readyState !== 4) { listRequest.abort(); }
     $('#course-manager-list').addClass('is-loading');
-    listRequest = $.ajax({ type: 'POST', url: 'requests/item/items', dataType: 'json', data: { course_id: courseId, _method: 'GET', layout: 'manager' } });
+    listRequest = $.ajax({ type: 'GET', url: 'requests/item/items', dataType: 'json', data: { course_id: courseId, layout: 'manager' } });
     listRequest.done(function(response) {
       if (!responseOk(response)) { $('#course-manager-list').html('<div class="course-manager-error">' + escapeHtml(responseMessage(response, 'Course content could not be loaded.')) + '</div>'); return; }
       $('#course-manager-list').html(response.html);

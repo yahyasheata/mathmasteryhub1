@@ -552,21 +552,22 @@ function items_item_render_section($course_id, $section_id, $title, $description
       </div>";
 }
 
-if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
+// The manager list is read-only. Current pages use GET; accept the former
+// POST + _method=GET shape only for compatibility with already-open tabs.
+$items_request_method = strtoupper((string) ($_SERVER['REQUEST_METHOD'] ?? 'GET'));
+$items_request_is_legacy_read = $items_request_method === 'POST' && (string) ($_POST['_method'] ?? '') === 'GET';
+if ($items_request_method !== 'GET' && !$items_request_is_legacy_read) {
     items_item_response(false, 'Invalid request method.');
 }
 
-if (!isset($_POST['_method']) || $_POST['_method'] !== 'GET') {
-    items_item_response(false, 'Invalid lesson list request.');
-}
-
-if (!isset($_POST['course_id']) || trim($_POST['course_id']) === '') {
+$items_request_data = $items_request_method === 'GET' ? $_GET : $_POST;
+if (!isset($items_request_data['course_id']) || trim((string) $items_request_data['course_id']) === '') {
     items_item_response(false, 'Validation failed. Course ID is missing.');
 }
 
 $conn = db();
 mmh_ensure_learning_schema($conn);
-$course_id = trim($_POST['course_id']);
+$course_id = trim((string) $items_request_data['course_id']);
 $safe_course_id = items_item_html($course_id);
 $has_sections = items_item_column_exists($conn, 'section_id') && items_item_table_exists($conn, 'course_sections');
 
@@ -651,7 +652,7 @@ foreach ($sections as $section) {
     );
 }
 
-if (isset($_POST['layout']) && $_POST['layout'] === 'manager') {
+if (($items_request_data['layout'] ?? '') === 'manager') {
     $manager_real_sections_html = '';
     foreach ($sections as $section) {
         $section_id = (string) $section['section_id'];
