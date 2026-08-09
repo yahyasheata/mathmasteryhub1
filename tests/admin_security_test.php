@@ -16,6 +16,7 @@ if (mmh_admin_allowed_handler('course', 'not-real') !== null) throw new RuntimeE
 
 $htaccess = file_get_contents(__DIR__ . '/../.htaccess');
 if (!str_contains((string) $htaccess, 'views|connection|inc|database|scripts|vendor')) throw new RuntimeException('Internal PHP blocking rule is missing.');
+if (!preg_match('/RewriteRule\s+\(\^\|\/\)\\\.\(\?!well-known/i', (string) $htaccess)) throw new RuntimeException('Dotfile origin protection rule is missing.');
 $notificationCourse = file_get_contents(__DIR__ . '/../views/admin/requests/notification-course.php');
 if (str_contains((string) $notificationCourse, 'course_id = 33')) throw new RuntimeException('Notification handler still contains the hardcoded course.');
 

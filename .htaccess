@@ -1,5 +1,9 @@
 RewriteEngine On
 
+# Never serve dotfiles or hidden configuration directories. Keep ACME and
+# other standards-based well-known endpoints available when explicitly used.
+RewriteRule (^|/)\.(?!well-known(?:/|$)) - [F,L,NC]
+
 # Internal PHP files are implementation details.  They must only be reached
 # through the front controller (or an explicitly public endpoint), while still
 # remaining includable by PHP.  These rules work with Apache and LiteSpeed.
