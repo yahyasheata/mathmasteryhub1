@@ -346,7 +346,7 @@ function items_item_manager_render_lesson($row, $section_locked = false, array $
         $meta = $assignment_stats[$assignment_id] ?? null;
         if ($meta) {
             $due = trim((string) ($meta['due_date'] ?? ''));
-            $due_label = $due !== '' ? 'Due ' . date('j M Y, g:i A', strtotime($due)) : 'No due date';
+            $due_label = $due !== '' ? date('j M Y, g:i A', strtotime($due)) : 'No due date';
             $submitted = (int) ($meta['submission_count'] ?? 0);
             $enrolled = (int) ($meta['enrolled_count'] ?? 0);
             $submission_label = $enrolled > 0 ? $submitted . ' of ' . $enrolled . ' submitted' : $submitted . ' submitted';
@@ -357,7 +357,7 @@ function items_item_manager_render_lesson($row, $section_locked = false, array $
                 $admin_base = '/admin';
             }
             $submission_url = $admin_base . '/assignment-submissions?assignment_id=' . rawurlencode($assignment_id) . '&course_id=' . rawurlencode((string) ($row['course_id'] ?? '')) . '&item_id=' . rawurlencode((string) ($row['item_id'] ?? '')) . '&from_course_content=1';
-            $assignment_panel = "<div class='course-manager-assignment-meta'><span class='course-manager-assignment-stat course-manager-assignment-due'><i class='far fa-calendar-alt ds-icon ds-icon-xs' aria-hidden='true'></i> " . items_item_html($due_label) . "</span><span class='course-manager-assignment-stat course-manager-assignment-submissions'><i class='fas fa-inbox ds-icon ds-icon-xs' aria-hidden='true'></i> " . items_item_html($submission_label) . "</span>{$needs_label}</div><div class='course-manager-assignment-actions'><a class='course-manager-assignment-link' href='" . items_item_html($submission_url) . "'><i class='fas fa-list ds-icon ds-icon-sm' aria-hidden='true'></i> View submissions <span aria-hidden='true'>→</span></a></div>";
+            $assignment_panel = "<div class='course-manager-assignment-detail-row'><div class='course-manager-assignment-meta'><span class='course-manager-assignment-stat course-manager-assignment-due'><i class='far fa-calendar-alt ds-icon ds-icon-md' aria-hidden='true'></i><span class='course-manager-assignment-stat-copy'><span>Due</span><strong>" . items_item_html($due_label) . "</strong></span></span><span class='course-manager-assignment-stat course-manager-assignment-submissions'><i class='fas fa-users ds-icon ds-icon-md' aria-hidden='true'></i><span class='course-manager-assignment-stat-copy'><span>Submissions</span><strong>" . items_item_html($submission_label) . "</strong></span></span>{$needs_label}</div><div class='course-manager-assignment-actions'><a class='course-manager-assignment-link' href='" . items_item_html($submission_url) . "'><i class='fas fa-list ds-icon ds-icon-sm' aria-hidden='true'></i> View submissions <span aria-hidden='true'>→</span></a></div></div>";
         }
     }
 
@@ -378,6 +378,10 @@ function items_item_manager_render_lesson($row, $section_locked = false, array $
     $title_markup = $is_assignment
         ? "<div class='course-manager-assignment-title-row'><button type='button' class='course-manager-edit-link' data-manager-action='edit-item' data-item-id='{$item_id}'>{$title}</button>{$row_actions}</div>"
         : "<button type='button' class='course-manager-edit-link' data-manager-action='edit-item' data-item-id='{$item_id}'>{$title}</button>";
+    $assignment_badges = "<span class='course-manager-row-badge course-manager-type-badge'>{$type_label}</span><span class='course-manager-row-badge course-manager-status-{$status_key}'>{$status_label}</span>{$locked_badge}";
+    $assignment_content = $is_assignment
+        ? "<div class='course-manager-assignment-surface'><span class='course-manager-row-icon course-manager-assignment-icon' aria-hidden='true'>{$icon}</span><div class='course-manager-row-main'>{$title_markup}<div class='course-manager-row-meta'>{$assignment_badges}</div>{$assignment_panel}</div></div>"
+        : "<span class='course-manager-row-icon' aria-hidden='true'>{$icon}</span><div class='course-manager-row-main'>{$title_markup}<div class='course-manager-row-meta'><span class='course-manager-row-badge course-manager-type-badge'>{$type_label}</span><span class='course-manager-row-badge course-manager-status-{$status_key}'>{$status_label}</span>{$locked_badge}</div>{$assignment_panel}</div>";
 
     return "
       <li class='lesson-manager-row course-builder-item" . ($is_assignment ? " course-manager-assignment-row" : '') . "'
@@ -387,22 +391,13 @@ function items_item_manager_render_lesson($row, $section_locked = false, array $
           data-course-id='{$course_id}'
           data-status='{$status_key}'
           data-template='{$template_class}'
-          data-visible='{$visibility}'
+        data-visible='{$visibility}'
           data-locked='" . ($section_locked ? '1' : '0') . "'>
         <label class='course-manager-select-wrap' title='Select lesson'>
           <input type='checkbox' class='course-manager-select' value='{$item_id}' aria-label='Select {$title}'>
         </label>
         <span class='course-manager-drag course-builder-sort-handle' title='Drag to reorder' aria-label='Drag to reorder'><i class='fas fa-grip-vertical ds-icon' aria-hidden='true'></i></span>
-        <span class='course-manager-row-icon' aria-hidden='true'>{$icon}</span>
-        <div class='course-manager-row-main'>
-          {$title_markup}
-          <div class='course-manager-row-meta'>
-            <span class='course-manager-row-badge course-manager-type-badge'>{$type_label}</span>
-            <span class='course-manager-row-badge course-manager-status-{$status_key}'>{$status_label}</span>
-            {$locked_badge}
-          </div>
-          {$assignment_panel}
-        </div>
+        {$assignment_content}
         " . ($is_assignment ? '' : $row_actions) . "
       </li>";
 }
