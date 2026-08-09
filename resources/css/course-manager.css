@@ -86,52 +86,33 @@
 .course-manager-row-meta { align-items: center; display: flex; flex-wrap: wrap; gap: .3rem; margin-top: .18rem; }
 .course-manager-assignment-meta { align-items: center; color: var(--text-muted); display: flex; flex-wrap: wrap; font-size: .72rem; gap: .65rem; margin-top: .3rem; }
 .course-manager-assignment-actions { margin-top: .35rem; }
-.course-manager-assignment-row { align-items: flex-start; gap: .6rem; padding-bottom: .55rem; padding-top: .55rem; }
-.course-manager-assignment-row .course-manager-row-main { padding-top: .05rem; }
-.course-manager-assignment-title-row { align-items: flex-start; display: flex; gap: .75rem; min-width: 0; }
-.course-manager-assignment-title-row .course-manager-edit-link { flex: 1 1 auto; font-size: .98rem; font-weight: 800; line-height: 1.35; min-width: 0; overflow-wrap: anywhere; white-space: normal; }
-.course-manager-assignment-title-row .course-manager-row-actions { align-items: flex-start; flex: 0 0 auto; margin-left: auto; }
-.course-manager-assignment-row .course-manager-assignment-meta { column-gap: 0; row-gap: .35rem; }
-.course-manager-assignment-row .course-manager-assignment-stat { align-items: center; display: inline-flex; gap: .3rem; min-height: 1.25rem; }
-.course-manager-assignment-row .course-manager-assignment-stat + .course-manager-assignment-stat { border-left: 1px solid var(--border-strong); margin-left: .8rem; padding-left: .8rem; }
-.course-manager-assignment-row .course-manager-row-meta { gap: .15rem 0; }
-.course-manager-assignment-row .course-manager-row-badge { background: transparent; border: 0; border-radius: 0; font-size: .72rem; font-weight: 700; padding: 0; }
-.course-manager-assignment-row .course-manager-row-badge + .course-manager-row-badge::before { color: var(--text-muted); content: '·'; margin: 0 .45rem 0 .3rem; }
-.course-manager-assignment-row .course-manager-type-badge { color: var(--text-secondary); }
-.course-manager-assignment-row .course-manager-status-published { color: var(--success); }
-.course-manager-assignment-row .course-manager-status-draft { color: var(--warning); }
-.course-manager-assignment-row .course-manager-row-badge-locked { color: var(--text-muted); }
-.course-manager-assignment-row .course-manager-row-icon { background: transparent; color: var(--text-muted); height: 22px; width: 22px; }
-.course-manager-assignment-row .course-manager-assignment-link { align-items: center; color: var(--primary); display: inline-flex; font-size: .76rem; font-weight: 750; gap: .3rem; text-decoration: none; }
-.course-manager-assignment-row .course-manager-assignment-link:hover, .course-manager-assignment-row .course-manager-assignment-link:focus-visible { color: var(--primary); text-decoration: underline; }
-.course-manager-assignment-row .course-manager-action-label { margin-left: .3rem; }
-.course-manager-assignment-row { align-items: stretch; background: color-mix(in srgb, var(--surface) 96%, var(--bg-primary)); border: 1px solid var(--border); border-radius: var(--radius-lg); box-shadow: var(--shadow-sm); margin-bottom: .7rem; min-height: 132px; padding: .65rem .75rem; transition: background var(--transition), border-color var(--transition), box-shadow var(--transition); }
+.course-manager-assignment-row { align-items: flex-start; background: color-mix(in srgb, var(--surface) 96%, var(--bg-primary)); border: 1px solid var(--border); border-inline-start: 3px solid var(--primary); border-radius: var(--radius-lg); box-shadow: var(--shadow-sm); gap: .55rem; margin-bottom: .55rem; min-height: 0; padding: .5rem .65rem; transition: background var(--transition), border-color var(--transition), box-shadow var(--transition); }
 .course-manager-assignment-row:hover { background: var(--surface-hover); border-color: var(--border-strong); box-shadow: var(--shadow-md); }
-.course-manager-assignment-surface { align-items: stretch; display: grid; flex: 1 1 auto; gap: 1rem; grid-template-columns: 56px minmax(0, 1fr); min-width: 0; }
-.course-manager-assignment-icon { align-self: start; background: var(--primary-soft) !important; border: 1px solid color-mix(in srgb, var(--primary) 30%, var(--border)); border-radius: var(--radius-md) !important; color: var(--primary) !important; height: 48px !important; margin-top: .1rem; width: 48px !important; }
-.course-manager-assignment-icon i { font-size: 1.2rem; }
+.course-manager-assignment-surface { align-items: flex-start; display: grid; flex: 1 1 auto; gap: .75rem; grid-template-columns: 42px minmax(0, 1fr); min-width: 0; }
+.course-manager-assignment-icon { align-self: start; background: var(--primary-soft) !important; border: 1px solid color-mix(in srgb, var(--primary) 30%, var(--border)); border-radius: var(--radius-md) !important; color: var(--primary) !important; height: 38px !important; margin-top: .05rem; width: 38px !important; }
+.course-manager-assignment-icon i { font-size: 1rem; }
 .course-manager-assignment-row .course-manager-row-main { padding-top: 0; }
-.course-manager-assignment-title-row { align-items: flex-start; display: flex; gap: .75rem; min-width: 0; }
-.course-manager-assignment-title-row .course-manager-edit-link { flex: 1 1 auto; font-size: 1rem; font-weight: 800; line-height: 1.3; min-width: 0; overflow-wrap: anywhere; white-space: normal; }
+.course-manager-assignment-title-row { align-items: flex-start; display: flex; gap: .55rem; min-width: 0; }
+.course-manager-assignment-title-row .course-manager-edit-link { flex: 1 1 auto; font-size: .95rem; font-weight: 800; line-height: 1.25; min-width: 0; overflow-wrap: anywhere; white-space: normal; }
 .course-manager-assignment-title-row .course-manager-row-actions { align-items: center; flex: 0 0 auto; margin-left: auto; }
-.course-manager-assignment-title-row .course-manager-row-actions .btn { min-height: 36px; }
-.course-manager-assignment-row .course-manager-row-meta { gap: .35rem; margin-top: .6rem; }
-.course-manager-assignment-row .course-manager-row-badge { align-items: center; background: var(--surface-hover); border: 1px solid var(--border); border-radius: var(--radius-pill); display: inline-flex; font-size: .7rem; font-weight: 750; gap: .28rem; line-height: 1; padding: .34rem .55rem; }
+.course-manager-assignment-title-row .course-manager-row-actions .btn { min-height: 32px; padding: .28rem .44rem; }
+.course-manager-assignment-row .course-manager-row-meta { gap: .3rem; margin-top: .35rem; }
+.course-manager-assignment-row .course-manager-row-badge { align-items: center; background: var(--surface-hover); border: 1px solid var(--border); border-radius: var(--radius-pill); display: inline-flex; font-size: .66rem; font-weight: 750; gap: .25rem; line-height: 1; padding: .26rem .45rem; }
 .course-manager-assignment-row .course-manager-row-badge + .course-manager-row-badge::before { content: none; margin: 0; }
 .course-manager-assignment-row .course-manager-type-badge { color: var(--text-secondary); }
 .course-manager-assignment-row .course-manager-status-published { background: var(--success-soft); border-color: color-mix(in srgb, var(--success) 34%, var(--border)); color: var(--success); }
 .course-manager-assignment-row .course-manager-status-draft { background: var(--warning-soft); border-color: color-mix(in srgb, var(--warning) 34%, var(--border)); color: var(--warning); }
 .course-manager-assignment-row .course-manager-row-badge-locked { background: var(--surface-inset); color: var(--text-secondary); }
-.course-manager-assignment-detail-row { align-items: center; border-top: 1px solid var(--border); display: flex; gap: 1rem; justify-content: space-between; margin-top: .75rem; padding-top: .7rem; }
-.course-manager-assignment-meta { align-items: stretch; display: flex; flex: 1 1 auto; flex-wrap: wrap; gap: .85rem; margin-top: 0; }
-.course-manager-assignment-row .course-manager-assignment-stat { align-items: center; display: inline-flex; gap: .5rem; min-height: 2.35rem; }
-.course-manager-assignment-row .course-manager-assignment-stat + .course-manager-assignment-stat { border-left: 1px solid var(--border-strong); margin-left: 0; padding-left: .85rem; }
-.course-manager-assignment-row .course-manager-assignment-stat > i { color: var(--primary); font-size: 1.05rem; }
-.course-manager-assignment-stat-copy { display: grid; gap: .12rem; min-width: 0; }
-.course-manager-assignment-stat-copy > span { color: var(--text-muted); font-size: .68rem; font-weight: 750; letter-spacing: .03em; text-transform: uppercase; }
-.course-manager-assignment-stat-copy > strong { color: var(--text-primary); font-size: .82rem; font-weight: 750; line-height: 1.25; overflow-wrap: anywhere; }
+.course-manager-assignment-detail-row { align-items: center; border-top: 1px solid var(--border); display: flex; gap: .75rem; justify-content: space-between; margin-top: .5rem; padding-top: .5rem; }
+.course-manager-assignment-meta { align-items: stretch; display: flex; flex: 1 1 auto; flex-wrap: wrap; gap: .65rem; margin-top: 0; }
+.course-manager-assignment-row .course-manager-assignment-stat { align-items: center; display: inline-flex; gap: .4rem; min-height: 1.9rem; }
+.course-manager-assignment-row .course-manager-assignment-stat + .course-manager-assignment-stat { border-left: 1px solid var(--border); margin-left: 0; padding-left: .65rem; }
+.course-manager-assignment-row .course-manager-assignment-stat > i { color: var(--primary); font-size: .88rem; }
+.course-manager-assignment-stat-copy { display: grid; gap: .08rem; min-width: 0; }
+.course-manager-assignment-stat-copy > span { color: var(--text-muted); font-size: .64rem; font-weight: 750; letter-spacing: .04em; text-transform: uppercase; }
+.course-manager-assignment-stat-copy > strong { color: var(--text-primary); font-size: .78rem; font-weight: 750; line-height: 1.25; overflow-wrap: anywhere; }
 .course-manager-assignment-actions { flex: 0 0 auto; margin-top: 0; }
-.course-manager-assignment-row .course-manager-assignment-link { align-items: center; border: 1px solid color-mix(in srgb, var(--primary) 72%, var(--border)); border-radius: var(--radius-md); color: var(--primary); display: inline-flex; font-size: .8rem; font-weight: 800; gap: .4rem; min-height: 40px; padding: .55rem .75rem; text-decoration: none; transition: background var(--transition), border-color var(--transition), color var(--transition), transform var(--transition); }
+.course-manager-assignment-row .course-manager-assignment-link { align-items: center; border: 1px solid color-mix(in srgb, var(--primary) 72%, var(--border)); border-radius: var(--radius-md); color: var(--primary); display: inline-flex; font-size: .75rem; font-weight: 800; gap: .35rem; min-height: 34px; padding: .4rem .65rem; text-decoration: none; transition: background var(--transition), border-color var(--transition), color var(--transition), transform var(--transition); }
 .course-manager-assignment-row .course-manager-assignment-link:hover, .course-manager-assignment-row .course-manager-assignment-link:focus-visible { background: var(--primary-soft); border-color: var(--primary); color: var(--primary); text-decoration: none; transform: translateY(-1px); }
 .course-manager-assignment-row .course-manager-assignment-link span[aria-hidden='true'] { font-size: 1rem; }
 .course-manager-row-badge-warning { background: var(--warning-soft); border-color: color-mix(in srgb, var(--warning) 30%, var(--border)); color: var(--warning); }
@@ -150,17 +131,17 @@
 @media (max-width: 899px) { .course-manager-page { margin-top: 60px; } .course-manager-page-header, .course-manager-toolbar { align-items: stretch; flex-direction: column; } .course-manager-summary { align-self: flex-start; } .course-manager-toolbar-search { min-width: 100%; } .course-manager-filter-result { margin-left: 0; } .course-manager-section-header { align-items: stretch; flex-direction: column; } .course-manager-section-actions { justify-content: flex-end; } }
 @media (max-width: 640px) { .course-manager-page { padding: 1rem .7rem 2rem; } .course-manager-template-grid { grid-template-columns: 1fr; } .course-manager-filter-bar > label { flex: 1 1 calc(50% - .4rem); } .course-manager-filter-bar select { min-width: 0; width: 100%; } .course-manager-bulk-bar { position: static; } .course-manager-bulk-bar select { max-width: none; min-width: 100%; order: 2; } .course-manager-bulk-copy { flex-basis: 100%; } .course-manager-section-leading { align-items: flex-start; } .course-manager-section-meta { flex-basis: 100%; margin-left: 2.2rem; } .course-manager-section-description { margin-left: 2.2rem; } .course-manager-section-actions { justify-content: space-between; width: 100%; } .course-manager-add-to-section { flex: 1; } .lesson-manager-row { gap: .35rem; } .course-manager-row-actions .dropdown .btn { min-width: 34px; } .course-manager-row-actions > .btn { display: none; } .course-manager-row-meta { max-width: 100%; } }
 @media (max-width: 640px) {
-  .course-manager-assignment-row { flex-wrap: wrap; padding: .55rem; }
-  .course-manager-assignment-surface { flex: 1 1 calc(100% - 4.25rem); gap: .7rem; grid-template-columns: 44px minmax(0, 1fr); }
-  .course-manager-assignment-icon { height: 40px !important; width: 40px !important; }
-  .course-manager-assignment-title-row { display: flex; gap: .5rem; }
+  .course-manager-assignment-row { flex-wrap: wrap; gap: .3rem; padding: .5rem .45rem; }
+  .course-manager-assignment-surface { flex: 1 1 calc(100% - 4.05rem); gap: .55rem; grid-template-columns: 38px minmax(0, 1fr); }
+  .course-manager-assignment-icon { height: 36px !important; width: 36px !important; }
+  .course-manager-assignment-title-row { display: flex; gap: .4rem; }
   .course-manager-assignment-title-row .course-manager-row-actions { margin-left: auto; }
   .course-manager-assignment-title-row .course-manager-row-actions > .btn { display: inline-flex; }
-  .course-manager-assignment-detail-row { align-items: stretch; flex-direction: column; gap: .7rem; }
-  .course-manager-assignment-meta { gap: .6rem; }
+  .course-manager-assignment-detail-row { align-items: stretch; flex-direction: column; gap: .55rem; }
+  .course-manager-assignment-meta { gap: .45rem; }
   .course-manager-assignment-row .course-manager-assignment-stat + .course-manager-assignment-stat { border-left: 0; margin-left: 0; padding-left: 0; }
   .course-manager-assignment-actions, .course-manager-assignment-link { width: 100%; }
-  .course-manager-assignment-row .course-manager-assignment-link { justify-content: center; }
+  .course-manager-assignment-row .course-manager-assignment-link { justify-content: center; min-height: 36px; }
 }
 
 /* Admin-only student-view preview. Kept in the Course Manager stylesheet so
