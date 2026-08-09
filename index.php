@@ -150,6 +150,18 @@ $router->mount('/admin', function() use ($router) {
         require __DIR__ . '/views/admin/course-content.php';
     });
 
+    $router->get('/courses/{courseId}/students', function($courseId) {
+        require_once '__init.php';
+        mmh_admin_require_admin();
+        require __DIR__ . '/views/admin/course-students.php';
+    });
+
+    $router->post('/courses/{courseId}/students', function($courseId) {
+        require_once '__init.php';
+        mmh_admin_require_mutation();
+        require __DIR__ . '/views/admin/requests/course-students.php';
+    });
+
     $router->get('/courses/{courseId}/content/{itemId}/preview', function($courseId, $itemId) {
         require_once '__init.php';
         mmh_admin_require_admin();
