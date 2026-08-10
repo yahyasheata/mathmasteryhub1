@@ -35,6 +35,8 @@ $authCsrfToken = mmh_auth_csrf_token();
   <link rel="stylesheet" href="<?= mmh_site_public_url('resources/css/fontawsome5.min.css') ?>">
   <link rel="stylesheet" href="<?= mmh_site_public_url('resources/css/design-system.css') ?>" data-design-system="mathhub">
   <style>
+    html, body { margin: 0; }
+    .password-reset-page, .password-reset-card, .password-reset-input, .password-reset-submit { box-sizing: border-box; }
     .password-reset-page {
       position: relative;
       display: grid;
