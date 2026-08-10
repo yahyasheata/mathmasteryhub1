@@ -15,5 +15,238 @@ $authMessage = mmh_auth_flash('password_reset');
 $authError = mmh_auth_flash('password_reset_error');
 $authCsrfToken = mmh_auth_csrf_token();
 ?><!doctype html>
-<html lang="en"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>Forgot your password? · <?=htmlspecialchars($site_name, ENT_QUOTES, 'UTF-8')?></title><?php include __DIR__ . '/../partials/favicon.php'; ?><link rel="stylesheet" href="<?=mmh_site_public_url('resources/css/design-system.css')?>"><style>body{font-family:system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif}.password-reset-shell{min-height:100vh;display:grid;place-items:center;padding:2rem 1rem}.password-reset-card{width:min(100%,30rem);padding:2rem;border:1px solid var(--border);border-radius:1rem;background:var(--surface);box-shadow:var(--shadow-lg)}.password-reset-card label{display:block;font-weight:600;margin-bottom:.45rem}.password-reset-card input{width:100%;padding:.75rem;border:1px solid var(--border);border-radius:.55rem;background:var(--bg-primary);color:var(--text-primary)}.password-reset-card input:focus{outline:2px solid var(--primary);outline-offset:2px}.password-reset-logo{width:9rem;height:auto;margin:0 auto 1.5rem;display:block}.password-reset-logo--dark{display:none}.dark .password-reset-logo--light{display:none}.dark .password-reset-logo--dark{display:block}</style></head>
-<body class="ds-bg-primary ds-text-primary"><main class="password-reset-shell"><section class="password-reset-card" aria-labelledby="forgot-title"><a href="<?=$authRootUrl?>" aria-label="Back to home"><img class="password-reset-logo password-reset-logo--light" src="<?=htmlspecialchars($authBrandLogoUrl, ENT_QUOTES, 'UTF-8')?>" alt="<?=htmlspecialchars($site_name, ENT_QUOTES, 'UTF-8')?>"><img class="password-reset-logo password-reset-logo--dark" src="<?=htmlspecialchars($authDarkLogoUrl, ENT_QUOTES, 'UTF-8')?>" alt="<?=htmlspecialchars($site_name, ENT_QUOTES, 'UTF-8')?>"></a><h1 id="forgot-title" class="text-2xl font-bold text-center mb-2">Forgot your password?</h1><p class="ds-text-secondary text-center mb-6">Enter your email and we'll send you a secure reset link.</p><?php if ($authMessage): ?><div class="mb-4 rounded-lg border border-green-500/40 bg-green-500/10 px-3 py-2 text-sm" role="status"><?=htmlspecialchars($authMessage, ENT_QUOTES, 'UTF-8')?></div><?php endif; ?><?php if ($authError): ?><div class="mb-4 rounded-lg border border-red-500/40 bg-red-500/10 px-3 py-2 text-sm" role="alert"><?=htmlspecialchars($authError, ENT_QUOTES, 'UTF-8')?></div><?php endif; ?><form method="post" action="<?=$authBaseUrl?>/forgot-password"><input type="hidden" name="csrf_token" value="<?=htmlspecialchars($authCsrfToken, ENT_QUOTES, 'UTF-8')?>"><label for="reset-email">Email address</label><input id="reset-email" name="email" type="email" autocomplete="email" required maxlength="190"><button class="mt-5 w-full rounded-lg bg-primary px-4 py-3 font-semibold ds-text-inverse" type="submit">Send reset link</button></form><p class="mt-4 text-center text-sm ds-text-muted">If you do not have an email linked to your account, contact support.</p><p class="mt-4 text-center"><a class="text-primary hover:underline" href="<?=$authBaseUrl?>/login">Back to login</a></p></section></main></body></html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Forgot your password? · <?= htmlspecialchars($site_name, ENT_QUOTES, 'UTF-8') ?></title>
+  <?php include __DIR__ . '/../partials/favicon.php'; ?>
+  <script>
+    (function () {
+      try {
+        var savedTheme = window.localStorage.getItem('theme');
+        var prefersDark = window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches;
+        var dark = savedTheme === 'dark' || (!savedTheme && prefersDark);
+        document.documentElement.classList.toggle('dark', dark);
+        document.documentElement.dataset.theme = dark ? 'dark' : 'light';
+      } catch (error) {}
+    }());
+  </script>
+  <link rel="stylesheet" href="<?= mmh_site_public_url('resources/css/fontawsome5.min.css') ?>">
+  <link rel="stylesheet" href="<?= mmh_site_public_url('resources/css/design-system.css') ?>" data-design-system="mathhub">
+  <style>
+    .password-reset-page {
+      position: relative;
+      display: grid;
+      place-items: center;
+      min-height: 100svh;
+      padding: clamp(1.25rem, 4vw, 3rem) 1rem;
+      overflow: hidden;
+      isolation: isolate;
+    }
+    .password-reset-page::before {
+      position: absolute;
+      z-index: -1;
+      top: -12rem;
+      left: 50%;
+      width: min(42rem, 100vw);
+      height: 28rem;
+      border-radius: 50%;
+      background: var(--primary-soft);
+      content: "";
+      filter: blur(24px);
+      opacity: .6;
+      transform: translateX(-50%);
+    }
+    .password-reset-card {
+      width: min(100%, 33rem);
+      padding: clamp(1.4rem, 4vw, 2.5rem);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-xl);
+      background: var(--surface-elevated);
+      box-shadow: var(--shadow-lg);
+    }
+    .password-reset-topbar {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 1rem;
+      margin-bottom: clamp(1.6rem, 4vw, 2.2rem);
+    }
+    .password-reset-brand {
+      display: inline-flex;
+      align-items: center;
+      min-width: 0;
+      border-radius: var(--radius-sm);
+    }
+    .password-reset-brand:focus-visible,
+    .password-reset-theme:focus-visible,
+    .password-reset-back:focus-visible {
+      outline: 3px solid var(--primary-ring);
+      outline-offset: 3px;
+    }
+    .password-reset-logo {
+      display: block;
+      width: clamp(7.2rem, 30vw, 9.25rem);
+      height: auto;
+      max-width: 100%;
+    }
+    .password-reset-logo--dark { display: none; }
+    html.dark .password-reset-logo--light,
+    html[data-theme="dark"] .password-reset-logo--light { display: none; }
+    html.dark .password-reset-logo--dark,
+    html[data-theme="dark"] .password-reset-logo--dark { display: block; }
+    .password-reset-theme {
+      display: inline-grid;
+      flex: 0 0 auto;
+      place-items: center;
+      width: var(--icon-button);
+      height: var(--icon-button);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-sm);
+      background: var(--surface-hover);
+      color: var(--text-secondary);
+      cursor: pointer;
+      transition: background var(--transition), border-color var(--transition), color var(--transition), transform var(--transition-fast);
+    }
+    .password-reset-theme:hover { border-color: var(--primary); color: var(--primary); }
+    .password-reset-theme:active { transform: scale(.96); }
+    .password-reset-theme .fa-sun { display: none; }
+    html.dark .password-reset-theme .fa-moon,
+    html[data-theme="dark"] .password-reset-theme .fa-moon { display: none; }
+    html.dark .password-reset-theme .fa-sun,
+    html[data-theme="dark"] .password-reset-theme .fa-sun { display: inline-block; }
+    .password-reset-heading { margin: 0; color: var(--text-primary); font-size: clamp(1.65rem, 5vw, 2.15rem); font-weight: 800; letter-spacing: -.025em; line-height: var(--line-tight); }
+    .password-reset-intro { max-width: 31rem; margin: .7rem 0 1.65rem; color: var(--text-secondary); font-size: .96rem; line-height: 1.55; }
+    .password-reset-feedback {
+      display: grid;
+      grid-template-columns: 2rem minmax(0, 1fr);
+      gap: .75rem;
+      align-items: start;
+      margin: 0 0 1.25rem;
+      padding: .9rem 1rem;
+      border: 1px solid var(--border);
+      border-radius: var(--radius-md);
+      background: var(--surface-muted);
+      color: var(--text-secondary);
+      font-size: .87rem;
+      line-height: 1.45;
+    }
+    .password-reset-feedback-icon { display: grid; place-items: center; width: 2rem; height: 2rem; border-radius: 50%; background: var(--success-soft); color: var(--success); }
+    .password-reset-feedback--error .password-reset-feedback-icon { background: var(--danger-soft); color: var(--danger); }
+    .password-reset-feedback strong { display: block; margin-bottom: .15rem; color: var(--text-primary); font-size: .9rem; }
+    .password-reset-form { display: grid; gap: 1.1rem; }
+    .password-reset-field { display: grid; gap: .45rem; }
+    .password-reset-field label { color: var(--text-primary); font-size: .84rem; font-weight: 750; }
+    .password-reset-input-wrap { position: relative; }
+    .password-reset-input-icon { position: absolute; top: 50%; left: 1rem; color: var(--text-muted); pointer-events: none; transform: translateY(-50%); }
+    .password-reset-input {
+      display: block;
+      width: 100%;
+      min-height: 3.1rem;
+      padding: .75rem 1rem .75rem 2.85rem;
+      border: 1px solid var(--border-strong);
+      border-radius: var(--radius-sm);
+      background: var(--surface-inset);
+      color: var(--text-primary);
+      font: inherit;
+      line-height: 1.35;
+      transition: border-color var(--transition), box-shadow var(--transition), background var(--transition);
+    }
+    .password-reset-input::placeholder { color: var(--text-muted); opacity: .8; }
+    .password-reset-input:hover { border-color: var(--primary); }
+    .password-reset-input:focus { border-color: var(--primary); outline: 0; box-shadow: var(--shadow-focus); background: var(--surface); }
+    .password-reset-submit {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: .55rem;
+      width: 100%;
+      min-height: 3.15rem;
+      padding: .8rem 1.1rem;
+      border: 1px solid var(--primary);
+      border-radius: var(--radius-sm);
+      background: var(--primary);
+      color: var(--text-inverse);
+      cursor: pointer;
+      font: inherit;
+      font-weight: 800;
+      transition: background var(--transition), border-color var(--transition), box-shadow var(--transition), transform var(--transition-fast);
+    }
+    .password-reset-submit:hover { border-color: var(--primary-hover); background: var(--primary-hover); box-shadow: var(--shadow-sm); }
+    .password-reset-submit:focus-visible { outline: 3px solid var(--primary-ring); outline-offset: 3px; }
+    .password-reset-submit:active { transform: translateY(1px); }
+    .password-reset-support { margin: 1.35rem 0 0; color: var(--text-muted); font-size: .78rem; line-height: 1.5; text-align: center; }
+    .password-reset-support strong { color: var(--text-secondary); font-weight: 700; }
+    .password-reset-back { display: inline-flex; align-items: center; gap: .45rem; margin-top: 1.35rem; color: var(--secondary); font-size: .87rem; font-weight: 750; text-decoration: none; }
+    .password-reset-back:hover { color: var(--secondary-hover); text-decoration: underline; }
+    @media (max-width: 520px) {
+      .password-reset-page { align-items: start; padding-top: 1.25rem; }
+      .password-reset-card { padding: 1.35rem; }
+      .password-reset-topbar { margin-bottom: 1.8rem; }
+    }
+    @media (prefers-reduced-motion: reduce) {
+      .password-reset-theme, .password-reset-input, .password-reset-submit { transition: none; }
+    }
+  </style>
+</head>
+<body class="ds-bg-primary ds-text-primary">
+  <main class="password-reset-page">
+    <section class="password-reset-card" aria-labelledby="forgot-title">
+      <div class="password-reset-topbar">
+        <a class="password-reset-brand" href="<?= htmlspecialchars($authRootUrl, ENT_QUOTES, 'UTF-8') ?>" aria-label="Back to home">
+          <img class="password-reset-logo password-reset-logo--light" src="<?= htmlspecialchars($authBrandLogoUrl, ENT_QUOTES, 'UTF-8') ?>" alt="<?= htmlspecialchars($site_name, ENT_QUOTES, 'UTF-8') ?>">
+          <img class="password-reset-logo password-reset-logo--dark" src="<?= htmlspecialchars($authDarkLogoUrl, ENT_QUOTES, 'UTF-8') ?>" alt="<?= htmlspecialchars($site_name, ENT_QUOTES, 'UTF-8') ?>">
+        </a>
+        <button class="password-reset-theme" id="password-reset-theme" type="button" aria-label="Toggle theme" title="Toggle theme">
+          <i class="fas fa-moon" aria-hidden="true"></i>
+          <i class="fas fa-sun" aria-hidden="true"></i>
+        </button>
+      </div>
+
+      <h1 class="password-reset-heading" id="forgot-title">Forgot your password?</h1>
+      <p class="password-reset-intro">Enter the email associated with your account and we'll send you a secure reset link.</p>
+
+      <?php if ($authMessage): ?>
+        <div class="password-reset-feedback" role="status" aria-live="polite">
+          <span class="password-reset-feedback-icon" aria-hidden="true"><i class="fas fa-check"></i></span>
+          <div><strong>Check your email</strong><?= htmlspecialchars($authMessage, ENT_QUOTES, 'UTF-8') ?></div>
+        </div>
+      <?php endif; ?>
+      <?php if ($authError): ?>
+        <div class="password-reset-feedback password-reset-feedback--error" role="alert" aria-live="assertive">
+          <span class="password-reset-feedback-icon" aria-hidden="true"><i class="fas fa-exclamation"></i></span>
+          <div><strong>We couldn't send that request</strong><?= htmlspecialchars($authError, ENT_QUOTES, 'UTF-8') ?></div>
+        </div>
+      <?php endif; ?>
+
+      <form class="password-reset-form" method="post" action="<?= htmlspecialchars($authBaseUrl . '/forgot-password', ENT_QUOTES, 'UTF-8') ?>">
+        <input type="hidden" name="csrf_token" value="<?= htmlspecialchars($authCsrfToken, ENT_QUOTES, 'UTF-8') ?>">
+        <div class="password-reset-field">
+          <label for="reset-email">Email address</label>
+          <div class="password-reset-input-wrap">
+            <i class="password-reset-input-icon fas fa-envelope" aria-hidden="true"></i>
+            <input class="password-reset-input" id="reset-email" name="email" type="email" autocomplete="email" inputmode="email" maxlength="190" placeholder="you@example.com" required>
+          </div>
+        </div>
+        <button class="password-reset-submit" type="submit"><span>Send reset link</span><i class="fas fa-arrow-right" aria-hidden="true"></i></button>
+      </form>
+
+      <p class="password-reset-support">Don't have an email linked to your account? <strong>Contact support.</strong></p>
+      <a class="password-reset-back" href="<?= htmlspecialchars($authBaseUrl . '/login', ENT_QUOTES, 'UTF-8') ?>"><i class="fas fa-arrow-left" aria-hidden="true"></i><span>Back to login</span></a>
+    </section>
+  </main>
+  <script>
+    (function () {
+      var toggle = document.getElementById('password-reset-theme');
+      if (!toggle) return;
+      toggle.addEventListener('click', function () {
+        var dark = !document.documentElement.classList.contains('dark');
+        document.documentElement.classList.toggle('dark', dark);
+        document.documentElement.dataset.theme = dark ? 'dark' : 'light';
+        try { window.localStorage.setItem('theme', dark ? 'dark' : 'light'); } catch (error) {}
+      });
+    }());
+  </script>
+</body>
+</html>
