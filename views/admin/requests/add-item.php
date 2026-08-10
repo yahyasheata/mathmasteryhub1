@@ -7,6 +7,7 @@ require_once 'inc/AcademicMetadata.php';
 require_once 'inc/CourseResourceResolver.php';
 require_once 'inc/TimedExam.php';
 require_once 'inc/AdminAssessmentService.php';
+require_once 'inc/AssignmentModelAnswerAccess.php';
 
 header('Content-Type: application/json; charset=utf-8');
 
@@ -1243,6 +1244,13 @@ try {
         }
         if ($template_type === 'classified_assignment') {
             item_update_assignment_context($conn, $course_id, (string) ($built['data']['assignment_id'] ?? ''), $item_id, $section_id);
+            mmh_assignment_model_answer_access_save(
+                $conn,
+                (string) ($built['data']['assignment_id'] ?? ''),
+                (string) $course_id,
+                $_POST['model_answer_access_mode'] ?? 'all',
+                is_array($_POST['model_answer_access_student_ids'] ?? null) ? $_POST['model_answer_access_student_ids'] : []
+            );
         }
         if ($template_type === 'classified_assignment') {
             if (!$conn->commit()) { throw new RuntimeException('Unable to commit the Homework update.'); }
@@ -1363,6 +1371,13 @@ try {
     }
     if ($template_type === 'classified_assignment') {
         item_update_assignment_context($conn, $course_id, (string) ($built['data']['assignment_id'] ?? ''), $item_id, $section_id);
+        mmh_assignment_model_answer_access_save(
+            $conn,
+            (string) ($built['data']['assignment_id'] ?? ''),
+            (string) $course_id,
+            $_POST['model_answer_access_mode'] ?? 'all',
+            is_array($_POST['model_answer_access_student_ids'] ?? null) ? $_POST['model_answer_access_student_ids'] : []
+        );
     }
     if ($template_type === 'classified_assignment' || $template_type === 'timed_exam') {
         if (!$conn->commit()) { throw new RuntimeException('Unable to commit the Homework save.'); }

@@ -4,6 +4,7 @@ require_once 'inc/functions.php';
 require_once 'inc/AcademicMetadata.php';
 require_once 'inc/CourseResourceResolver.php';
 require_once 'inc/TimedExam.php';
+require_once 'inc/AssignmentModelAnswerAccess.php';
 
 header('Content-Type: application/json; charset=utf-8');
 
@@ -428,6 +429,24 @@ if ($template_type === 'classified_assignment' && $existing_assignment_id_raw !=
         $assignment_record = $assignment_stmt->get_result()->fetch_assoc() ?: [];
         $assignment_stmt->close();
     }
+}
+$model_answer_access_mode = $template_type === 'classified_assignment' && $existing_assignment_id_raw !== ''
+    ? mmh_assignment_model_answer_access_mode($conn, $existing_assignment_id_raw)
+    : 'all';
+$model_answer_access_selected_ids = $template_type === 'classified_assignment' && $existing_assignment_id_raw !== ''
+    ? mmh_assignment_model_answer_access_selected_ids($conn, $existing_assignment_id_raw)
+    : [];
+$model_answer_access_students_html = '';
+if ($template_type === 'classified_assignment') {
+    foreach (mmh_assignment_model_answer_access_enrolled_students($conn, $course_id) as $student) {
+        $studentId = (int) ($student['user_id'] ?? 0);
+        if ($studentId <= 0) continue;
+        $studentName = trim((string) ($student['full_name'] ?? '')) ?: (string) ($student['username'] ?? 'Student');
+        $searchText = strtolower($studentName . ' ' . (string) ($student['username'] ?? ''));
+        $checked = in_array($studentId, $model_answer_access_selected_ids, true) ? ' checked' : '';
+        $model_answer_access_students_html .= "<label class='model-answer-access-student' data-student-search='" . htmlspecialchars($searchText, ENT_QUOTES, 'UTF-8') . "'><input type='checkbox' name='model_answer_access_student_ids[]' value='{$studentId}'{$checked}><span>" . htmlspecialchars($studentName, ENT_QUOTES, 'UTF-8') . "</span><small>" . htmlspecialchars((string) ($student['username'] ?? ''), ENT_QUOTES, 'UTF-8') . "</small></label>";
+    }
+    if ($model_answer_access_students_html === '') $model_answer_access_students_html = "<div class='text-muted small'>No active students are enrolled in this course yet.</div>";
 }
 $legacy_content = $item['item_description'];
 $notes_content = $template_type === 'notes' ? ($template_data['content'] ?? $item['item_description']) : '';
@@ -919,6 +938,21 @@ $html_response = "
                     <option value='after_due'" . ($model_answer_release === 'after_due' ? ' selected' : '') . ">Visible after due date</option>
                     <option value='after_submission'" . ($model_answer_release === 'after_submission' ? ' selected' : '') . ">Visible after student submission</option>
                   </select>
+                </div>
+                <div class='col-12 p-2'>
+                  <fieldset class='model-answer-access-card'>
+                    <legend class='h6 mb-1'>Model Answer access</legend>
+                    <p class='text-muted small mb-2'>Control which enrolled students can open this Model Answer. Homework access and submissions are unchanged.</p>
+                    <label class='form-check'><input class='form-check-input' type='radio' name='model_answer_access_mode' value='all'" . ($model_answer_access_mode === 'all' ? ' checked' : '') . "><span class='form-check-label'>All enrolled students</span></label>
+                    <label class='form-check'><input class='form-check-input' type='radio' name='model_answer_access_mode' value='selected'" . ($model_answer_access_mode === 'selected' ? ' checked' : '') . "><span class='form-check-label'>Selected students</span></label>
+                    <label class='form-check'><input class='form-check-input' type='radio' name='model_answer_access_mode' value='none'" . ($model_answer_access_mode === 'none' ? ' checked' : '') . "><span class='form-check-label'>No students</span></label>
+                    <div class='model-answer-access-selected mt-2' data-model-answer-selected>
+                      <label class='form-label small mb-1' for='model-answer-access-search'>Search enrolled students</label>
+                      <input id='model-answer-access-search' type='search' class='form-control form-control-sm mb-2' placeholder='Name or email' data-model-answer-access-search>
+                      <div class='small text-muted mb-1' data-model-answer-access-count>0 selected</div>
+                      <div class='model-answer-access-students' data-model-answer-access-list>{$model_answer_access_students_html}</div>
+                    </div>
+                  </fieldset>
                 </div>
                 <div class='col-12 col-lg-4 p-2'>
                   <div>Maximum Score</div>

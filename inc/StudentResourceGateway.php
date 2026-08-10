@@ -12,6 +12,7 @@ require_once __DIR__ . '/CourseResourceResolver.php';
 require_once __DIR__ . '/CourseResourceNavigation.php';
 require_once __DIR__ . '/RecoveryPlan.php';
 require_once __DIR__ . '/TimedExam.php';
+require_once __DIR__ . '/AssignmentModelAnswerAccess.php';
 
 if (!function_exists('mmh_student_resource_url')) {
     /** Build the one canonical authenticated course-item URL. */
@@ -163,6 +164,16 @@ if (!function_exists('mmh_student_resource_gateway')) {
         }
 
         $resource = mmh_course_resource_resolve($selection['item']);
+        $homeworkPart = strtolower(trim((string) ($options['homework_part'] ?? $options['part'] ?? '')));
+        if ($homeworkPart !== '' && !in_array($homeworkPart, ['homework', 'model-answer'], true)) {
+            return mmh_student_resource_denial(404, 'This Homework resource could not be found.', $studentId, $course);
+        }
+        if ($homeworkPart === 'model-answer') {
+            $assignmentId = mmh_course_assignment_id($item);
+            if ($assignmentId === '' || !mmh_assignment_model_answer_access_can($conn, $assignmentId, $canonicalCourseId, $studentId)) {
+                return mmh_student_resource_denial(403, 'This Model Answer is not available for your account.', $studentId, $course);
+            }
+        }
         $navigation = course_resource_navigation($conn, $course, $studentId, $itemKey, $recoveryContext);
         $navigation['mode'] = !empty($recoveryContext['valid']) ? 'recovery' : 'course';
         $navigation['current'] = $item;
@@ -181,11 +192,6 @@ if (!function_exists('mmh_student_resource_gateway')) {
         $returnUrl = $baseUrl !== '' && !empty($recoveryContext['valid'])
             ? mmh_recovery_plan_workspace_url($baseUrl, $canonicalCourseId, (int) $recoveryContext['plan']['id'], (int) ($recoveryContext['task']['id'] ?? 0))
             : ($baseUrl !== '' ? student_course_access_course_url($baseUrl, $canonicalCourseId, $itemKey, true) : '');
-        $homeworkPart = strtolower(trim((string) ($options['homework_part'] ?? $options['part'] ?? '')));
-        if ($homeworkPart !== '' && !in_array($homeworkPart, ['homework', 'model-answer'], true)) {
-            return mmh_student_resource_denial(404, 'This Homework resource could not be found.', $studentId, $course);
-        }
-
         $timedExam = null;
         if (($resource['action'] ?? '') === 'timed_exam' || strtolower((string) ($item['template_type'] ?? '')) === 'timed_exam') {
             $timedExam = mmh_timed_exam_load_for_item($conn, $canonicalCourseId, $itemKey, false);

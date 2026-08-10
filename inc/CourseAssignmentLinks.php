@@ -1,5 +1,6 @@
 <?php
 require_once __DIR__ . '/CourseResourceResolver.php';
+require_once __DIR__ . '/AssignmentModelAnswerAccess.php';
 
 if (!function_exists('mmh_course_assignment_generate_id')) {
     function mmh_course_assignment_generate_id(mysqli $conn): string
@@ -62,6 +63,7 @@ if (!function_exists('mmh_course_assignment_clone_for_item')) {
             throw new RuntimeException($insert->error ?: $conn->error);
         }
         $insert->close();
+        mmh_assignment_model_answer_access_clone($conn, $sourceAssignmentId, $newId, $courseId);
         return $newId;
     }
 }

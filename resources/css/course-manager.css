@@ -170,3 +170,9 @@ html:has(.course-manager-page) .admin-top-nav { overflow-x: hidden; }
 .course-content-preview-note { color: var(--text-muted); font-size: .8rem; margin-top: .8rem; padding: .7rem .85rem; }
 .course-content-preview-note i { color: var(--secondary); }
 @media (max-width: 700px) { .course-content-preview-header { align-items: stretch; flex-direction: column; } .course-content-preview-actions .btn { flex: 1; } .course-content-preview-stage, .course-content-preview-external { min-height: 54vh; } .course-content-preview-embed, .course-content-preview-rich { height: 54vh; min-height: 320px; } }
+.model-answer-access-card{border:1px solid var(--border);border-radius:12px;padding:1rem;background:var(--surface)}
+.model-answer-access-card legend{font-weight:700;color:var(--text-primary)}
+.model-answer-access-students{display:grid;gap:.35rem;max-height:180px;overflow:auto;padding:.5rem;border:1px solid var(--border);border-radius:8px}
+.model-answer-access-student{display:grid;grid-template-columns:auto 1fr;column-gap:.5rem;align-items:center;padding:.3rem .4rem;border-radius:6px}
+.model-answer-access-student:hover{background:var(--surface-muted)}
+.model-answer-access-student small{grid-column:2;color:var(--text-secondary);font-size:.75rem}

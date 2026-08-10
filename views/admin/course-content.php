@@ -386,6 +386,25 @@ $admin_base = rtrim((string) $baseUrl, '/') . '/admin/';
     if (!$pane.length) { $pane = $form.find('.template-pane[data-template-pane="custom_html"]'); }
     $pane.removeClass('d-none'); $pane.find('[data-template-required]').prop('required', true); updateCustomLabel($form); initEditorTinyMCE();
   }
+  function setupModelAnswerAccess($scope) {
+    var $root = $scope && $scope.length ? $scope : $('#course-manager-editor');
+    var $access = $root.find('[data-model-answer-selected]');
+    if (!$access.length) { return; }
+    function toggle() {
+      var mode = $root.find('[name="model_answer_access_mode"]:checked').val() || 'all';
+      $access.toggleClass('d-none', mode !== 'selected');
+      $access.find('[data-model-answer-access-count]').text($access.find('input[name="model_answer_access_student_ids[]"]:checked').length + ' selected');
+    }
+    $root.off('change.modelAnswerAccess', '[name="model_answer_access_mode"]').on('change.modelAnswerAccess', '[name="model_answer_access_mode"]', toggle);
+    $root.off('change.modelAnswerAccess', 'input[name="model_answer_access_student_ids[]"]').on('change.modelAnswerAccess', 'input[name="model_answer_access_student_ids[]"]', toggle);
+    $root.off('input.modelAnswerAccess', '[data-model-answer-access-search]').on('input.modelAnswerAccess', '[data-model-answer-access-search]', function() {
+      var query = String($(this).val() || '').toLowerCase().trim();
+      $access.find('.model-answer-access-student').each(function() {
+        $(this).toggle(!query || String($(this).data('student-search') || '').indexOf(query) !== -1);
+      });
+    });
+    toggle();
+  }
   function updateSectionFields($form) {
     var custom = $form.find('.sectionTypeSelector').val() === 'custom';
     $form.find('[data-custom-section-type]').toggleClass('d-none', !custom).find('input').prop('required', custom);
@@ -413,7 +432,7 @@ $admin_base = rtrim((string) $baseUrl, '/') . '/admin/';
     editorDirty = false;
     var $form = $('#course-manager-editor form').first();
     $form.on('input.courseManager change.courseManager', 'input, select, textarea', markEditorDirty);
-    if ($form.hasClass('courseBuilderItemForm')) { activateTemplate($form, $form.find('[name="template_type"]').val() || 'recording'); }
+    if ($form.hasClass('courseBuilderItemForm')) { activateTemplate($form, $form.find('[name="template_type"]').val() || 'recording'); setupModelAnswerAccess($form); }
     if ($form.hasClass('courseBuilderSectionForm')) { updateSectionFields($form); }
     $('#course-manager-editor')[0].scrollIntoView({ behavior: 'smooth', block: 'start' });
   }
