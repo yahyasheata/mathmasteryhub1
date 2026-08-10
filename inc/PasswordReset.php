@@ -70,6 +70,30 @@ if (!function_exists('mmh_password_reset_env')) {
     }
 }
 
+if (!function_exists('mmh_password_reset_resend_config')) {
+    /** Safe, non-secret Resend configuration status shared with Admin Integrations. */
+    function mmh_password_reset_resend_config(): array
+    {
+        $apiKey = mmh_password_reset_env('RESEND_API_KEY');
+        $fromEmail = mmh_password_reset_env('MAIL_FROM_EMAIL');
+        $fromName = mmh_password_reset_env('MAIL_FROM_NAME');
+        $publicUrl = rtrim(mmh_password_reset_env('APP_PUBLIC_URL'), '/');
+        $parts = $publicUrl !== '' ? parse_url($publicUrl) : false;
+        $publicUrlValid = is_array($parts)
+            && strtolower((string) ($parts['scheme'] ?? '')) === 'https'
+            && trim((string) ($parts['host'] ?? '')) !== '';
+        return [
+            'provider' => 'Resend',
+            'configured' => $apiKey !== ''
+                && filter_var($fromEmail, FILTER_VALIDATE_EMAIL) !== false
+                && $publicUrlValid,
+            'from_email_configured' => filter_var($fromEmail, FILTER_VALIDATE_EMAIL) !== false,
+            'from_name_configured' => $fromName !== '',
+            'public_url_configured' => $publicUrlValid,
+        ];
+    }
+}
+
 if (!function_exists('mmh_password_reset_public_url')) {
     function mmh_password_reset_public_url(string $token): ?string
     {
@@ -210,12 +234,13 @@ if (!function_exists('mmh_password_reset_issue')) {
 if (!function_exists('mmh_password_reset_send_resend')) {
     function mmh_password_reset_send_resend(string $recipient, string $resetUrl): array
     {
+        $config = mmh_password_reset_resend_config();
+        if (empty($config['configured'])) {
+            return [false, 'mailer_not_configured'];
+        }
         $apiKey = mmh_password_reset_env('RESEND_API_KEY');
         $fromEmail = mmh_password_reset_env('MAIL_FROM_EMAIL');
         $fromName = mmh_password_reset_env('MAIL_FROM_NAME') ?: 'Math Mastery Hub';
-        if ($apiKey === '' || !filter_var($fromEmail, FILTER_VALIDATE_EMAIL)) {
-            return [false, 'mailer_not_configured'];
-        }
         if (!function_exists('curl_init')) {
             return [false, 'curl_unavailable'];
         }

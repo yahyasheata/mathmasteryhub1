@@ -14,6 +14,7 @@ $authDarkLogoUrl = mmh_site_public_url('resources/images/branding/mathhub-logo-w
 $authMessage = mmh_auth_flash('password_reset');
 $authError = mmh_auth_flash('password_reset_error');
 $authCsrfToken = mmh_auth_csrf_token();
+$authSupportWhatsAppUrl = mmh_site_settings_whatsapp_url($site_settings);
 ?><!doctype html>
 <html lang="en">
 <head>
@@ -180,6 +181,11 @@ $authCsrfToken = mmh_auth_csrf_token();
     .password-reset-submit:active { transform: translateY(1px); }
     .password-reset-support { margin: 1.35rem 0 0; color: var(--text-muted); font-size: .78rem; line-height: 1.5; text-align: center; }
     .password-reset-support strong { color: var(--text-secondary); font-weight: 700; }
+    .password-reset-support-actions { display: grid; gap: .65rem; margin-top: 1.35rem; text-align: center; }
+    .password-reset-support-actions p { margin: 0; color: var(--text-muted); font-size: .82rem; line-height: 1.5; }
+    .password-reset-support-link { display: inline-flex; align-items: center; justify-content: center; gap: .5rem; min-height: 2.65rem; padding: .65rem 1rem; border: 1px solid var(--border-strong); border-radius: var(--radius-sm); color: var(--text-primary); font-weight: 750; text-decoration: none; transition: border-color var(--transition), background var(--transition), box-shadow var(--transition); }
+    .password-reset-support-link:hover { border-color: var(--primary); background: var(--surface-muted); box-shadow: var(--shadow-sm); }
+    .password-reset-support-link:focus-visible { outline: 3px solid var(--primary-ring); outline-offset: 3px; }
     .password-reset-back { display: inline-flex; align-items: center; gap: .45rem; margin-top: 1.35rem; color: var(--secondary); font-size: .87rem; font-weight: 750; text-decoration: none; }
     .password-reset-back:hover { color: var(--secondary-hover); text-decoration: underline; }
     @media (max-width: 520px) {
@@ -234,7 +240,14 @@ $authCsrfToken = mmh_auth_csrf_token();
         <button class="password-reset-submit" type="submit"><span>Send reset link</span><i class="fas fa-arrow-right" aria-hidden="true"></i></button>
       </form>
 
-      <p class="password-reset-support">Don't have an email linked to your account? <strong>Contact support.</strong></p>
+      <?php if ($authSupportWhatsAppUrl !== ''): ?>
+        <div class="password-reset-support-actions">
+          <p>Don't have an email linked to your account? Contact our support team and we'll help you recover your account.</p>
+          <a class="password-reset-support-link" href="<?= htmlspecialchars($authSupportWhatsAppUrl, ENT_QUOTES, 'UTF-8') ?>" target="_blank" rel="noopener noreferrer"><i class="fab fa-whatsapp" aria-hidden="true"></i><span>WhatsApp Support</span></a>
+        </div>
+      <?php else: ?>
+        <p class="password-reset-support">Don't have an email linked to your account? <strong>Contact support.</strong></p>
+      <?php endif; ?>
       <a class="password-reset-back" href="<?= htmlspecialchars($authBaseUrl . '/login', ENT_QUOTES, 'UTF-8') ?>"><i class="fas fa-arrow-left" aria-hidden="true"></i><span>Back to login</span></a>
     </section>
   </main>

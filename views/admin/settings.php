@@ -4,6 +4,7 @@ require_once '__init.php';
 require_once 'inc/functions.php';
 require_once 'inc/Auth.php';
 require_once 'inc/LandingPage.php';
+require_once 'inc/PasswordReset.php';
 
 $conn = db();
 mmh_landing_ensure_schema($conn);
@@ -17,7 +18,8 @@ $values = array_merge($settings, $old);
 $errors = is_array($flash['errors'] ?? null) ? $flash['errors'] : [];
 $lastUpdated = $conn->query('SELECT MAX(updated_at) AS updated_at FROM settings')->fetch_assoc()['updated_at'] ?? null;
 $driveConfigured = trim((string) getenv('MMH_GOOGLE_DRIVE_API_KEY')) !== '';
-$mailConfigured = trim((string) getenv('MAIL_HOST')) !== '' || trim((string) getenv('SMTP_HOST')) !== '';
+$mailConfig = mmh_password_reset_resend_config();
+$mailConfigured = !empty($mailConfig['configured']);
 $csrfToken = mmh_auth_csrf_token();
 
 function mmh_settings_escape($value): string { return htmlspecialchars((string) $value, ENT_QUOTES, 'UTF-8'); }
@@ -89,6 +91,7 @@ $settingsSaveState = (($flash['type'] ?? '') === 'success') ? 'All changes saved
               <label class="span-all">About the website<textarea class="form-control <?=isset($errors['website_bio'])?'is-invalid':''?>" name="settings[website_bio]" rows="6" maxlength="3000"><?=mmh_settings_escape(mmh_settings_value($values,'website_bio'))?></textarea><small>Shown in the public footer and used as a safe fallback description.</small><?=mmh_settings_error($errors,'website_bio')?></label>
               <label>Support email<input class="form-control <?=isset($errors['contact_email'])?'is-invalid':''?>" type="email" name="settings[contact_email]" value="<?=mmh_settings_escape(mmh_settings_value($values,'contact_email'))?>" maxlength="190" autocomplete="email"><small>Displayed on the Contact page.</small><?=mmh_settings_error($errors,'contact_email')?></label>
               <label>Public support phone<input class="form-control" type="tel" name="settings[phone]" value="<?=mmh_settings_escape(mmh_settings_value($values,'phone'))?>" maxlength="80"><small>Optional public support number.</small><?=mmh_settings_error($errors,'phone')?></label>
+              <label>Support WhatsApp<input class="form-control <?=isset($errors['support_whatsapp'])?'is-invalid':''?>" type="tel" name="settings[support_whatsapp]" value="<?=mmh_settings_escape(mmh_settings_value($values,'support_whatsapp'))?>" maxlength="40" placeholder="+201012345678"><small>Used for account-access support. Enter an international number.</small><?=mmh_settings_error($errors,'support_whatsapp')?></label>
               <label>WhatsApp payment number<input class="form-control" type="tel" name="settings[whatsapp_phone]" value="<?=mmh_settings_escape(mmh_settings_value($values,'whatsapp_phone'))?>" maxlength="80"><small>Receipt confirmation messages from course checkout open on this number.</small><?=mmh_settings_error($errors,'whatsapp_phone')?></label>
               <label>Instapay number<input class="form-control" type="tel" name="settings[instapay_number]" value="<?=mmh_settings_escape(mmh_settings_value($values,'instapay_number'))?>" maxlength="80"><small>Shown on the course checkout page.</small><?=mmh_settings_error($errors,'instapay_number')?></label>
               <label>Vodafone Cash number<input class="form-control" type="tel" name="settings[vodafone_cash_number]" value="<?=mmh_settings_escape(mmh_settings_value($values,'vodafone_cash_number'))?>" maxlength="80"><small>Shown on the course checkout page.</small><?=mmh_settings_error($errors,'vodafone_cash_number')?></label>
@@ -185,7 +188,7 @@ $settingsSaveState = (($flash['type'] ?? '') === 'success') ? 'All changes saved
 
           <section class="admin-settings-panel" data-settings-panel="integrations" aria-labelledby="integrations-title">
             <div class="admin-settings-panel-heading"><div><h2 id="integrations-title">Integrations</h2><p>Configuration status only. Credentials remain in environment configuration and are never shown here.</p></div></div>
-            <div class="admin-settings-status-grid"><article class="admin-settings-status <?= $driveConfigured ? 'is-ready' : ''?>"><span class="fab fa-google-drive" aria-hidden="true"></span><div><h3>Google Drive importer</h3><p><?= $driveConfigured ? 'API key configured in the environment.' : 'No API key detected. Configure MMH_GOOGLE_DRIVE_API_KEY in the environment.'?></p></div><strong><?= $driveConfigured ? 'Configured' : 'Needs setup'?></strong></article><article class="admin-settings-status <?= $mailConfigured ? 'is-ready' : ''?>"><span class="fas fa-envelope" aria-hidden="true"></span><div><h3>Email delivery</h3><p><?= $mailConfigured ? 'Mail transport environment configuration detected.' : 'No mail transport environment configuration detected.'?></p></div><strong><?= $mailConfigured ? 'Configured' : 'Needs setup'?></strong></article></div>
+            <div class="admin-settings-status-grid"><article class="admin-settings-status <?= $driveConfigured ? 'is-ready' : ''?>"><span class="fab fa-google-drive" aria-hidden="true"></span><div><h3>Google Drive importer</h3><p><?= $driveConfigured ? 'API key configured in the environment.' : 'No API key detected. Configure MMH_GOOGLE_DRIVE_API_KEY in the environment.'?></p></div><strong><?= $driveConfigured ? 'Configured' : 'Needs setup'?></strong></article><article class="admin-settings-status <?= $mailConfigured ? 'is-ready' : ''?>"><span class="fas fa-envelope" aria-hidden="true"></span><div><h3>Email delivery</h3><p><?= $mailConfigured ? 'Resend · Email delivery is configured.' : 'Resend configuration is incomplete. Check the server environment.'?></p></div><strong><?= $mailConfigured ? 'Configured' : 'Needs setup'?></strong></article></div>
           </section>
 
           <section class="admin-settings-panel" data-settings-panel="maintenance" aria-labelledby="maintenance-title">

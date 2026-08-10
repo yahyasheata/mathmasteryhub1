@@ -20,6 +20,7 @@ if (!function_exists('mmh_site_settings_defaults')) {
             'phone' => '',
             'phone2' => '',
             'whatsapp_phone' => '',
+            'support_whatsapp' => '',
             'instapay_number' => '01062688166',
             'vodafone_cash_number' => '01062688166',
             'facebook_link' => '',
@@ -200,6 +201,7 @@ if (!function_exists('mmh_site_settings_allowed_keys')) {
             'phone' => ['type' => 'text', 'max' => 80, 'category' => 'Contact'],
             'phone2' => ['type' => 'text', 'max' => 80, 'category' => 'Contact'],
             'whatsapp_phone' => ['type' => 'text', 'max' => 80, 'category' => 'Contact'],
+            'support_whatsapp' => ['type' => 'whatsapp_phone', 'max' => 40, 'category' => 'Contact'],
             'instapay_number' => ['type' => 'text', 'max' => 80, 'category' => 'Payments'],
             'vodafone_cash_number' => ['type' => 'text', 'max' => 80, 'category' => 'Payments'],
             'facebook_link' => ['type' => 'url', 'max' => 500, 'category' => 'Contact'],
@@ -313,6 +315,13 @@ if (!function_exists('mmh_site_settings_validate')) {
         if ($type === 'email' && $value !== '' && !filter_var($value, FILTER_VALIDATE_EMAIL)) {
             return [false, '', 'Enter a valid email address.'];
         }
+        if ($type === 'whatsapp_phone') {
+            if ($value === '') return [true, '', ''];
+            $normalized = mmh_site_settings_normalize_whatsapp_phone($value);
+            return $normalized !== null
+                ? [true, $normalized, '']
+                : [false, '', 'Use a valid international WhatsApp number, for example +201012345678.'];
+        }
         if ($type === 'url' && $value !== '' && !mmh_site_settings_safe_external_url($value)) {
             return [false, '', 'Use a valid HTTPS URL.'];
         }
@@ -331,6 +340,29 @@ if (!function_exists('mmh_site_settings_validate')) {
             return [false, '', 'This value is too long.'];
         }
         return [true, $value, ''];
+    }
+}
+
+if (!function_exists('mmh_site_settings_normalize_whatsapp_phone')) {
+    /** Store digits only; wa.me paths must not contain a leading plus sign. */
+    function mmh_site_settings_normalize_whatsapp_phone($value): ?string
+    {
+        $value = trim((string) (is_scalar($value) ? $value : ''));
+        if ($value === '') return null;
+        if (!preg_match('/\A\+?[0-9][0-9\s().-]*\z/', $value)) return null;
+        $digits = preg_replace('/\D+/', '', $value) ?? '';
+        if (str_starts_with($digits, '00')) $digits = substr($digits, 2);
+        if (strlen($digits) < 8 || strlen($digits) > 15 || str_starts_with($digits, '0')) return null;
+        return $digits;
+    }
+}
+
+if (!function_exists('mmh_site_settings_whatsapp_url')) {
+    function mmh_site_settings_whatsapp_url(array $settings, string $key = 'support_whatsapp', string $message = 'Hello Math Mastery Hub Support, I need help recovering access to my account.'): string
+    {
+        $phone = mmh_site_settings_normalize_whatsapp_phone($settings[$key] ?? '');
+        if ($phone === null) return '';
+        return 'https://wa.me/' . $phone . '?text=' . rawurlencode($message);
     }
 }
 
