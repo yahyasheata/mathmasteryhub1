@@ -57,7 +57,7 @@ $admin_base = rtrim((string) $baseUrl, '/') . '/admin/';
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Lesson Manager | <?=$site_name;?></title>
     <?php include 'layouts/admin/header.php'; ?>
-    <link rel="stylesheet" href="<?=$baseUrl?>/resources/css/course-manager.css?v=assignment-card-compact-20260809-r4">
+    <link rel="stylesheet" href="<?=$baseUrl?>/resources/css/course-manager.css?v=assignment-card-compact-20260809-r4-course-copy-20260820-r1">
     <script src="<?=$baseUrl?>/resources/js/jquery-ui.min.js"></script>
     <script src="<?=$baseUrl?>/resources/js/jquery.ui.touch-punch.min.js"></script>
 </head>
@@ -162,6 +162,32 @@ $admin_base = rtrim((string) $baseUrl, '/') . '/admin/';
             <section id="course-manager-list" class="course-manager-list" aria-label="Course lesson manager">
                 <div class="course-manager-loading"><span class="spinner-border spinner-border-sm" aria-hidden="true"></span> Loading course content…</div>
             </section>
+
+            <div id="course-copy-modal" class="course-copy-modal d-none" role="dialog" aria-modal="true" aria-labelledby="course-copy-title">
+                <div class="course-copy-modal-backdrop" data-copy-action="close"></div>
+                <div class="course-copy-modal-card">
+                    <div class="course-copy-modal-header">
+                        <div><div class="course-manager-eyebrow">Course content</div><h2 id="course-copy-title">Copy content</h2></div>
+                        <button type="button" class="btn-close" data-copy-action="close" aria-label="Close"></button>
+                    </div>
+                    <div class="course-copy-modal-body">
+                        <p id="course-copy-description" class="course-copy-description"></p>
+                        <label for="course-copy-destination-course">Destination course</label>
+                        <input id="course-copy-course-search" class="form-control mb-2" type="search" placeholder="Search courses" autocomplete="off">
+                        <select id="course-copy-destination-course" class="form-control" required></select>
+                        <div id="course-copy-section-wrap" class="mt-3">
+                            <label for="course-copy-destination-section">Destination section</label>
+                            <select id="course-copy-destination-section" class="form-control"><option value="">General</option></select>
+                            <small class="form-text text-muted">The copy is appended to the end of the selected section.</small>
+                        </div>
+                        <div id="course-copy-feedback" class="course-copy-feedback" role="status" aria-live="polite"></div>
+                    </div>
+                    <div class="course-copy-modal-footer">
+                        <button type="button" class="btn btn-outline-secondary" data-copy-action="close">Cancel</button>
+                        <button type="button" class="btn btn-primary" id="course-copy-submit"><span class="fas fa-copy ds-icon ds-icon-sm" aria-hidden="true"></span> <span data-copy-submit-label>Copy</span></button>
+                    </div>
+                </div>
+            </div>
         </main>
     </div>
 </div>
@@ -172,7 +198,7 @@ $admin_base = rtrim((string) $baseUrl, '/') . '/admin/';
 
   var courseId = $('.course-manager-page').data('course-id');
   var baseUrl = <?=json_encode(rtrim((string) $baseUrl, '/'));?>;
-  var adminCsrfToken = <?=json_encode(mmh_auth_csrf_token());?>;
+  var adminCsrfToken = <?=json_encode(mmh_admin_csrf_token());?>;
   var listRequest = null;
   var sortingTimer = null;
   var sortingInFlight = false;
@@ -491,6 +517,77 @@ $admin_base = rtrim((string) $baseUrl, '/') . '/admin/';
     $.ajax({ type: 'POST', url: 'requests/section/duplicate', data: { _method: 'DUPLICATE', course_id: courseId, section_id: sectionId }, dataType: 'json' }).done(function(response) { if (responseOk(response)) { notify('success', responseMessage(response, 'Section duplicated.')); loadList(); } else { notify('error', responseMessage(response, 'Section could not be duplicated.')); } }).fail(function() { notify('error', 'The section could not be duplicated.'); }).always(function() { setButtonLoading($button, false); });
   }
 
+  var copyState = { kind: '', sourceId: '', title: '', courses: [], sourceCourseId: String(courseId || '') };
+  function closeCopyModal() {
+    $('#course-copy-modal').addClass('d-none');
+    copyState = { kind: '', sourceId: '', title: '', courses: [], sourceCourseId: String(courseId || '') };
+  }
+  function copyCourses(query) {
+    query = String(query || '').toLowerCase().trim();
+    var $select = $('#course-copy-destination-course');
+    var current = String($select.val() || '');
+    var html = '';
+    copyState.courses.forEach(function(course) {
+      if (query && (String(course.title || '').toLowerCase().indexOf(query) === -1 && String(course.id || '').toLowerCase().indexOf(query) === -1)) return;
+      var state = course.state ? ' · ' + course.state : '';
+      html += '<option value="' + escapeHtml(course.id) + '">' + escapeHtml(course.title) + escapeHtml(state) + '</option>';
+    });
+    $select.html(html);
+    if (current) $select.val(current);
+    updateCopySections();
+  }
+  function updateCopySections() {
+    var selected = String($('#course-copy-destination-course').val() || '');
+    var course = copyState.courses.find(function(item) { return String(item.id) === selected; });
+    var html = '<option value="">General</option>';
+    (course && Array.isArray(course.sections) ? course.sections : []).forEach(function(section) { html += '<option value="' + escapeHtml(section.id) + '">' + escapeHtml(section.title) + '</option>'; });
+    $('#course-copy-destination-section').html(html);
+    $('#course-copy-section-wrap').toggleClass('d-none', copyState.kind === 'section');
+  }
+  function openCopyModal(kind, sourceId, title, $button) {
+    copyState.kind = kind; copyState.sourceId = String(sourceId || ''); copyState.title = String(title || 'Content');
+    $('#course-copy-title').text('Copy "' + copyState.title + '"');
+    $('#course-copy-description').text(kind === 'section' ? 'A new section and independent copies of its items will be created.' : 'The original content stays unchanged. Choose where to place the new copy.');
+    $('#course-copy-submit [data-copy-submit-label]').text(kind === 'section' ? 'Copy section' : 'Copy item');
+    $('#course-copy-feedback').empty(); $('#course-copy-course-search').val('');
+    $('#course-copy-modal').removeClass('d-none');
+    if (!copyState.courses.length) {
+      $('#course-copy-destination-course').html('<option>Loading courses…</option>').prop('disabled', true);
+      $.getJSON('requests/course-copy/options').done(function(response) {
+        if (!responseOk(response)) { $('#course-copy-feedback').text(responseMessage(response, 'Courses could not be loaded.')); return; }
+        copyState.courses = Array.isArray(response.courses) ? response.courses : [];
+        $('#course-copy-destination-course').prop('disabled', false);
+        copyCourses('');
+      }).fail(function() { $('#course-copy-feedback').text('Courses could not be loaded. Please try again.'); });
+    } else { copyCourses(''); }
+  }
+  function submitCopy() {
+    var destinationCourseId = String($('#course-copy-destination-course').val() || '');
+    var destinationSectionId = String($('#course-copy-destination-section').val() || '');
+    if (!destinationCourseId) { $('#course-copy-feedback').text('Choose a destination course.'); return; }
+    var $submit = $('#course-copy-submit');
+    $submit.prop('disabled', true).find('[data-copy-submit-label]').text('Copying…');
+    var data = {
+      source_course_id: copyState.sourceCourseId,
+      destination_course_id: destinationCourseId,
+      destination_section_id: destinationSectionId,
+      _token: adminCsrfToken
+    };
+    var endpoint = copyState.kind === 'section' ? 'requests/course-copy/section' : 'requests/course-copy/item';
+    if (copyState.kind === 'section') data.source_section_id = copyState.sourceId; else data.source_item_id = copyState.sourceId;
+    $.ajax({ type: 'POST', url: endpoint, data: data, dataType: 'json' }).done(function(response) {
+      if (!responseOk(response)) { $('#course-copy-feedback').text(responseMessage(response, 'The copy could not be created.')); return; }
+      var destination = copyState.courses.find(function(item) { return String(item.id) === destinationCourseId; });
+      var sectionTitle = destinationSectionId ? ((destination && destination.sections || []).find(function(item) { return String(item.id) === destinationSectionId; }) || {}).title : 'General';
+      var destinationLabel = (destination ? destination.title : 'the destination course') + ' → ' + (sectionTitle || 'General');
+      var copyMessage = (copyState.kind === 'section' ? 'Section' : 'Item') + ' copied successfully to ' + destinationLabel + '.';
+      if (response.message && response.message.indexOf('review') !== -1) copyMessage += ' ' + response.message;
+      notify('success', copyMessage);
+      closeCopyModal();
+      if (destinationCourseId === String(courseId)) loadList();
+    }).fail(function(xhr) { $('#course-copy-feedback').text(xhr && xhr.responseJSON ? responseMessage(xhr.responseJSON, 'The copy could not be created.') : 'The copy could not be created.'); }).always(function() { $submit.prop('disabled', false).find('[data-copy-submit-label]').text(copyState.kind === 'section' ? 'Copy section' : 'Copy item'); });
+  }
+
   $(document).on('click.courseManager', '[data-manager-action]', function(event) {
     var $button = $(this); var action = $button.data('manager-action');
     if (action === 'toggle-section') { event.preventDefault(); var $section = $button.closest('.course-manager-section'); setSectionCollapsed($section, !$section.hasClass('is-collapsed')); return; }
@@ -505,15 +602,19 @@ $admin_base = rtrim((string) $baseUrl, '/') . '/admin/';
     if (action === 'edit-item') { openItem({ course_id: courseId, item_id: $button.data('item-id') }, $button); return; }
     if (action === 'preview-item') { event.preventDefault(); window.location.assign(baseUrl + '/admin/courses/' + encodeURIComponent(courseId) + '/content/' + encodeURIComponent(String($button.data('item-id'))) + '/preview'); return; }
     if (action === 'toggle-item-status') { bulkAction(String($button.data('status')) === 'published' ? 'unpublish' : 'publish', [String($button.data('item-id'))], '', $button); return; }
-    if (action === 'duplicate-item') { bulkAction('duplicate', [String($button.data('item-id'))], '', $button); return; }
+    if (action === 'duplicate-item') { openCopyModal('item', String($button.data('item-id')), $button.closest('.lesson-manager-row').find('.course-manager-edit-link').first().text(), $button); return; }
     if (action === 'delete-item') { Swal.fire({ icon: 'warning', title: 'Delete this lesson?', text: 'This cannot be undone.', showCancelButton: true, confirmButtonText: 'Delete', confirmButtonColor: 'var(--danger)' }).then(function(result) { if (result.isConfirmed) { bulkAction('delete', [String($button.data('item-id'))], '', $button); } }); return; }
     if (action === 'edit-section') { openSection({ course_id: courseId, section_id: $button.data('section-id'), _method: 'GET' }, $button); return; }
-    if (action === 'duplicate-section') { duplicateSection(String($button.data('section-id')), $button); return; }
+    if (action === 'duplicate-section') { openCopyModal('section', String($button.data('section-id')), $button.closest('.course-manager-section').find('.course-manager-section-title').first().text(), $button); return; }
     if (action === 'delete-section') { Swal.fire({ icon: 'warning', title: 'Delete this section?', text: 'Lessons will never be orphaned.', showCancelButton: true, confirmButtonText: 'Continue' }).then(function(result) { if (result.isConfirmed) { deleteSection(String($button.data('section-id')), $button); } }); return; }
     if (action === 'move-section') { var $sectionToMove = $button.closest('.course-manager-section'); var direction = $button.data('direction'); var $target = direction === 'up' ? $sectionToMove.prev('.course-manager-section') : $sectionToMove.next('.course-manager-section'); if ($target.length) { direction === 'up' ? $sectionToMove.insertBefore($target) : $sectionToMove.insertAfter($target); queueSortingSave(); } return; }
   });
   $(document).on('click.courseManager', '.course-manager-template', function() { openItem({ course_id: courseId, section_id: pickerSectionId, template_type: $(this).data('template') }, $(this)); });
   $(document).on('change.courseManager', '#course-manager-list .course-manager-select', updateBulkBar);
+  $(document).on('input.courseManager', '#course-copy-course-search', function() { copyCourses($(this).val()); });
+  $(document).on('change.courseManager', '#course-copy-destination-course', updateCopySections);
+  $(document).on('click.courseManager', '[data-copy-action="close"]', closeCopyModal);
+  $(document).on('click.courseManager', '#course-copy-submit', submitCopy);
   $(document).on('input.courseManager change.courseManager', '#lesson-manager-search, #lesson-manager-status, #lesson-manager-type, #lesson-manager-visibility, #lesson-manager-locked', applyFilters);
   $(document).on('click.courseManager', '[data-manager-bulk]', function() {
     var $button = $(this); var action = String($button.data('manager-bulk')); var ids = selectedIds();

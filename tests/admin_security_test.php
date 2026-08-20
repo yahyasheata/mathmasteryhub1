@@ -20,7 +20,7 @@ if (!preg_match('/RewriteRule\s+\(\^\|\/\)\\\.\(\?!well-known/i', (string) $htac
 $notificationCourse = file_get_contents(__DIR__ . '/../views/admin/requests/notification-course.php');
 if (str_contains((string) $notificationCourse, 'course_id = 33')) throw new RuntimeException('Notification handler still contains the hardcoded course.');
 
-$duplication = file_get_contents(__DIR__ . '/../views/admin/requests/bulk-items.php');
+$duplication = file_get_contents(__DIR__ . '/../inc/CourseContentCopyService.php');
 foreach (['paper_source', 'paper_external_url', 'paper_external_preview_url', 'paper_external_download_url', 'paper_fallback_instructions'] as $field) {
     if (!str_contains((string) $duplication, $field)) throw new RuntimeException("Timed Exam duplication is missing {$field}.");
 }

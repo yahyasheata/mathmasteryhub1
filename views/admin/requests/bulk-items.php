@@ -1,6 +1,6 @@
 <?php
 require_once 'connection/config.php';
-require_once 'inc/CourseAssignmentLinks.php';
+require_once 'inc/CourseContentCopyService.php';
 
 header('Content-Type: application/json; charset=utf-8');
 
@@ -44,23 +44,6 @@ function bulk_items_unique_ids($value)
     }
 
     return array_keys($ids);
-}
-
-function bulk_items_generate_id(mysqli $conn, $course_id)
-{
-    do {
-        $item_id = (string) random_int(99, 999999);
-        $statement = $conn->prepare('SELECT id FROM course_items WHERE item_id = ? AND course_id = ? LIMIT 1');
-        if (!$statement) {
-            throw new RuntimeException($conn->error);
-        }
-        $statement->bind_param('ss', $item_id, $course_id);
-        $statement->execute();
-        $exists = $statement->get_result()->num_rows > 0;
-        $statement->close();
-    } while ($exists);
-
-    return $item_id;
 }
 
 function bulk_items_section_is_valid(mysqli $conn, $course_id, $section_id)
@@ -167,6 +150,27 @@ if ($destination_section_id === '__general__') {
     $destination_section_id = '';
 }
 
+// Keep bulk duplication on the same canonical transactional copy service as
+// the item/section copy workspace. Each copy is independent and never carries
+// student submissions, grades, progress, or model-answer access rows.
+if ($action === 'duplicate') {
+    try {
+        $created_ids = [];
+        foreach ($selected as $lesson) {
+            $copy = CourseContentCopyService::copyItem($conn, $course_id, (string) $lesson['item_id'], $course_id, trim((string) ($lesson['section_id'] ?? '')) ?: null);
+            $created_ids[] = $copy['item_id'];
+        }
+        bulk_items_response(true, count($selected) === 1 ? 'Lesson duplicated successfully.' : count($selected) . ' lessons duplicated successfully.', [
+            'course_id' => $course_id,
+            'affected' => count($selected),
+            'action' => $action,
+            'created_item_ids' => $created_ids,
+        ]);
+    } catch (Throwable $exception) {
+        bulk_items_response(false, $exception->getMessage() ?: 'The selected lessons could not be duplicated.');
+    }
+}
+
 try {
     $conn->begin_transaction();
 
@@ -219,52 +223,6 @@ try {
         }
         $delete->close();
         $message = count($selected) === 1 ? 'Lesson archived successfully.' : count($selected) . ' lessons archived successfully.';
-    } else {
-        $orders = [];
-        $insert = $conn->prepare('INSERT INTO course_items (item_id, item_title, item_description, item_type, section_id, template_type, template_data, duration_minutes, metadata, assignment_id, due_date, status, sort_order, course_id, page_order) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)');
-        if (!$insert) {
-            throw new RuntimeException($conn->error);
-        }
-        $created_ids = [];
-        foreach ($selected as $lesson) {
-            $section_id = (string) ($lesson['section_id'] ?? '');
-            $order_key = $section_id === '' ? '__general__' : $section_id;
-            if (!array_key_exists($order_key, $orders)) {
-                $orders[$order_key] = bulk_items_next_order($conn, $course_id, $section_id === '' ? null : $section_id);
-            }
-            $orders[$order_key]++;
-            $new_item_id = bulk_items_generate_id($conn, $course_id);
-            $item_title = (string) $lesson['item_title'];
-            $item_description = (string) $lesson['item_description'];
-            $item_type = (string) $lesson['item_type'];
-            $template_type = (string) ($lesson['template_type'] ?? '');
-            $template_data = (string) ($lesson['template_data'] ?? '');
-            $duration_minutes = $lesson['duration_minutes'] !== null ? (int) $lesson['duration_minutes'] : null;
-            $metadata = (string) ($lesson['metadata'] ?? '');
-            $assignment_id = $lesson['assignment_id'] !== null ? (int) $lesson['assignment_id'] : null;
-            $due_date = $lesson['due_date'];
-            $status = (string) ($lesson['status'] ?: 'published');
-            $sort_order = $orders[$order_key];
-            $page_order = $orders[$order_key];
-            $insert->bind_param('sssssssisissisi', $new_item_id, $item_title, $item_description, $item_type, $section_id, $template_type, $template_data, $duration_minutes, $metadata, $assignment_id, $due_date, $status, $sort_order, $course_id, $page_order);
-            if (!$insert->execute()) {
-                throw new RuntimeException($insert->error ?: $conn->error);
-            }
-            if ($template_type === 'timed_exam') {
-                $copyExam = $conn->prepare("INSERT INTO timed_exams (course_id, item_id, title, instructions, status, timing_mode, scheduled_start_at_utc, duration_minutes, grace_minutes, max_attempts, allowed_answer_types, max_file_size_bytes, paper_source, paper_external_url, paper_external_preview_url, paper_external_download_url, paper_fallback_instructions, paper_storage_key, paper_original_name, paper_mime, paper_size_bytes, paper_view_allowed, paper_download_allowed, late_submission_allowed, expiry_policy, max_marks, results_release_at_utc, recovery_window_start_at_utc, recovery_window_end_at_utc, recovery_allowed, created_by, updated_by) SELECT course_id, ?, CONCAT(title, ' (Copy)'), instructions, 'draft', timing_mode, scheduled_start_at_utc, duration_minutes, grace_minutes, max_attempts, allowed_answer_types, max_file_size_bytes, paper_source, paper_external_url, paper_external_preview_url, paper_external_download_url, paper_fallback_instructions, paper_storage_key, paper_original_name, paper_mime, paper_size_bytes, paper_view_allowed, paper_download_allowed, late_submission_allowed, expiry_policy, max_marks, results_release_at_utc, recovery_window_start_at_utc, recovery_window_end_at_utc, recovery_allowed, created_by, updated_by FROM timed_exams WHERE course_id = ? AND item_id = ? AND deleted_at IS NULL LIMIT 1");
-                if ($copyExam) { $copyExam->bind_param('sss', $new_item_id, $course_id, $lesson['item_id']); $copyExam->execute(); $copyExam->close(); }
-            }
-            $source_assignment_id = mmh_course_assignment_id($lesson);
-            if ($source_assignment_id !== '') {
-                $new_assignment_id = mmh_course_assignment_clone_for_item($conn, $course_id, $source_assignment_id, $new_item_id, $section_id);
-                if ($new_assignment_id !== null) {
-                    mmh_course_assignment_relink_item($conn, $course_id, $new_item_id, $source_assignment_id, $new_assignment_id);
-                }
-            }
-            $created_ids[] = $new_item_id;
-        }
-        $insert->close();
-        $message = count($selected) === 1 ? 'Lesson duplicated successfully.' : count($selected) . ' lessons duplicated successfully.';
     }
 
     $conn->commit();

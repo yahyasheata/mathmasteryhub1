@@ -291,6 +291,26 @@ $router->mount('/admin', function() use ($router) {
         require __DIR__ . '/views/admin/requests/bulk-items.php';
     });
 
+    // Course Content copy is intentionally explicit: destination validation,
+    // transactional duplication, and child-record rules live in one service.
+    $router->get('/requests/course-copy/options', function() {
+        require_once '__init.php';
+        mmh_admin_require_admin();
+        require __DIR__ . '/views/admin/requests/course-copy-options.php';
+    });
+
+    $router->post('/requests/course-copy/item', function() {
+        require_once '__init.php';
+        mmh_admin_require_mutation();
+        require __DIR__ . '/views/admin/requests/copy-item.php';
+    });
+
+    $router->post('/requests/course-copy/section', function() {
+        require_once '__init.php';
+        mmh_admin_require_mutation();
+        require __DIR__ . '/views/admin/requests/copy-section.php';
+    });
+
     $router->post('/requests/{page}/{action}', function($page, $action) {
         require_once '__init.php';
         $handler = mmh_admin_allowed_handler((string) $page, (string) $action);

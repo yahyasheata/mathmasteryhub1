@@ -14,7 +14,7 @@ foreach (['mmh_admin_course_archive', 'mmh_admin_course_set_status', 'mmh_admin_
     if (!str_contains((string) $courseService, 'function ' . $name)) throw new RuntimeException("Canonical course service missing {$name}.");
 }
 if (!str_contains((string) $assessmentService, 'mmh_admin_assignment_submission_counts')) throw new RuntimeException('Canonical assessment reads are missing.');
-if (!str_contains((string) $duplicateItem, 'mmh_course_assignment_clone_for_item')) throw new RuntimeException('Item duplication still reuses assignment identity.');
+if (!str_contains((string) $duplicateItem, 'CourseContentCopyService::copyItem')) throw new RuntimeException('Item duplication is not using the canonical independent-copy service.');
 if (!str_contains((string) $migration, 'MMH_SCHEMA_MIGRATION_MODE')) throw new RuntimeException('Runtime schema migration mode is missing.');
 if (!str_contains((string) $learningSchema, 'mmh_schema_mutations_allowed')) throw new RuntimeException('Learning schema is not migration-gated.');
 if (!str_contains((string) $live, 'mmh_schema_mutations_allowed')) throw new RuntimeException('Live-session schema is not migration-gated.');
