@@ -48,6 +48,7 @@ $base = rtrim(mmh_current_request_base_url(), '/');
 $previewExitUrl = $timedExamPreview
     ? $base . '/admin/courses/' . rawurlencode((string) $course['course_id']) . '/content#course-item-' . rawurlencode((string) ($exam['item_id'] ?? ''))
     : '';
+$returnCourseUrl = $timedExamPreview ? $previewExitUrl : $base . '/user/course/' . rawurlencode((string) $course['course_id']);
 $esc = static fn($value): string => htmlspecialchars((string) $value, ENT_QUOTES, 'UTF-8');
 $localDate = static function (?string $value): string {
     if (!$value) return 'Not scheduled';
@@ -111,7 +112,7 @@ include 'views/user/layouts/user/header.php';
 <main class="timed-exam-shell">
   <header class="timed-exam-sticky-head timed-exam-head">
     <div class="timed-exam-head-main"><div class="timed-exam-eyebrow"><?= $esc($course['course_title']); ?> · <?= $esc($exam['section_title'] ?: 'Course exam'); ?></div><h1><?= $esc($exam['title']); ?></h1><div class="timed-exam-head-meta"><span class="timed-exam-badge"><span class="fas fa-stopwatch" aria-hidden="true"></span> Fixed Window</span><span>Closes <?= $esc($localDate($state['window']['closes_at']?->format('Y-m-d H:i:s'))); ?></span></div></div>
-    <div class="timed-exam-timer"><span class="timed-exam-countdown"<?= $activeState ? ' data-countdown data-close="' . (int) $closeTimestamp . '"' : ''; ?>><?= $activeState ? '--:--' : $esc($state['label']); ?></span><a class="course-btn course-btn-secondary" href="<?= $esc($base . '/user/course/' . rawurlencode((string) $course['course_id'])); ?>"><span class="fas fa-arrow-left" aria-hidden="true"></span> Return to course</a></div>
+    <div class="timed-exam-timer"><span class="timed-exam-countdown"<?= $activeState ? ' data-countdown data-close="' . (int) $closeTimestamp . '"' : ''; ?>><?= $activeState ? '--:--' : $esc($state['label']); ?></span><a class="course-btn course-btn-secondary" href="<?= $esc($returnCourseUrl); ?>"><span class="fas fa-arrow-left" aria-hidden="true"></span> <?= $timedExamPreview ? 'Exit Preview' : 'Return to course'; ?></a></div>
   </header>
   <section class="timed-exam-card" aria-labelledby="timed-exam-instructions-title">
     <h2 id="timed-exam-instructions-title" class="h5">Instructions</h2>
