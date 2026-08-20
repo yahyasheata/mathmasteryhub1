@@ -22,9 +22,10 @@ final class CourseContentCopyService
 
         $conn->begin_transaction();
         try {
-            $maps = ['sections' => [], 'items' => [], 'assignments' => []];
+            $maps = ['sections' => [], 'items' => [], 'assignments' => [], 'assignment_refs' => []];
             $copy = self::copyItemRow($conn, $source, $destinationCourseId, $destinationSectionId, $maps);
             self::finalizeItemReferences($conn, $copy['item_id'], $maps);
+            self::finalizeAssignmentReferences($conn, $maps);
             $conn->commit();
             return [
                 'course_id' => $destinationCourseId,
@@ -57,7 +58,7 @@ final class CourseContentCopyService
             $sectionValues = self::sectionValues($source, $destinationCourseId, $newSectionId, $newSort, $warnings);
             self::insertRow($conn, 'course_sections', $sectionValues);
 
-            $maps = ['sections' => [(string) $sourceSectionId => $newSectionId], 'items' => [], 'assignments' => []];
+            $maps = ['sections' => [(string) $sourceSectionId => $newSectionId], 'items' => [], 'assignments' => [], 'assignment_refs' => []];
             $itemIds = [];
             $order = 1;
             foreach ($items as $item) {
@@ -71,6 +72,7 @@ final class CourseContentCopyService
             foreach ($itemIds as $newItemId) {
                 self::finalizeItemReferences($conn, $newItemId, $maps);
             }
+            self::finalizeAssignmentReferences($conn, $maps);
             $conn->commit();
             return ['course_id' => $destinationCourseId, 'section_id' => $newSectionId, 'item_ids' => $itemIds, 'warnings' => array_values(array_unique($warnings))];
         } catch (Throwable $e) {
@@ -157,6 +159,11 @@ final class CourseContentCopyService
             return null;
         }
         $newId = self::uniqueAssignmentId($conn);
+        $referenceSnapshot = [];
+        foreach (['recommended_recording_item_id', 'recommended_notes_item_id', 'recommended_revision_item_id'] as $column) {
+            if (array_key_exists($column, $assignment)) $referenceSnapshot[$column] = $assignment[$column];
+        }
+        $maps['assignment_refs'][$newId] = $referenceSnapshot;
         unset($assignment['id'], $assignment['created_at']);
         $assignment['assignment_id'] = $newId;
         $assignment['course_id'] = $destinationCourseId;
@@ -268,6 +275,27 @@ final class CourseContentCopyService
         $stmt->bind_param('sss', $dataJson, $metaJson, $newItemId);
         $stmt->execute();
         $stmt->close();
+    }
+
+    private static function finalizeAssignmentReferences(mysqli $conn, array $maps): void
+    {
+        foreach (($maps['assignment_refs'] ?? []) as $newAssignmentId => $references) {
+            $values = [];
+            foreach (['recommended_recording_item_id', 'recommended_notes_item_id', 'recommended_revision_item_id'] as $column) {
+                if (!array_key_exists($column, $references)) continue;
+                $oldItemId = trim((string) $references[$column]);
+                $values[$column] = $oldItemId !== '' ? ($maps['items'][$oldItemId] ?? null) : null;
+            }
+            if (!$values) continue;
+            $set = implode(', ', array_map(static fn($column) => "`{$column}` = ?", array_keys($values)));
+            $sql = 'UPDATE assignments SET ' . $set . ' WHERE assignment_id = ? LIMIT 1';
+            $stmt = $conn->prepare($sql);
+            $params = array_values($values);
+            $params[] = (string) $newAssignmentId;
+            self::bind($stmt, str_repeat('s', count($params)), $params);
+            $stmt->execute();
+            $stmt->close();
+        }
     }
 
     private static function jsonRemap($value, array $maps): ?string
