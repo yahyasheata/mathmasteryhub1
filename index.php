@@ -172,6 +172,33 @@ $router->mount('/admin', function() use ($router) {
         require __DIR__ . '/views/admin/course-content-preview.php';
     });
 
+    // Timed Exam Preview deliberately reuses the canonical student workspace,
+    // but establishes a trusted, read-only admin context before rendering it.
+    $router->get('/courses/{courseId}/timed-exam/item/{itemId}/preview', function($courseId, $itemId) {
+        require_once '__init.php';
+        require_once __DIR__ . '/inc/TimedExam.php';
+        mmh_admin_require_admin();
+        $previewConn = db();
+        $previewExam = mmh_timed_exam_load_for_item($previewConn, (string) $courseId, (string) $itemId, true);
+        if (!$previewExam) { http_response_code(404); exit('Timed Exam not found.'); }
+        $examId = (int) $previewExam['id'];
+        $timedExamPreview = true;
+        $timedExamPreviewExitUrl = rtrim(mmh_current_request_base_url(), '/') . '/admin/courses/' . rawurlencode((string) $courseId) . '/content';
+        require __DIR__ . '/views/user/timed-exam.php';
+    });
+
+    $router->get('/courses/{courseId}/timed-exam/item/{itemId}/paper', function($courseId, $itemId) {
+        require_once '__init.php';
+        require_once __DIR__ . '/inc/TimedExam.php';
+        mmh_admin_require_admin();
+        $previewConn = db();
+        $previewExam = mmh_timed_exam_load_for_item($previewConn, (string) $courseId, (string) $itemId, true);
+        if (!$previewExam) { http_response_code(404); exit('Timed Exam not found.'); }
+        $examId = (int) $previewExam['id'];
+        $timedExamPreview = true;
+        include __DIR__ . '/views/user/requests/open-timed-exam-paper.php';
+    });
+
     // Course Content's initial item list is read-only. Keep it outside the
     // mutation middleware so refreshes can use a normal GET request while
     // retaining the handler's own admin guard and validation.

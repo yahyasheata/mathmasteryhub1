@@ -761,8 +761,24 @@ if (!function_exists('mmh_timed_exam_refresh_attempt')) {
 }
 
 if (!function_exists('mmh_timed_exam_student_context')) {
-    function mmh_timed_exam_student_context(mysqli $conn, array $exam, int $studentId): array
+    function mmh_timed_exam_student_context(mysqli $conn, array $exam, int $studentId, bool $preview = false): array
     {
+        if ($preview) {
+            $duration = max(1, (int) ($exam['duration_minutes'] ?? 60));
+            $now = new DateTimeImmutable('now', new DateTimeZone('UTC'));
+            $previewExam = mmh_timed_exam_with_window($exam, $now->format('Y-m-d H:i:s'), $now->modify('+' . $duration . ' minutes')->format('Y-m-d H:i:s'));
+            $window = mmh_timed_exam_window($previewExam);
+            return [
+                'exam' => $previewExam,
+                'attempt' => null,
+                'latest_version' => null,
+                'state' => ['key' => 'open', 'label' => 'Preview', 'remaining_seconds' => $duration * 60, 'window' => $window],
+                'upload_version_limit' => max(1, (int) ($exam['max_attempts'] ?? 1)),
+                'upload_version_count' => 0,
+                'upload_versions_remaining' => max(1, (int) ($exam['max_attempts'] ?? 1)),
+                'preview' => true,
+            ];
+        }
         $scope = mmh_timed_exam_attempt_scope($exam);
         $attempt = mmh_timed_exam_student_attempt($conn, $studentId, (int) $exam['id'], false, $scope);
         $state = mmh_timed_exam_state($exam, $attempt);
