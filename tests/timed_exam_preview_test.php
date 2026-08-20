@@ -35,6 +35,18 @@ if (!str_contains($router, "'/courses/{courseId}/timed-exam/item/{itemId}/previe
     || !str_contains($router, "'/courses/{courseId}/timed-exam/item/{itemId}/paper'")) {
     throw new RuntimeException('Admin preview routes are not registered.');
 }
+$previewRouteStart = strpos($router, "'/courses/{courseId}/timed-exam/item/{itemId}/preview'");
+$paperRouteStart = strpos($router, "'/courses/{courseId}/timed-exam/item/{itemId}/paper'");
+if ($previewRouteStart === false || $paperRouteStart === false) throw new RuntimeException('Unable to locate preview route bodies.');
+$previewRoute = substr($router, $previewRouteStart, 1100);
+$paperRoute = substr($router, $paperRouteStart, 1100);
+foreach (['preview' => $previewRoute, 'paper' => $paperRoute] as $routeName => $routeSource) {
+    $connectionInclude = strpos($routeSource, "require_once __DIR__ . '/connection/config.php';");
+    $databaseUse = strpos($routeSource, '$previewConn = db();');
+    if ($connectionInclude === false || $databaseUse === false || $connectionInclude > $databaseUse) {
+        throw new RuntimeException("{$routeName} route does not load the canonical connection before db().");
+    }
+}
 if (!str_contains($items, 'Preview as Student') || !str_contains($items, "\$template_type === 'timed_exam'")) {
     throw new RuntimeException('Timed Exam Course Content card has no dedicated preview action.');
 }

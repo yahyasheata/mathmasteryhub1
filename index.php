@@ -176,8 +176,9 @@ $router->mount('/admin', function() use ($router) {
     // but establishes a trusted, read-only admin context before rendering it.
     $router->get('/courses/{courseId}/timed-exam/item/{itemId}/preview', function($courseId, $itemId) {
         require_once '__init.php';
-        require_once __DIR__ . '/inc/TimedExam.php';
         mmh_admin_require_admin();
+        require_once __DIR__ . '/connection/config.php';
+        require_once __DIR__ . '/inc/TimedExam.php';
         $previewConn = db();
         $previewExam = mmh_timed_exam_load_for_item($previewConn, (string) $courseId, (string) $itemId, true);
         if (!$previewExam) { http_response_code(404); exit('Timed Exam not found.'); }
@@ -189,8 +190,9 @@ $router->mount('/admin', function() use ($router) {
 
     $router->get('/courses/{courseId}/timed-exam/item/{itemId}/paper', function($courseId, $itemId) {
         require_once '__init.php';
-        require_once __DIR__ . '/inc/TimedExam.php';
         mmh_admin_require_admin();
+        require_once __DIR__ . '/connection/config.php';
+        require_once __DIR__ . '/inc/TimedExam.php';
         $previewConn = db();
         $previewExam = mmh_timed_exam_load_for_item($previewConn, (string) $courseId, (string) $itemId, true);
         if (!$previewExam) { http_response_code(404); exit('Timed Exam not found.'); }
