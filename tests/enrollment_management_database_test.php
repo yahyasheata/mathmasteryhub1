@@ -28,6 +28,11 @@ try {
     $insert->close();
     $query($admin, "INSERT INTO learning_events (user_id,course_id) VALUES (1,'source'),(4,'source')");
 
+    $assert(mmh_enrollment_ensure($admin, 9, 'private', 'Private Course'), 'Direct enrollment into a private course failed.');
+    $assert((int) $admin->query("SELECT COUNT(*) AS total FROM course_logs WHERE user_id=9 AND course_id='private'")->fetch_assoc()['total'] === 1, 'Private enrollment row was not created.');
+    $assert((string) $admin->query("SELECT course_state FROM courses WHERE course_id='private'")->fetch_assoc()['course_state'] === 'private', 'Private course state changed during enrollment.');
+    $assert(!mmh_enrollment_ensure($admin, 10, 'draft', 'Draft Course'), 'Draft course accepted a student enrollment.');
+
     $assert(mmh_enrollment_remove($admin, 1, 'source'), 'Single enrollment removal failed.');
     $assert((int) $admin->query("SELECT COUNT(*) AS total FROM course_logs WHERE user_id=1 AND course_id='source'")->fetch_assoc()['total'] === 0, 'Removed enrollment still exists.');
     $assert((int) $admin->query("SELECT COUNT(*) AS total FROM learning_events WHERE user_id=1 AND course_id='source'")->fetch_assoc()['total'] === 1, 'Historical learning event was deleted.');
@@ -52,6 +57,8 @@ try {
     $index = file_get_contents(dirname(__DIR__) . '/index.php');
     $page = file_get_contents(dirname(__DIR__) . '/views/admin/course-students.php');
     $assert(is_string($handler) && str_contains($handler, 'mmh_enrollment_remove_batch') && str_contains($handler, 'mmh_enrollment_move_batch'), 'Admin handler does not use canonical enrollment services.');
+    $addUser = file_get_contents(dirname(__DIR__) . '/views/admin/requests/addUser-course.php');
+    $assert(is_string($addUser) && str_contains($addUser, "course_state IN ('public', 'private')") && str_contains($addUser, 'mmh_enrollment_ensure'), 'Direct admin enrollment does not accept Private courses through the canonical writer.');
     $assert(is_string($index) && str_contains($index, "mmh_admin_require_mutation()"), 'Admin enrollment route is not mutation-protected.');
     $assert(is_string($page) && str_contains($page, 'mmh_admin_csrf_token()'), 'Enrollment management form is missing admin CSRF.');
     echo "Enrollment management database checks passed.\n";

@@ -36,6 +36,13 @@ if (!function_exists('mmh_enrollment_ensure')) {
     function mmh_enrollment_ensure(mysqli $conn, int $userId, string $courseId, string $courseTitle, ?string $purchaseDate = null, bool $manageTransaction = true): bool
     {
         if ($userId <= 0 || trim($courseId) === '') return false;
+        $courseCheck = $conn->prepare("SELECT course_id FROM courses WHERE course_id = ? AND archived_at IS NULL AND course_state IN ('public', 'private') LIMIT 1");
+        if (!$courseCheck) return false;
+        $courseCheck->bind_param('s', $courseId);
+        $courseCheck->execute();
+        $courseAvailable = (bool) $courseCheck->get_result()->fetch_assoc();
+        $courseCheck->close();
+        if (!$courseAvailable) return false;
         $ownsTransaction = $manageTransaction;
         if ($ownsTransaction && !$conn->begin_transaction()) return false;
         $lockName = mmh_enrollment_lock_name($userId, $courseId);

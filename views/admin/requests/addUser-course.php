@@ -2,6 +2,7 @@
 require_once 'connection/config.php';
 require_once '__init.php';
 require_once 'inc/functions.php';
+require_once 'inc/EnrollmentService.php';
 
 
 function add_user_course_save_learning_override(mysqli $conn, $course_id, $user_id)
@@ -71,7 +72,7 @@ function add_user_course_student_options(mysqli_result $result)
 
 function add_user_course_fetch_course(mysqli $conn, $course_id)
 {
-    $stmt = $conn->prepare('SELECT course_id, course_title, course_price, course_state FROM courses WHERE course_id = ? LIMIT 1');
+    $stmt = $conn->prepare("SELECT course_id, course_title, course_price, course_state FROM courses WHERE course_id = ? AND archived_at IS NULL AND course_state IN ('public', 'private') LIMIT 1");
     if (!$stmt) {
         return null;
     }
@@ -132,28 +133,22 @@ function add_user_course_create_course_log(mysqli $conn, array $course, $user_id
     if (add_user_course_log_exists($conn, $course['course_id'], $user_id)) {
         return ['status' => 1, 'message' => 'Student is already enrolled.'];
     }
-
-    $stmt = $conn->prepare('INSERT INTO course_logs (user_id, course_id, course_title, purchase_date) VALUES (?, ?, ?, NOW())');
-    if (!$stmt) {
-        return ['status' => 0, 'message' => 'Error', 'reason' => $conn->error];
-    }
-    $user_id_string = (string) $user_id;
-    $course_id_int = (int) $course['course_id'];
-    $course_title = (string) $course['course_title'];
-    $stmt->bind_param('sis', $user_id_string, $course_id_int, $course_title);
-    $ok = $stmt->execute();
-    $reason = $stmt->error ?: $conn->error;
-    $stmt->close();
-
+    $ok = mmh_enrollment_ensure($conn, (int) $user_id, (string) $course['course_id'], (string) $course['course_title']);
     return $ok
         ? ['status' => 1, 'message' => 'Student enrolled successfully.']
-        : ['status' => 0, 'message' => 'Error', 'reason' => $reason];
+        : ['status' => 0, 'message' => 'Error', 'reason' => 'Enrollment could not be created for this course.'];
 }
 
 function add_user_course_enroll_student(mysqli $conn, array $course, $user_id)
 {
     if (add_user_course_log_exists($conn, $course['course_id'], $user_id)) {
         return ['status' => 1, 'message' => 'Student is already enrolled.'];
+    }
+
+    // Manual admin enrollment into a Private course is not a purchase. Keep
+    // the course private and write only the canonical enrollment relationship.
+    if (strtolower((string) ($course['course_state'] ?? '')) === 'private') {
+        return add_user_course_create_course_log($conn, $course, $user_id);
     }
 
     if (add_user_course_transaction_exists($conn, $course['course_id'], $user_id)) {
