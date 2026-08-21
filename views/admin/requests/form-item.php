@@ -457,7 +457,6 @@ $recording_warning = ($recording_link_status['state'] ?? '') === 'legacy_embed'
     ? "<div class='alert alert-warning mt-2 mb-0'>This is a legacy Microsoft embed link. Replace it with a normal SharePoint / Microsoft Stream sharing link before saving.</div>"
     : '';
 $assignment_url = $template_type === 'classified_assignment' ? ($template_data['homework_resource']['url'] ?? $template_data['url'] ?? form_item_first_href($item['item_description'])) : '';
-$assignment_url_2 = $template_type === 'classified_assignment' ? ($template_data['homework_resource_2']['url'] ?? '') : '';
 $model_answer_url = $template_type === 'classified_assignment'
     ? ($template_data['model_answer_resource']['url'] ?? '')
     : ($template_type === 'assignment_model_answer' ? ($template_data['url'] ?? form_item_first_href($item['item_description'])) : '');
@@ -913,12 +912,8 @@ $html_response = "
             <div class='{$pane_class['classified_assignment']}' data-template-pane='classified_assignment'>
               <div class='row'>
                 <div class='col-12 col-lg-8 p-2'>
-                  <div>Homework PDF 1</div>
+                  <div>Homework resource</div>
                   <input type='url' class='form-control' name='assignment_drive_url' data-template-required='classified_assignment' value='" . form_item_json_value(['url' => $assignment_url], 'url') . "' placeholder='https://drive.google.com/...'>
-                </div>
-                <div class='col-12 col-lg-4 p-2'>
-                  <div>Homework PDF 2 <small class='text-muted'>(optional)</small></div>
-                  <input type='url' class='form-control' name='assignment_drive_url_2' value='" . form_item_json_value(['url' => $assignment_url_2], 'url') . "' placeholder='https://drive.google.com/...'>
                 </div>
                 <div class='col-12 col-lg-4 p-2'>
                   <div>Assignment Deadline</div>

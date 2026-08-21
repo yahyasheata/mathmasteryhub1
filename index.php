@@ -242,6 +242,15 @@ $router->mount('/admin', function() use ($router) {
         require __DIR__ . '/views/admin/requests/search-resource-free-learning.php';
     });
 
+    $router->get('/submission-file/{fileId}', function($fileId) {
+        require_once '__init.php';
+        require_once __DIR__ . '/inc/AssignmentSubmissionFiles.php';
+        mmh_admin_require_admin();
+        $validatedFileId = filter_var($fileId, FILTER_VALIDATE_INT, ['options' => ['min_range' => 1]]);
+        if ($validatedFileId === false) { http_response_code(404); exit('File not found.'); }
+        mmh_assignment_submission_file_serve(db(), (int) $validatedFileId, true);
+    });
+
     $router->get('/timed-exam-submissions/{courseId}/{examId}', function($courseId, $examId) {
         require_once '__init.php';
         mmh_admin_require_admin(false);
@@ -361,6 +370,15 @@ $router->mount('/user', function() use ($router) {
             exit();
         }
         include('views/user/requests/join-live-session.php');
+    });
+
+    $router->get('/submission-file/{fileId}', function($fileId) {
+        require_once '__init.php';
+        require_once __DIR__ . '/inc/AssignmentSubmissionFiles.php';
+        if (!isset($_SESSION['username'])) { http_response_code(401); exit('Sign in required.'); }
+        $validatedFileId = filter_var($fileId, FILTER_VALIDATE_INT, ['options' => ['min_range' => 1]]);
+        if ($validatedFileId === false) { http_response_code(404); exit('File not found.'); }
+        mmh_assignment_submission_file_serve(db(), (int) $validatedFileId, false);
     });
 
     $router->get('/course/resource/{courseId}/{itemId}', function($courseId, $itemId) {

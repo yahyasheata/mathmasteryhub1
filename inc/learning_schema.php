@@ -268,6 +268,9 @@ function mmh_ensure_learning_schema(mysqli $conn)
         submission_id INT NOT NULL,
         file_path VARCHAR(255) NOT NULL,
         original_filename VARCHAR(255) NULL,
+        mime_type VARCHAR(127) NULL,
+        file_size BIGINT UNSIGNED NULL,
+        sort_order INT UNSIGNED NOT NULL DEFAULT 0,
         uploaded_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
         PRIMARY KEY (id),
         KEY idx_submission_file (submission_id, id)

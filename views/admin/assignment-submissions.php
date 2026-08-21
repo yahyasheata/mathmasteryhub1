@@ -4,6 +4,7 @@ require_once '__init.php';
 require_once 'inc/functions.php';
 require_once 'inc/learning_schema.php';
 require_once 'inc/AssignmentProgress.php';
+require_once 'inc/AssignmentSubmissionFiles.php';
 $username = $_SESSION['admin'];
 $pageName = "assignment_submissions";
 $subPageName = "assignment_submissions";
@@ -125,9 +126,11 @@ $result = $submission_stmt->get_result();
                           ? mb_strimwidth($label, 0, 30, '…', 'UTF-8')
                           : (strlen($label) > 30 ? substr($label, 0, 27) . '...' : $label);
                         $safeLabel = htmlspecialchars($label, ENT_QUOTES, 'UTF-8');
-                        $file_links[] = '<a href="../' . htmlspecialchars($file_path, ENT_QUOTES, 'UTF-8') . '" target="_blank" rel="noopener" class="btn btn-primary btn-sm mb-1 admin-file-link" title="' . $safeLabel . '" aria-label="Open ' . $safeLabel . '"><span class="fas fa-download" aria-hidden="true"></span><span class="admin-file-name">' . htmlspecialchars($displayLabel, ENT_QUOTES, 'UTF-8') . '</span></a>';
+                        $fileUrl = mmh_assignment_submission_file_url(mmh_current_request_base_url(), $submission_file['id'] ?? 0, true);
+                        if ($fileUrl === '') { continue; }
+                        $file_links[] = '<a href="' . htmlspecialchars($fileUrl, ENT_QUOTES, 'UTF-8') . '" target="_blank" rel="noopener" class="btn btn-primary btn-sm mb-1 admin-file-link" title="' . $safeLabel . '" aria-label="Open ' . $safeLabel . '"><span class="fas fa-file-pdf" aria-hidden="true"></span><span class="admin-file-name">' . htmlspecialchars($displayLabel, ENT_QUOTES, 'UTF-8') . '</span></a>';
                       }
-                      $file_link = $file_links ? implode('<br>', $file_links) : '-';
+                      $file_link = $file_links ? '<div class="admin-submission-file-list"><strong>Submitted files (' . count($file_links) . ')</strong><div>' . implode('', $file_links) . '</div></div>' : '-';
                       $is_imported = (($row['submission_source'] ?? '') === 'legacy_import');
                       $source_label = $is_imported ? 'Imported by Instructor' : 'LMS';
                       $source_detail = $is_imported && !empty($row['original_submitted_at']) ? '<small class="d-block ds-text-muted">Original: ' . htmlspecialchars((string) $row['original_submitted_at']) . '</small>' : '';

@@ -102,6 +102,42 @@ if (!function_exists('mmh_assignment_submission_open')) {
     }
 }
 
+if (!function_exists('mmh_assignment_submission_max_files')) {
+    function mmh_assignment_submission_max_files(): int
+    {
+        $value = defined('MMH_ASSIGNMENT_MAX_FILES') ? (int) constant('MMH_ASSIGNMENT_MAX_FILES') : 10;
+        return max(1, min($value, 25));
+    }
+}
+
+if (!function_exists('mmh_assignment_submission_max_file_bytes')) {
+    function mmh_assignment_submission_max_file_bytes(): int
+    {
+        $value = defined('MMH_ASSIGNMENT_MAX_FILE_BYTES') ? (int) constant('MMH_ASSIGNMENT_MAX_FILE_BYTES') : 20 * 1024 * 1024;
+        return max(1024 * 1024, min($value, 50 * 1024 * 1024));
+    }
+}
+
+if (!function_exists('mmh_assignment_submission_allowed_mimes')) {
+    function mmh_assignment_submission_allowed_mimes(): array
+    {
+        return [
+            'pdf' => ['application/pdf'],
+            'doc' => ['application/msword', 'application/octet-stream'],
+            'docx' => ['application/vnd.openxmlformats-officedocument.wordprocessingml.document', 'application/zip', 'application/octet-stream'],
+        ];
+    }
+}
+
+if (!function_exists('mmh_assignment_submission_file_url')) {
+    function mmh_assignment_submission_file_url($baseUrl, $fileId, bool $admin = false): string
+    {
+        $fileId = filter_var($fileId, FILTER_VALIDATE_INT, ['options' => ['min_range' => 1]]);
+        if ($fileId === false) return '';
+        return rtrim((string) $baseUrl, '/') . ($admin ? '/admin/submission-file/' : '/user/submission-file/') . (int) $fileId;
+    }
+}
+
 if (!function_exists('mmh_assignment_submission_files')) {
     /** Return imported attachments when present; legacy and LMS rows fall back to file_path. */
     function mmh_assignment_submission_files(mysqli $conn, ?array $submission)
@@ -111,7 +147,7 @@ if (!function_exists('mmh_assignment_submission_files')) {
         }
         $files = [];
         $submissionId = (int) $submission['id'];
-        $stmt = $conn->prepare('SELECT file_path, original_filename FROM assignment_submission_files WHERE submission_id = ? ORDER BY id ASC');
+        $stmt = $conn->prepare('SELECT id, file_path, original_filename FROM assignment_submission_files WHERE submission_id = ? ORDER BY id ASC');
         if ($stmt) {
             $stmt->bind_param('i', $submissionId);
             if ($stmt->execute()) {
@@ -123,7 +159,7 @@ if (!function_exists('mmh_assignment_submission_files')) {
             $stmt->close();
         }
         if (!$files && trim((string) ($submission['file_path'] ?? '')) !== '') {
-            $files[] = ['file_path' => (string) $submission['file_path'], 'original_filename' => null];
+            $files[] = ['id' => null, 'file_path' => (string) $submission['file_path'], 'original_filename' => null];
         }
         return $files;
     }

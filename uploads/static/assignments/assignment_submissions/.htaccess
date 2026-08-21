@@ -1,0 +1,4 @@
+# Submission answer files are served only through authenticated LMS routes.
+<FilesMatch "^(submission_|legacy_submission_)">
+    Require all denied
+</FilesMatch>

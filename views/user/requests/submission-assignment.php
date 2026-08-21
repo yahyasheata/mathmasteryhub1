@@ -30,7 +30,7 @@ if (empty($_SESSION['username'])) {
 if (!student_course_csrf_valid($_POST['csrf_token'] ?? null)) {
     assignment_submission_response(false, 'Your session has expired. Please refresh the course and try again.', [], 403);
 }
-if (empty($_POST['assignment_id']) || empty($_FILES['submission_file'])) {
+if (empty($_POST['assignment_id']) || (empty($_FILES['submission_files']) && empty($_FILES['submission_file']))) {
     assignment_submission_response(false, 'The data is incomplete.', [], 422);
 }
 
@@ -112,108 +112,128 @@ try {
         }
     }
 
-    $file = $_FILES['submission_file'];
-    if (($file['error'] ?? UPLOAD_ERR_NO_FILE) !== UPLOAD_ERR_OK || empty($file['tmp_name']) || !is_uploaded_file($file['tmp_name'])) {
-        assignment_submission_response(false, 'File upload failed. Please choose the file again and retry.', [], 422);
+    // Accept the new normalized multi-file field while preserving the legacy
+    // single-file field for already-open pages and older clients.
+    $rawFiles = $_FILES['submission_files'] ?? $_FILES['submission_file'] ?? null;
+    if (!is_array($rawFiles) || !isset($rawFiles['name'])) {
+        assignment_submission_response(false, 'Choose at least one answer file.', [], 422);
     }
-    $allowedExtensions = ['pdf', 'doc', 'docx'];
-    $extension = strtolower(pathinfo((string) ($file['name'] ?? ''), PATHINFO_EXTENSION));
-    if (!in_array($extension, $allowedExtensions, true)) {
-        assignment_submission_response(false, 'Unsupported file format. Only PDF or Word files are allowed.', [], 422);
+    $fileEntries = [];
+    $names = is_array($rawFiles['name']) ? $rawFiles['name'] : [$rawFiles['name']];
+    $tmpNames = is_array($rawFiles['tmp_name'] ?? null) ? $rawFiles['tmp_name'] : [$rawFiles['tmp_name'] ?? ''];
+    $errors = is_array($rawFiles['error'] ?? null) ? $rawFiles['error'] : [$rawFiles['error'] ?? UPLOAD_ERR_NO_FILE];
+    $sizes = is_array($rawFiles['size'] ?? null) ? $rawFiles['size'] : [$rawFiles['size'] ?? 0];
+    $maxFiles = mmh_assignment_submission_max_files();
+    $maxBytes = mmh_assignment_submission_max_file_bytes();
+    $allowedMimes = mmh_assignment_submission_allowed_mimes();
+    if (count($names) < 1 || count($names) > $maxFiles) {
+        assignment_submission_response(false, 'Choose between 1 and ' . $maxFiles . ' answer files.', [], 422);
+    }
+    $finfo = new finfo(FILEINFO_MIME_TYPE);
+    foreach ($names as $index => $originalName) {
+        $error = (int) ($errors[$index] ?? UPLOAD_ERR_NO_FILE);
+        $temporary = (string) ($tmpNames[$index] ?? '');
+        $size = (int) ($sizes[$index] ?? 0);
+        $extension = strtolower(pathinfo((string) $originalName, PATHINFO_EXTENSION));
+        if ($error !== UPLOAD_ERR_OK || $temporary === '' || !is_uploaded_file($temporary) || $size <= 0 || $size > $maxBytes || !isset($allowedMimes[$extension])) {
+            assignment_submission_response(false, 'Every answer file must be a valid PDF or Word file within the upload limits.', [], 422);
+        }
+        $detectedMime = strtolower((string) $finfo->file($temporary));
+        if (!in_array($detectedMime, $allowedMimes[$extension], true)) {
+            assignment_submission_response(false, 'The uploaded file type could not be verified. Please choose a valid PDF or Word file.', [], 422);
+        }
+        $fileEntries[] = [
+            'temporary' => $temporary,
+            'original_filename' => substr(trim((string) $originalName), 0, 255),
+            'extension' => $extension,
+            'mime_type' => $detectedMime,
+            'file_size' => $size,
+            'sort_order' => count($fileEntries),
+        ];
     }
 
     $uploadDirectory = 'uploads/static/assignments/assignment_submissions/';
     if (!is_dir($uploadDirectory) && !mkdir($uploadDirectory, 0777, true) && !is_dir($uploadDirectory)) {
         assignment_submission_response(false, 'Failed to prepare the upload directory. Please contact your teacher.', [], 500);
     }
-    $fileName = 'submission_' . $assignmentId . '_' . $studentId . '_' . time() . '_' . bin2hex(random_bytes(6)) . '.' . $extension;
-    $filePath = $uploadDirectory . $fileName;
-    if (!move_uploaded_file($file['tmp_name'], $filePath)) {
-        assignment_submission_response(false, 'File upload failed. Please try again.', [], 500);
+    $newPaths = [];
+    foreach ($fileEntries as $index => &$entry) {
+        $fileName = 'submission_' . $assignmentId . '_' . $studentId . '_' . time() . '_' . $index . '_' . bin2hex(random_bytes(6)) . '.' . $entry['extension'];
+        $entry['file_path'] = $uploadDirectory . $fileName;
+        if (!move_uploaded_file($entry['temporary'], $entry['file_path'])) {
+            foreach ($newPaths as $path) { if (is_file($path)) unlink($path); }
+            assignment_submission_response(false, 'File upload failed. Please try again.', [], 500);
+        }
+        $newPaths[] = $entry['file_path'];
     }
+    unset($entry);
 
     $submittedAt = date('Y-m-d H:i:s');
-    $oldFile = null;
-    $legacyAttachmentFiles = [];
+    $oldPaths = [];
     $isResubmission = false;
     try {
         $conn->begin_transaction();
-
-        // The existing non-unique assignment/student index lets InnoDB lock
-        // this lookup range before deciding whether to update or insert.
-        $existingStmt = $conn->prepare('SELECT id, file_path, submission_source FROM assignment_submissions WHERE assignment_id = ? AND student_id = ? ORDER BY id ASC LIMIT 1 FOR UPDATE');
-        if (!$existingStmt) {
-            throw new RuntimeException('Unable to prepare submission lookup.');
-        }
+        $existingStmt = $conn->prepare('SELECT id, file_path FROM assignment_submissions WHERE assignment_id = ? AND student_id = ? ORDER BY id ASC LIMIT 1 FOR UPDATE');
+        if (!$existingStmt) throw new RuntimeException('Unable to prepare submission lookup.');
         $existingStmt->bind_param('si', $assignmentId, $studentId);
         $existingStmt->execute();
         $existing = $existingStmt->get_result()->fetch_assoc();
         $existingStmt->close();
-
         if ($existing) {
             $isResubmission = true;
-            $oldFile = $existing['file_path'] ?? null;
+            if (!empty($existing['file_path'])) $oldPaths[] = (string) $existing['file_path'];
             $submissionId = (int) $existing['id'];
-            // A later student upload supersedes an instructor-imported packet.
-            // Clear only its child attachments so the current LMS file remains
-            // the visible submission; ordinary LMS resubmissions are unchanged.
-            if (($existing['submission_source'] ?? '') === 'legacy_import') {
-                $legacyFilesStmt = $conn->prepare('SELECT file_path FROM assignment_submission_files WHERE submission_id = ?');
-                if ($legacyFilesStmt) {
-                    $legacyFilesStmt->bind_param('i', $submissionId);
-                    if ($legacyFilesStmt->execute()) {
-                        $legacyResult = $legacyFilesStmt->get_result();
-                        while ($legacyFile = $legacyResult->fetch_assoc()) { $legacyAttachmentFiles[] = (string) ($legacyFile['file_path'] ?? ''); }
-                    }
-                    $legacyFilesStmt->close();
-                }
-                $deleteLegacyFilesStmt = $conn->prepare('DELETE FROM assignment_submission_files WHERE submission_id = ?');
-                if (!$deleteLegacyFilesStmt) { throw new RuntimeException('Unable to update imported attachments.'); }
-                $deleteLegacyFilesStmt->bind_param('i', $submissionId);
-                $deleteLegacyFilesStmt->execute();
-                $deleteLegacyFilesStmt->close();
+            $oldFilesStmt = $conn->prepare('SELECT file_path FROM assignment_submission_files WHERE submission_id = ?');
+            if ($oldFilesStmt) {
+                $oldFilesStmt->bind_param('i', $submissionId);
+                $oldFilesStmt->execute();
+                $oldResult = $oldFilesStmt->get_result();
+                while ($oldFile = $oldResult->fetch_assoc()) if (!empty($oldFile['file_path'])) $oldPaths[] = (string) $oldFile['file_path'];
+                $oldFilesStmt->close();
             }
-            $updateStmt = $conn->prepare('UPDATE assignment_submissions SET file_path = ?, submitted_at = ?, self_score = ?, self_score_status = ?, grade = ?, verification_note = NULL, verified_at = NULL, verified_by = NULL, submission_source = ?, imported_by = NULL, imported_at = NULL, original_submitted_at = NULL, import_notes = NULL WHERE id = ?');
-            if (!$updateStmt) {
-                throw new RuntimeException('Unable to prepare submission update.');
-            }
-            $submissionSource = 'lms';
-            $updateStmt->bind_param('sssdssi', $filePath, $submittedAt, $selfScore, $selfScoreStatus, $finalScore, $submissionSource, $submissionId);
-            $saved = $updateStmt->execute();
-            $updateStmt->close();
+            $deleteFilesStmt = $conn->prepare('DELETE FROM assignment_submission_files WHERE submission_id = ?');
+            if (!$deleteFilesStmt) throw new RuntimeException('Unable to replace submission files.');
+            $deleteFilesStmt->bind_param('i', $submissionId);
+            if (!$deleteFilesStmt->execute()) throw new RuntimeException('Unable to replace submission files.');
+            $deleteFilesStmt->close();
+            $primaryPath = $newPaths[0];
         } else {
             $submissionSource = 'lms';
+            $primaryPath = $newPaths[0];
             $insertStmt = $conn->prepare('INSERT INTO assignment_submissions (assignment_id, student_id, file_path, submitted_at, self_score, self_score_status, grade, submission_source) VALUES (?, ?, ?, ?, ?, ?, ?, ?)');
-            if (!$insertStmt) {
-                throw new RuntimeException('Unable to prepare submission insert.');
-            }
-            $insertStmt->bind_param('sissdsss', $assignmentId, $studentId, $filePath, $submittedAt, $selfScore, $selfScoreStatus, $finalScore, $submissionSource);
-            $saved = $insertStmt->execute();
+            if (!$insertStmt) throw new RuntimeException('Unable to prepare submission insert.');
+            $insertStmt->bind_param('sissdsss', $assignmentId, $studentId, $primaryPath, $submittedAt, $selfScore, $selfScoreStatus, $finalScore, $submissionSource);
+            if (!$insertStmt->execute()) throw new RuntimeException('Unable to save submission.');
+            $submissionId = (int) $conn->insert_id;
             $insertStmt->close();
         }
-        if (!$saved) {
-            throw new RuntimeException('Unable to save submission.');
+        if (!isset($submissionId) || $submissionId <= 0) throw new RuntimeException('Unable to save submission.');
+        if ($existing) {
+            // Execute the replacement update after the statement shape is finalized.
+            $updateStmt = $conn->prepare("UPDATE assignment_submissions SET file_path = ?, submitted_at = ?, self_score = ?, self_score_status = ?, grade = ?, verification_note = NULL, verified_at = NULL, verified_by = NULL, submission_source = 'lms', imported_by = NULL, imported_at = NULL, original_submitted_at = NULL, import_notes = NULL WHERE id = ?");
+            if (!$updateStmt) throw new RuntimeException('Unable to prepare submission update.');
+            $primaryPath = $newPaths[0];
+            $updateStmt->bind_param('ssdssi', $primaryPath, $submittedAt, $selfScore, $selfScoreStatus, $finalScore, $submissionId);
+            if (!$updateStmt->execute()) throw new RuntimeException('Unable to update submission.');
+            $updateStmt->close();
         }
+        $fileInsert = $conn->prepare('INSERT INTO assignment_submission_files (submission_id, file_path, original_filename, mime_type, file_size, sort_order) VALUES (?, ?, ?, ?, ?, ?)');
+        if (!$fileInsert) throw new RuntimeException('Unable to save submission files.');
+        foreach ($fileEntries as $entry) {
+            $fileInsert->bind_param('isssii', $submissionId, $entry['file_path'], $entry['original_filename'], $entry['mime_type'], $entry['file_size'], $entry['sort_order']);
+            if (!$fileInsert->execute()) throw new RuntimeException('Unable to save submission files.');
+        }
+        $fileInsert->close();
         $conn->commit();
     } catch (Throwable $e) {
-        try {
-            $conn->rollback();
-        } catch (Throwable $ignored) {
-        }
-        if (is_file($filePath)) {
-            @unlink($filePath);
-        }
+        try { $conn->rollback(); } catch (Throwable $ignored) {}
+        foreach ($newPaths as $path) { if (is_file($path)) unlink($path); }
         assignment_submission_response(false, 'Unable to save your submission. Please try again.', [], 500);
     }
+    foreach (array_unique($oldPaths) as $oldPath) {
+        if ($oldPath !== '' && !in_array($oldPath, $newPaths, true) && is_file($oldPath)) unlink($oldPath);
+    }
 
-    if ($oldFile && $oldFile !== $filePath && is_file($oldFile)) {
-        @unlink($oldFile);
-    }
-    foreach (array_unique($legacyAttachmentFiles) as $legacyAttachmentFile) {
-        if ($legacyAttachmentFile !== '' && $legacyAttachmentFile !== $filePath && is_file($legacyAttachmentFile)) {
-            @unlink($legacyAttachmentFile);
-        }
-    }
 
     mmh_log_event($conn, $studentId, $isResubmission ? 'homework_resubmitted' : 'homework_submitted', [
         'course_id' => $courseId,
@@ -224,6 +244,7 @@ try {
             'self_score' => $selfScore,
             'self_score_status' => $selfScoreStatus,
             'final_score' => $finalScore,
+            'file_count' => count($fileEntries),
         ],
     ]);
 
@@ -246,6 +267,7 @@ try {
             'max_score' => $maxScore,
             'verification_status' => $selfScoreStatus,
             'final_score' => $finalScore,
+            'file_count' => count($fileEntries),
         ],
     ]);
 } catch (Throwable $e) {
