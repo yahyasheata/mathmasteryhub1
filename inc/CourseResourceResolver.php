@@ -633,6 +633,8 @@ if (!function_exists('mmh_course_resource_resolve_core')) {
         $assignmentId = mmh_course_assignment_id($item);
         $homeworkData = is_array($data['homework_resource'] ?? null) ? $data['homework_resource'] : [];
         $homeworkUrl = mmh_course_resource_safe_url($homeworkData['url'] ?? $data['url'] ?? $data['assignment_drive_url'] ?? '');
+        $homeworkData2 = is_array($data['homework_resource_2'] ?? null) ? $data['homework_resource_2'] : [];
+        $homeworkUrl2 = mmh_course_resource_safe_url($homeworkData2['url'] ?? $data['assignment_drive_url_2'] ?? '');
         if ($homeworkUrl === null && preg_match_all('/<a\b[^>]*\bhref\s*=\s*(["\'])(.*?)\1[^>]*>/is', (string) ($item['item_description'] ?? ''), $homeworkLinks)) {
             foreach ($homeworkLinks[2] as $candidate) {
                 $candidate = mmh_course_resource_safe_url(html_entity_decode((string) $candidate, ENT_QUOTES, 'UTF-8'));
@@ -664,6 +666,12 @@ if (!function_exists('mmh_course_resource_resolve_core')) {
                     'provider' => (string) ($homeworkData['provider'] ?? $homeworkType),
                     'resource_type' => $homeworkType,
                     'embed' => !array_key_exists('embed', $homeworkData) || !empty($homeworkData['embed']),
+                ],
+                'homework_resource_2' => $homeworkUrl2 === null ? null : [
+                    'url' => $homeworkUrl2,
+                    'provider' => (string) ($homeworkData2['provider'] ?? mmh_course_resource_type_for_url($homeworkUrl2, 'external_link')),
+                    'resource_type' => (string) ($homeworkData2['resource_type'] ?? $homeworkData2['type'] ?? mmh_course_resource_type_for_url($homeworkUrl2, 'external_link')),
+                    'embed' => !array_key_exists('embed', $homeworkData2) || !empty($homeworkData2['embed']),
                 ],
                 'model_answer_resource' => $modelAnswerUrl === null ? null : [
                     'url' => $modelAnswerUrl,

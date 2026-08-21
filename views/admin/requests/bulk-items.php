@@ -92,7 +92,7 @@ if (bulk_items_post('_method') !== 'BULK') {
 $course_id = bulk_items_post('course_id');
 $action = bulk_items_post('action');
 $item_ids = bulk_items_unique_ids($_POST['item_ids'] ?? []);
-$allowed_actions = ['move', 'publish', 'unpublish', 'delete', 'duplicate'];
+$allowed_actions = ['move', 'publish', 'unpublish', 'delete', 'duplicate', 'copy'];
 
 if ($course_id === '' || !in_array($action, $allowed_actions, true)) {
     bulk_items_response(false, 'Validation failed. The course or bulk action is invalid.');
@@ -168,6 +168,20 @@ if ($action === 'duplicate') {
         ]);
     } catch (Throwable $exception) {
         bulk_items_response(false, $exception->getMessage() ?: 'The selected lessons could not be duplicated.');
+    }
+}
+
+if ($action === 'copy') {
+    $destination_course_id = bulk_items_post('destination_course_id');
+    $destination_section_id = bulk_items_post('destination_section_id');
+    if ($destination_course_id === '') bulk_items_response(false, 'Choose a destination course.');
+    try {
+        $result = CourseContentCopyService::copyItems($conn, $course_id, $item_ids, $destination_course_id, $destination_section_id !== '' ? $destination_section_id : null);
+        $message = count($selected) === 1 ? 'Lesson copied successfully.' : count($selected) . ' lessons copied successfully.';
+        if (!empty($result['warnings'])) $message .= ' ' . implode(' ', $result['warnings']);
+        bulk_items_response(true, $message, array_merge($result, ['affected' => count($selected), 'action' => $action]));
+    } catch (Throwable $exception) {
+        bulk_items_response(false, $exception->getMessage() ?: 'The selected lessons could not be copied.');
     }
 }
 

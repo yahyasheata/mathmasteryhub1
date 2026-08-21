@@ -39,6 +39,59 @@ final class CourseContentCopyService
         }
     }
 
+    /**
+     * Copy several independent items into one destination section in source
+     * course order. A single transaction keeps bulk copy all-or-nothing.
+     *
+     * @return array{course_id:string,section_id:?string,item_ids:array<int,string>,warnings:array<int,string>}
+     */
+    public static function copyItems(mysqli $conn, string $sourceCourseId, array $sourceItemIds, string $destinationCourseId, ?string $destinationSectionId = null): array
+    {
+        self::assertCourse($conn, $sourceCourseId);
+        self::assertCourse($conn, $destinationCourseId);
+        $requested = [];
+        foreach ($sourceItemIds as $id) {
+            $id = trim((string) $id);
+            if ($id !== '') $requested[$id] = true;
+        }
+        if (!$requested) throw new RuntimeException('Select at least one course item to copy.');
+
+        $sourceItems = [];
+        foreach (array_keys($requested) as $sourceItemId) {
+            $source = self::fetchOne($conn, 'SELECT ci.*, COALESCE(cs.sort_order, 2147483647) AS section_sort_order FROM course_items ci LEFT JOIN course_sections cs ON cs.course_id = ci.course_id AND cs.section_id = ci.section_id WHERE ci.course_id = ? AND ci.item_id = ? LIMIT 1', 'ss', [$sourceCourseId, $sourceItemId]);
+            if (!$source) throw new RuntimeException('One or more source course items were not found.');
+            $sourceItems[] = $source;
+        }
+        usort($sourceItems, static function (array $a, array $b): int {
+            $aSection = (int) ($a['section_sort_order'] ?? 2147483647);
+            $bSection = (int) ($b['section_sort_order'] ?? 2147483647);
+            $aOrder = (int) ($a['page_order'] ?? $a['sort_order'] ?? 0);
+            $bOrder = (int) ($b['page_order'] ?? $b['sort_order'] ?? 0);
+            return $aSection <=> $bSection ?: ($aOrder <=> $bOrder ?: ((int) ($a['id'] ?? 0) <=> (int) ($b['id'] ?? 0)));
+        });
+        $destinationSectionId = self::normalizeDestinationSection($conn, $destinationCourseId, $destinationSectionId);
+
+        $conn->begin_transaction();
+        try {
+            $maps = ['sections' => [], 'items' => [], 'assignments' => [], 'assignment_refs' => []];
+            $itemIds = [];
+            $warnings = [];
+            $order = self::nextItemOrder($conn, $destinationCourseId, $destinationSectionId);
+            foreach ($sourceItems as $source) {
+                $copy = self::copyItemRow($conn, $source, $destinationCourseId, $destinationSectionId, $maps, $order++);
+                $itemIds[] = $copy['item_id'];
+                $warnings = array_merge($warnings, $copy['warnings']);
+            }
+            foreach ($itemIds as $newItemId) self::finalizeItemReferences($conn, $newItemId, $maps);
+            self::finalizeAssignmentReferences($conn, $maps);
+            $conn->commit();
+            return ['course_id' => $destinationCourseId, 'section_id' => $destinationSectionId, 'item_ids' => $itemIds, 'warnings' => array_values(array_unique($warnings))];
+        } catch (Throwable $e) {
+            $conn->rollback();
+            throw $e;
+        }
+    }
+
     /** @return array{course_id:string,section_id:string,item_ids:array<int,string>,warnings:array<int,string>} */
     public static function copySection(mysqli $conn, string $sourceCourseId, string $sourceSectionId, string $destinationCourseId): array
     {

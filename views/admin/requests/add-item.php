@@ -675,6 +675,10 @@ function item_build_template(mysqli $conn, $template_type, $course_id, $item_tit
             if ($url === '' || !filter_var($url, FILTER_VALIDATE_URL)) {
                 item_response(false, 'Validation failed. Please enter a valid Google Drive URL.');
             }
+            $url2 = item_post('assignment_drive_url_2');
+            if ($url2 !== '' && !filter_var($url2, FILTER_VALIDATE_URL)) {
+                item_response(false, 'Validation failed. Please enter a valid Homework PDF 2 URL.');
+            }
             $due_date_value = item_normalize_datetime(item_post('assignment_deadline'));
             if ($due_date_value === null) {
                 item_response(false, 'Validation failed. Please choose an assignment deadline.');
@@ -715,6 +719,7 @@ function item_build_template(mysqli $conn, $template_type, $course_id, $item_tit
                 // authoritative format for the shared Homework surface.
                 'url' => $url,
                 'homework_resource' => item_homework_resource_slot($url),
+                'homework_resource_2' => $url2 === '' ? null : item_homework_resource_slot($url2),
                 'model_answer_resource' => $model_answer_url === '' ? null : item_homework_resource_slot($model_answer_url, $model_answer_release),
                 'model_answer_release' => $model_answer_release,
                 'visibility' => ['homework' => true, 'model_answer' => $model_answer_release !== 'hidden'],

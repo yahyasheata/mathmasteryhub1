@@ -136,6 +136,7 @@ $admin_base = rtrim((string) $baseUrl, '/') . '/admin/';
                 <button type="button" class="btn btn-outline-success btn-sm" data-manager-bulk="publish"><i class="fas fa-eye ds-icon ds-icon-sm" aria-hidden="true"></i> Publish</button>
                 <button type="button" class="btn btn-outline-secondary btn-sm" data-manager-bulk="unpublish"><i class="fas fa-file ds-icon ds-icon-sm" aria-hidden="true"></i> Move to draft</button>
                 <button type="button" class="btn btn-outline-secondary btn-sm" data-manager-bulk="duplicate"><i class="fas fa-copy ds-icon ds-icon-sm" aria-hidden="true"></i> Duplicate</button>
+                <button type="button" class="btn btn-outline-primary btn-sm" data-manager-bulk="copy"><i class="fas fa-share-square ds-icon ds-icon-sm" aria-hidden="true"></i> Copy to another course</button>
                 <button type="button" class="btn btn-outline-danger btn-sm" data-manager-bulk="delete"><i class="fas fa-trash ds-icon ds-icon-sm" aria-hidden="true"></i> Delete</button>
                 <button type="button" class="btn btn-link btn-sm" data-manager-action="clear-selection">Clear</button>
             </section>
@@ -517,10 +518,10 @@ $admin_base = rtrim((string) $baseUrl, '/') . '/admin/';
     $.ajax({ type: 'POST', url: 'requests/section/duplicate', data: { _method: 'DUPLICATE', course_id: courseId, section_id: sectionId }, dataType: 'json' }).done(function(response) { if (responseOk(response)) { notify('success', responseMessage(response, 'Section duplicated.')); loadList(); } else { notify('error', responseMessage(response, 'Section could not be duplicated.')); } }).fail(function() { notify('error', 'The section could not be duplicated.'); }).always(function() { setButtonLoading($button, false); });
   }
 
-  var copyState = { kind: '', sourceId: '', title: '', courses: [], sourceCourseId: String(courseId || '') };
+  var copyState = { kind: '', sourceId: '', sourceIds: [], title: '', courses: [], sourceCourseId: String(courseId || '') };
   function closeCopyModal() {
     $('#course-copy-modal').addClass('d-none');
-    copyState = { kind: '', sourceId: '', title: '', courses: [], sourceCourseId: String(courseId || '') };
+    copyState = { kind: '', sourceId: '', sourceIds: [], title: '', courses: [], sourceCourseId: String(courseId || '') };
   }
   function copyCourses(query) {
     query = String(query || '').toLowerCase().trim();
@@ -545,10 +546,13 @@ $admin_base = rtrim((string) $baseUrl, '/') . '/admin/';
     $('#course-copy-section-wrap').toggleClass('d-none', copyState.kind === 'section');
   }
   function openCopyModal(kind, sourceId, title, $button) {
-    copyState.kind = kind; copyState.sourceId = String(sourceId || ''); copyState.title = String(title || 'Content');
-    $('#course-copy-title').text('Copy "' + copyState.title + '"');
+    copyState.kind = kind;
+    copyState.sourceIds = Array.isArray(sourceId) ? sourceId.map(String) : [String(sourceId || '')];
+    copyState.sourceId = copyState.sourceIds[0] || '';
+    copyState.title = String(title || (kind === 'bulk' ? copyState.sourceIds.length + ' lessons' : 'Content'));
+    $('#course-copy-title').text('Copy ' + copyState.title);
     $('#course-copy-description').text(kind === 'section' ? 'A new section and independent copies of its items will be created.' : 'The original content stays unchanged. Choose where to place the new copy.');
-    $('#course-copy-submit [data-copy-submit-label]').text(kind === 'section' ? 'Copy section' : 'Copy item');
+    $('#course-copy-submit [data-copy-submit-label]').text(kind === 'section' ? 'Copy section' : (kind === 'bulk' ? 'Copy lessons' : 'Copy item'));
     $('#course-copy-feedback').empty(); $('#course-copy-course-search').val('');
     $('#course-copy-modal').removeClass('d-none');
     if (!copyState.courses.length) {
@@ -573,19 +577,22 @@ $admin_base = rtrim((string) $baseUrl, '/') . '/admin/';
       destination_section_id: destinationSectionId,
       _token: adminCsrfToken
     };
-    var endpoint = copyState.kind === 'section' ? 'requests/course-copy/section' : 'requests/course-copy/item';
-    if (copyState.kind === 'section') data.source_section_id = copyState.sourceId; else data.source_item_id = copyState.sourceId;
+    var endpoint = copyState.kind === 'section' ? 'requests/course-copy/section' : (copyState.kind === 'bulk' ? 'requests/item/bulk' : 'requests/course-copy/item');
+    if (copyState.kind === 'section') data.source_section_id = copyState.sourceId;
+    else if (copyState.kind === 'bulk') { data._method = 'BULK'; data.action = 'copy'; data.course_id = copyState.sourceCourseId; data.item_ids = copyState.sourceIds; }
+    else data.source_item_id = copyState.sourceId;
     $.ajax({ type: 'POST', url: endpoint, data: data, dataType: 'json' }).done(function(response) {
       if (!responseOk(response)) { $('#course-copy-feedback').text(responseMessage(response, 'The copy could not be created.')); return; }
       var destination = copyState.courses.find(function(item) { return String(item.id) === destinationCourseId; });
       var sectionTitle = destinationSectionId ? ((destination && destination.sections || []).find(function(item) { return String(item.id) === destinationSectionId; }) || {}).title : 'General';
       var destinationLabel = (destination ? destination.title : 'the destination course') + ' → ' + (sectionTitle || 'General');
-      var copyMessage = (copyState.kind === 'section' ? 'Section' : 'Item') + ' copied successfully to ' + destinationLabel + '.';
+      var copyLabel = copyState.kind === 'section' ? 'Section' : (copyState.kind === 'bulk' ? 'Lessons' : 'Item');
+      var copyMessage = copyLabel + ' copied successfully to ' + destinationLabel + '.';
       if (response.message && response.message.indexOf('review') !== -1) copyMessage += ' ' + response.message;
       notify('success', copyMessage);
       closeCopyModal();
       if (destinationCourseId === String(courseId)) loadList();
-    }).fail(function(xhr) { $('#course-copy-feedback').text(xhr && xhr.responseJSON ? responseMessage(xhr.responseJSON, 'The copy could not be created.') : 'The copy could not be created.'); }).always(function() { $submit.prop('disabled', false).find('[data-copy-submit-label]').text(copyState.kind === 'section' ? 'Copy section' : 'Copy item'); });
+    }).fail(function(xhr) { $('#course-copy-feedback').text(xhr && xhr.responseJSON ? responseMessage(xhr.responseJSON, 'The copy could not be created.') : 'The copy could not be created.'); }).always(function() { $submit.prop('disabled', false).find('[data-copy-submit-label]').text(copyState.kind === 'section' ? 'Copy section' : (copyState.kind === 'bulk' ? 'Copy lessons' : 'Copy item')); });
   }
 
   $(document).on('click.courseManager', '[data-manager-action]', function(event) {
@@ -602,10 +609,12 @@ $admin_base = rtrim((string) $baseUrl, '/') . '/admin/';
     if (action === 'edit-item') { openItem({ course_id: courseId, item_id: $button.data('item-id') }, $button); return; }
     if (action === 'preview-item') { event.preventDefault(); window.location.assign(baseUrl + '/admin/courses/' + encodeURIComponent(courseId) + '/content/' + encodeURIComponent(String($button.data('item-id'))) + '/preview'); return; }
     if (action === 'toggle-item-status') { bulkAction(String($button.data('status')) === 'published' ? 'unpublish' : 'publish', [String($button.data('item-id'))], '', $button); return; }
-    if (action === 'duplicate-item') { openCopyModal('item', String($button.data('item-id')), $button.closest('.lesson-manager-row').find('.course-manager-edit-link').first().text(), $button); return; }
+    if (action === 'duplicate-item') { bulkAction('duplicate', [String($button.data('item-id'))], '', $button); return; }
+    if (action === 'copy-item') { openCopyModal('item', String($button.data('item-id')), $button.closest('.lesson-manager-row').find('.course-manager-edit-link').first().text(), $button); return; }
     if (action === 'delete-item') { Swal.fire({ icon: 'warning', title: 'Delete this lesson?', text: 'This cannot be undone.', showCancelButton: true, confirmButtonText: 'Delete', confirmButtonColor: 'var(--danger)' }).then(function(result) { if (result.isConfirmed) { bulkAction('delete', [String($button.data('item-id'))], '', $button); } }); return; }
     if (action === 'edit-section') { openSection({ course_id: courseId, section_id: $button.data('section-id'), _method: 'GET' }, $button); return; }
-    if (action === 'duplicate-section') { openCopyModal('section', String($button.data('section-id')), $button.closest('.course-manager-section').find('.course-manager-section-title').first().text(), $button); return; }
+    if (action === 'duplicate-section') { duplicateSection(String($button.data('section-id')), $button); return; }
+    if (action === 'copy-section') { openCopyModal('section', String($button.data('section-id')), $button.closest('.course-manager-section').find('.course-manager-section-title').first().text(), $button); return; }
     if (action === 'delete-section') { Swal.fire({ icon: 'warning', title: 'Delete this section?', text: 'Lessons will never be orphaned.', showCancelButton: true, confirmButtonText: 'Continue' }).then(function(result) { if (result.isConfirmed) { deleteSection(String($button.data('section-id')), $button); } }); return; }
     if (action === 'move-section') { var $sectionToMove = $button.closest('.course-manager-section'); var direction = $button.data('direction'); var $target = direction === 'up' ? $sectionToMove.prev('.course-manager-section') : $sectionToMove.next('.course-manager-section'); if ($target.length) { direction === 'up' ? $sectionToMove.insertBefore($target) : $sectionToMove.insertAfter($target); queueSortingSave(); } return; }
   });
@@ -619,6 +628,7 @@ $admin_base = rtrim((string) $baseUrl, '/') . '/admin/';
   $(document).on('click.courseManager', '[data-manager-bulk]', function() {
     var $button = $(this); var action = String($button.data('manager-bulk')); var ids = selectedIds();
     if (action === 'delete') { Swal.fire({ icon: 'warning', title: 'Delete ' + ids.length + ' selected lessons?', text: 'This cannot be undone.', showCancelButton: true, confirmButtonText: 'Delete selected' }).then(function(result) { if (result.isConfirmed) { bulkAction(action, ids, '', $button); } }); return; }
+    if (action === 'copy') { openCopyModal('bulk', ids, ids.length + ' selected lessons', $button); return; }
     bulkAction(action, ids, $('#course-manager-bulk-destination').val(), $button);
   });
   $(document).on('click.courseManager', '#course-manager-editor [data-bs-dismiss="modal"], #course-manager-editor .btn-close', function(event) { event.preventDefault(); closeEditor(false); });

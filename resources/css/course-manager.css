@@ -1,4 +1,25 @@
 /* Dedicated admin Lesson Manager: consumes the shared MathHub design tokens. */
+/* Keep Course Content menus readable in their resting state. Legacy admin
+   button rules can otherwise inherit transparent text until hover. */
+.course-manager-section-actions .dropdown-menu,
+.course-manager-row-actions .dropdown-menu {
+  background: var(--surface) !important;
+  border-color: var(--border) !important;
+  opacity: 1;
+}
+.course-manager-section-actions .dropdown-menu .dropdown-item,
+.course-manager-row-actions .dropdown-menu .dropdown-item {
+  background: transparent;
+  color: var(--text-primary) !important;
+  opacity: 1 !important;
+}
+.course-manager-section-actions .dropdown-menu .dropdown-item:hover,
+.course-manager-section-actions .dropdown-menu .dropdown-item:focus-visible,
+.course-manager-row-actions .dropdown-menu .dropdown-item:hover,
+.course-manager-row-actions .dropdown-menu .dropdown-item:focus-visible {
+  background: var(--surface-hover) !important;
+  color: var(--text-primary) !important;
+}
 html:has(.course-manager-page) { overflow-x: hidden; }
 html:has(.course-manager-page) .admin-top-nav { overflow-x: hidden; }
 .course-manager-main { min-width: 0; overflow-x: hidden !important; width: 100%; }

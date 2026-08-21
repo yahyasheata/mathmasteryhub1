@@ -372,6 +372,7 @@ function items_item_manager_render_lesson($row, $section_locked = false, array $
               <li><hr class='dropdown-divider'></li>
               <li><button type='button' class='dropdown-item' data-manager-action='toggle-item-status' data-item-id='{$item_id}' data-status='{$status_key}'><i class='fas {$publish_icon} ds-icon ds-icon-sm' aria-hidden='true'></i> {$publish_label}</button></li>
               <li><button type='button' class='dropdown-item' data-manager-action='duplicate-item' data-item-id='{$item_id}'><i class='fas fa-copy ds-icon ds-icon-sm' aria-hidden='true'></i> Duplicate</button></li>
+              <li><button type='button' class='dropdown-item' data-manager-action='copy-item' data-item-id='{$item_id}'><i class='fas fa-share-square ds-icon ds-icon-sm' aria-hidden='true'></i> Copy to another course</button></li>
               <li><hr class='dropdown-divider'></li>
               <li><button type='button' class='dropdown-item text-danger' data-manager-action='delete-item' data-item-id='{$item_id}'><i class='fas fa-archive ds-icon ds-icon-sm' aria-hidden='true'></i> Archive</button></li>
             </ul>
@@ -438,6 +439,7 @@ function items_item_manager_render_section(mysqli $conn, $course_id, array $sect
             <ul class='dropdown-menu dropdown-menu-end'>
               <li><button type='button' class='dropdown-item' data-manager-action='edit-section' data-section-id='{$safe_section_id}'><i class='fas fa-pen ds-icon ds-icon-sm' aria-hidden='true'></i> Edit section</button></li>
               <li><button type='button' class='dropdown-item' data-manager-action='duplicate-section' data-section-id='{$safe_section_id}'><i class='fas fa-copy ds-icon ds-icon-sm' aria-hidden='true'></i> Duplicate section</button></li>
+              <li><button type='button' class='dropdown-item' data-manager-action='copy-section' data-section-id='{$safe_section_id}'><i class='fas fa-share-square ds-icon ds-icon-sm' aria-hidden='true'></i> Copy to another course</button></li>
               <li><button type='button' class='dropdown-item' data-manager-action='move-section' data-section-id='{$safe_section_id}' data-direction='up'><i class='fas fa-arrow-up ds-icon ds-icon-sm' aria-hidden='true'></i> Move up</button></li>
               <li><button type='button' class='dropdown-item' data-manager-action='move-section' data-section-id='{$safe_section_id}' data-direction='down'><i class='fas fa-arrow-down ds-icon ds-icon-sm' aria-hidden='true'></i> Move down</button></li>
               <li><hr class='dropdown-divider'></li>
