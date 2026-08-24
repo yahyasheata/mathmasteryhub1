@@ -178,6 +178,7 @@ final class CourseContentCopyService
         $template = strtolower(trim((string) ($source['template_type'] ?? $source['item_type'] ?? '')));
         $templateData = self::jsonRemap($source['template_data'] ?? null, $maps);
         $metadata = self::jsonSanitize($source['metadata'] ?? null, $warnings);
+        $copiedStatus = $template === 'timed_exam' ? 'draft' : (string) ($source['status'] ?? 'draft');
         $values = [
             'item_id' => $newItemId,
             'item_title' => rtrim((string) ($source['item_title'] ?? '')) . ' (Copy)',
@@ -190,7 +191,7 @@ final class CourseContentCopyService
             'duration_minutes' => $source['duration_minutes'] ?? null,
             'assignment_id' => $newAssignmentId !== null && ctype_digit((string) $newAssignmentId) ? (int) $newAssignmentId : null,
             'due_date' => $source['due_date'] ?? null,
-            'status' => (string) ($source['status'] ?? 'draft'),
+            'status' => $copiedStatus,
             'sort_order' => $order,
             'course_id' => $destinationCourseId,
             'page_order' => $order,
@@ -245,7 +246,7 @@ final class CourseContentCopyService
         $paper_external_preview_url = $exam['paper_external_preview_url'] ?? null;
         $paper_external_download_url = $exam['paper_external_download_url'] ?? null;
         $paper_fallback_instructions = $exam['paper_fallback_instructions'] ?? null;
-        unset($exam['id'], $exam['created_at'], $exam['updated_at'], $exam['deleted_at'], $exam['roster_finalized_at_utc']);
+        unset($exam['id'], $exam['created_at'], $exam['updated_at'], $exam['deleted_at'], $exam['roster_finalized_at_utc'], $exam['roster_finalized_generation']);
         $exam['course_id'] = $destinationCourseId;
         $exam['item_id'] = $newItemId;
         $exam['title'] = rtrim((string) ($exam['title'] ?? 'Timed Exam')) . ' (Copy)';
@@ -255,13 +256,15 @@ final class CourseContentCopyService
         $exam['recovery_window_start_at_utc'] = null;
         $exam['recovery_window_end_at_utc'] = null;
         $exam['roster_finalized_at_utc'] = null;
+        if (array_key_exists('attempt_generation', $exam)) $exam['attempt_generation'] = 1;
+        if (array_key_exists('roster_finalized_generation', $exam)) $exam['roster_finalized_generation'] = null;
         $exam['paper_source'] = $paper_source;
         $exam['paper_external_url'] = $paper_external_url;
         $exam['paper_external_preview_url'] = $paper_external_preview_url;
         $exam['paper_external_download_url'] = $paper_external_download_url;
         $exam['paper_fallback_instructions'] = $paper_fallback_instructions;
         self::insertRow($conn, 'timed_exams', $exam);
-        $warnings[] = 'Timed Exam copied as Draft with its schedule cleared for review.';
+        $warnings[] = 'Timed Exam copied as Draft with its schedule cleared for review. Open the copied item, configure its window, and publish it before students can access it.';
     }
 
     private static function sectionValues(array $source, string $destinationCourseId, string $newSectionId, int $sort, array &$warnings): array

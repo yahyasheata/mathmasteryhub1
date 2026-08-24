@@ -56,7 +56,7 @@ foreach ($exams as $exam) {
     $summary['exams_scanned']++;
     $deadline = mmh_timed_exam_effective_deadline($exam);
     $deadlinePassed = $deadline instanceof DateTimeImmutable && $now > $deadline;
-    $alreadyMarked = !empty($exam['roster_finalized_at_utc']);
+    $alreadyMarked = mmh_timed_exam_roster_finalized_for_generation($exam);
     if ($deadlinePassed && ($includeFinalized || !$alreadyMarked)) {
         $summary['exams_due']++;
         $roster = mmh_timed_exam_finalize_exam_roster($conn, $exam, $dryRun, $now);

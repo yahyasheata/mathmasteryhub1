@@ -75,6 +75,40 @@ if (!function_exists('mmh_timed_exam_lifecycle_schema_available')) {
     }
 }
 
+if (!function_exists('mmh_timed_exam_window_generation_schema_available')) {
+    /** The additive window-generation columns preserve historical finalizer metadata. */
+    function mmh_timed_exam_window_generation_schema_available(mysqli $conn): bool
+    {
+        static $cache = [];
+        $key = spl_object_id($conn);
+        if (array_key_exists($key, $cache)) return $cache[$key];
+        $stmt = $conn->prepare("SELECT COUNT(*) AS total FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'timed_exams' AND COLUMN_NAME IN ('attempt_generation', 'roster_finalized_generation')");
+        if (!$stmt) return $cache[$key] = false;
+        $stmt->execute();
+        $cache[$key] = (int) (($stmt->get_result()->fetch_assoc()['total'] ?? 0)) === 2;
+        $stmt->close();
+        return $cache[$key];
+    }
+}
+
+if (!function_exists('mmh_timed_exam_generation')) {
+    function mmh_timed_exam_generation(array $exam): int
+    {
+        return max(1, (int) ($exam['attempt_generation'] ?? 1));
+    }
+}
+
+if (!function_exists('mmh_timed_exam_roster_finalized_for_generation')) {
+    function mmh_timed_exam_roster_finalized_for_generation(array $exam): bool
+    {
+        if (array_key_exists('roster_finalized_generation', $exam)) {
+            return !empty($exam['roster_finalized_at_utc'])
+                && (int) ($exam['roster_finalized_generation'] ?? 0) === mmh_timed_exam_generation($exam);
+        }
+        return !empty($exam['roster_finalized_at_utc']);
+    }
+}
+
 if (!function_exists('mmh_timed_exam_terminal_states')) {
     function mmh_timed_exam_terminal_states(): array
     {
@@ -93,7 +127,11 @@ if (!function_exists('mmh_timed_exam_attempt_scope')) {
     function mmh_timed_exam_attempt_scope(array $exam): string
     {
         $scope = trim((string) ($exam['_attempt_scope'] ?? 'primary'));
-        return preg_match('/\A(?:primary|recovery:[0-9]+:[0-9]+|legacy:[0-9]+)\z/', $scope) ? $scope : 'primary';
+        if ($scope === 'primary') {
+            $generation = mmh_timed_exam_generation($exam);
+            return $generation > 1 ? 'primary:' . $generation : 'primary';
+        }
+        return preg_match('/\A(?:primary:[0-9]+|recovery:[0-9]+:[0-9]+|legacy:[0-9]+)\z/', $scope) ? $scope : 'primary';
     }
 }
 
@@ -267,7 +305,7 @@ if (!function_exists('mmh_timed_exam_student_attempt')) {
     function mmh_timed_exam_student_attempt(mysqli $conn, int $studentId, int $examId, bool $create = false, string $scope = 'primary'): ?array
     {
         if ($studentId <= 0 || $examId <= 0 || !mmh_timed_exam_table_available($conn)) return null;
-        $scope = preg_match('/\A(?:primary|recovery:[0-9]+:[0-9]+|legacy:[0-9]+)\z/', $scope) ? $scope : 'primary';
+        $scope = preg_match('/\A(?:primary(?::[0-9]+)?|recovery:[0-9]+:[0-9]+|legacy:[0-9]+)\z/', $scope) ? $scope : 'primary';
         $sql = mmh_timed_exam_lifecycle_schema_available($conn)
             ? 'SELECT * FROM timed_exam_attempts WHERE timed_exam_id = ? AND student_id = ? AND attempt_scope = ? ORDER BY id DESC LIMIT 1'
             : 'SELECT * FROM timed_exam_attempts WHERE timed_exam_id = ? AND student_id = ? ORDER BY id DESC LIMIT 1';
@@ -636,13 +674,23 @@ if (!function_exists('mmh_timed_exam_finalize_exam_roster')) {
         }
         if (!$dryRun && $counts['failed'] === 0 && mmh_timed_exam_lifecycle_schema_available($conn)) {
             $examId = (int) ($exam['id'] ?? 0);
-            $mark = $conn->prepare('UPDATE timed_exams SET roster_finalized_at_utc = COALESCE(roster_finalized_at_utc, ?) WHERE id = ?');
-            if ($mark) {
-                $finalizedAt = $now->format('Y-m-d H:i:s');
-                $mark->bind_param('si', $finalizedAt, $examId);
-                if (!$mark->execute()) { $counts['failed']++; $errors[] = 'roster_marker'; }
-                $mark->close();
-            } else { $counts['failed']++; $errors[] = 'roster_marker'; }
+            $finalizedAt = $now->format('Y-m-d H:i:s');
+            if (mmh_timed_exam_window_generation_schema_available($conn)) {
+                $mark = $conn->prepare('UPDATE timed_exams SET roster_finalized_at_utc = ?, roster_finalized_generation = ? WHERE id = ?');
+                $generation = mmh_timed_exam_generation($exam);
+                if ($mark) {
+                    $mark->bind_param('sii', $finalizedAt, $generation, $examId);
+                    if (!$mark->execute()) { $counts['failed']++; $errors[] = 'roster_marker'; }
+                    $mark->close();
+                } else { $counts['failed']++; $errors[] = 'roster_marker'; }
+            } else {
+                $mark = $conn->prepare('UPDATE timed_exams SET roster_finalized_at_utc = COALESCE(roster_finalized_at_utc, ?) WHERE id = ?');
+                if ($mark) {
+                    $mark->bind_param('si', $finalizedAt, $examId);
+                    if (!$mark->execute()) { $counts['failed']++; $errors[] = 'roster_marker'; }
+                    $mark->close();
+                } else { $counts['failed']++; $errors[] = 'roster_marker'; }
+            }
         }
         return $counts + ['due' => true, 'errors' => $errors];
     }
@@ -1188,6 +1236,26 @@ if (!function_exists('mmh_timed_exam_save_config')) {
         $recoveryEnd = mmh_timed_exam_datetime_to_utc($data['recovery_window_end_at'] ?? null);
         $recoveryAllowed = !empty($data['recovery_allowed']) ? 1 : 0;
         $existing = mmh_timed_exam_load_for_item($conn, $courseId, $itemId, true);
+        $generationSchema = mmh_timed_exam_window_generation_schema_available($conn);
+        $attemptGeneration = $existing ? mmh_timed_exam_generation($existing) : 1;
+        if ($existing && $generationSchema) {
+            $oldStart = mmh_timed_exam_utc_datetime((string) ($existing['scheduled_start_at_utc'] ?? ''));
+            $newStart = mmh_timed_exam_utc_datetime($scheduled);
+            $windowChanged = ($oldStart?->format('Y-m-d H:i:s') ?? '') !== ($newStart?->format('Y-m-d H:i:s') ?? '')
+                || (int) ($existing['duration_minutes'] ?? 0) !== $duration
+                || (int) ($existing['grace_minutes'] ?? 0) !== $grace
+                || (int) (!empty($existing['late_submission_allowed'])) !== $lateAllowed;
+            if ($windowChanged) {
+                $historyStmt = $conn->prepare('SELECT COUNT(*) AS total FROM timed_exam_attempts WHERE timed_exam_id = ?');
+                if (!$historyStmt) throw new RuntimeException('Unable to inspect Timed Exam history before changing its window.');
+                $existingExamId = (int) ($existing['id'] ?? 0);
+                $historyStmt->bind_param('i', $existingExamId);
+                $historyStmt->execute();
+                $historicalAttempts = (int) (($historyStmt->get_result()->fetch_assoc()['total'] ?? 0));
+                $historyStmt->close();
+                if ($historicalAttempts > 0 || !empty($existing['roster_finalized_at_utc'])) $attemptGeneration++;
+            }
+        }
         $paperSource = 'external_link';
         $storageKey = $existing['paper_storage_key'] ?? null;
         $paperName = $existing['paper_original_name'] ?? null;
@@ -1224,7 +1292,13 @@ if (!function_exists('mmh_timed_exam_save_config')) {
             $stmt->bind_param('sssssiiisissssssssiiiisdsssiii', $title, $instructions, $status, $timingMode, $scheduled, $duration, $grace, $maxAttempts, $jsonTypes, $maxSize, $paperSource, $externalUrl, $externalPreviewUrl, $externalDownloadUrl, $fallbackInstructions, $storageKey, $paperName, $paperMime, $paperSize, $viewAllowed, $downloadAllowed, $lateAllowed, $expiryPolicy, $maxMarks, $release, $recoveryStart, $recoveryEnd, $recoveryAllowed, $createdBy, $id);
             if (!$stmt->execute()) { $error = $stmt->error; $stmt->close(); throw new RuntimeException($error); }
             $stmt->close();
-            if (mmh_timed_exam_lifecycle_schema_available($conn)) {
+            if ($generationSchema && $attemptGeneration !== mmh_timed_exam_generation($existing)) {
+                $generationUpdate = $conn->prepare('UPDATE timed_exams SET attempt_generation = ? WHERE id = ?');
+                if (!$generationUpdate) throw new RuntimeException('Unable to create the new Timed Exam attempt cycle.');
+                $generationUpdate->bind_param('ii', $attemptGeneration, $id);
+                if (!$generationUpdate->execute()) { $error = $generationUpdate->error; $generationUpdate->close(); throw new RuntimeException($error); }
+                $generationUpdate->close();
+            } elseif (!$generationSchema && mmh_timed_exam_lifecycle_schema_available($conn)) {
                 $resetRoster = $conn->prepare('UPDATE timed_exams SET roster_finalized_at_utc = NULL WHERE id = ?');
                 if (!$resetRoster) throw new RuntimeException('Unable to reset Timed Exam roster finalization after configuration changed.');
                 $resetRoster->bind_param('i', $id);
@@ -1276,10 +1350,14 @@ if (!function_exists('mmh_timed_exam_course_states')) {
     {
         if ($studentId <= 0 || $courseId === '' || !mmh_timed_exam_table_available($conn)) return [];
         $lifecycleSchema = mmh_timed_exam_lifecycle_schema_available($conn);
+        $generationSchema = $lifecycleSchema && mmh_timed_exam_window_generation_schema_available($conn);
+        $currentPrimaryScope = $generationSchema
+            ? "(a2.attempt_scope = CASE WHEN COALESCE(e.attempt_generation, 1) > 1 THEN CONCAT('primary:', e.attempt_generation) ELSE 'primary' END)"
+            : "(a2.attempt_scope = 'primary')";
         $scopeFilter = $lifecycleSchema
             ? ($includeRecoveryCompletion
-                ? " AND (a2.attempt_scope = 'primary' OR a2.state IN ('submitted','auto_submitted','graded'))"
-                : " AND a2.attempt_scope = 'primary'")
+                ? " AND ({$currentPrimaryScope} OR a2.state IN ('submitted','auto_submitted','graded'))"
+                : " AND {$currentPrimaryScope}")
             : '';
         $attemptOrder = $includeRecoveryCompletion
             ? " ORDER BY CASE WHEN a2.state IN ('submitted','auto_submitted','graded') THEN 0 ELSE 1 END, a2.id DESC LIMIT 1"
@@ -1294,7 +1372,7 @@ if (!function_exists('mmh_timed_exam_course_states')) {
             if (($state['key'] ?? '') === 'expired') {
                 $finalized = mmh_timed_exam_finalize_attempt($conn, $row, $studentId, $attempt ? (int) $attempt['id'] : null);
                 if (!empty($finalized['success'])) {
-                    $attempt = $finalized['attempt'] ?? mmh_timed_exam_student_attempt($conn, $studentId, (int) $row['id'], false, 'primary');
+                    $attempt = $finalized['attempt'] ?? mmh_timed_exam_student_attempt($conn, $studentId, (int) $row['id'], false, mmh_timed_exam_attempt_scope($row));
                     $state = mmh_timed_exam_state($row, $attempt);
                     $row['attempt_id'] = $attempt['id'] ?? null;
                     $row['attempt_state'] = $attempt['state'] ?? null;

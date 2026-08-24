@@ -1,6 +1,7 @@
 <?php
 require_once 'connection/config.php';
 require_once 'inc/functions.php';
+require_once 'inc/TimedExam.php';
 
 header('Content-Type: application/json; charset=utf-8');
 
@@ -67,7 +68,8 @@ $item_id = trim($_POST['item_id']);
 $course_id = trim($_POST['course_id']);
 
 try {
-    $select_stmt = $conn->prepare('SELECT status FROM course_items WHERE item_id = ? AND course_id = ? LIMIT 1');
+    if (!$conn->begin_transaction()) status_item_response(false, 'Unable to begin the visibility update.');
+    $select_stmt = $conn->prepare('SELECT status, template_type, item_type FROM course_items WHERE item_id = ? AND course_id = ? LIMIT 1');
     $select_stmt->bind_param('ss', $item_id, $course_id);
     $select_stmt->execute();
     $item = $select_stmt->get_result()->fetch_assoc();
@@ -85,17 +87,28 @@ try {
     $update_stmt = $conn->prepare('UPDATE course_items SET status = ? WHERE item_id = ? AND course_id = ? LIMIT 1');
     $update_stmt->bind_param('sss', $new_status, $item_id, $course_id);
 
-    if ($update_stmt->execute()) {
-        status_item_response(true, "Lesson visibility updated to {$label}.", [
-            'item_id' => $item_id,
-            'course_id' => $course_id,
-            'new_status' => $new_status,
-            'label' => $label,
-        ]);
+    if (!$update_stmt->execute()) {
+        throw new RuntimeException($update_stmt->error ?: $conn->error ?: 'Unable to update lesson visibility.');
     }
-
-    status_item_response(false, 'Unexpected server error while updating visibility.', ['reason' => $update_stmt->error ?: $conn->error]);
+    $update_stmt->close();
+    $template = strtolower(trim((string) ($item['template_type'] ?? $item['item_type'] ?? '')));
+    if ($template === 'timed_exam') {
+        $examStatus = $new_status === 'published' ? 'published' : 'draft';
+        $examUpdate = $conn->prepare('UPDATE timed_exams SET status = ? WHERE course_id = ? AND item_id = ? AND deleted_at IS NULL LIMIT 1');
+        if (!$examUpdate) throw new RuntimeException('Unable to synchronize the Timed Exam publication state.');
+        $examUpdate->bind_param('sss', $examStatus, $course_id, $item_id);
+        if (!$examUpdate->execute()) { $error = $examUpdate->error; $examUpdate->close(); throw new RuntimeException($error ?: 'Unable to synchronize the Timed Exam publication state.'); }
+        $examUpdate->close();
+    }
+    if (!$conn->commit()) throw new RuntimeException('Unable to commit the visibility update.');
+    status_item_response(true, "Lesson visibility updated to {$label}.", [
+        'item_id' => $item_id,
+        'course_id' => $course_id,
+        'new_status' => $new_status,
+        'label' => $label,
+    ]);
 } catch (Throwable $e) {
+    $conn->rollback();
     status_item_response(false, 'Unexpected server error while updating visibility.', ['reason' => $e->getMessage()]);
 }
 ?>
