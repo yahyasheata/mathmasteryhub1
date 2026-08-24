@@ -105,11 +105,12 @@ $isGroup = static function (array $names) use ($adminPageName, $adminSubPageName
         </section>
 
         <section class="admin-nav-group" data-admin-nav-group="system">
-            <button type="button" class="admin-nav-group-toggle <?=$isPage('settings') ? 'active' : ''?>" data-admin-submenu-toggle="admin-system-menu" aria-controls="admin-system-menu" aria-expanded="<?=$isPage('settings') ? 'true' : 'false'?>">
+            <button type="button" class="admin-nav-group-toggle <?=$isGroup(['settings', 'admin-management']) ? 'active' : ''?>" data-admin-submenu-toggle="admin-system-menu" aria-controls="admin-system-menu" aria-expanded="<?=$isGroup(['settings', 'admin-management']) ? 'true' : 'false'?>">
                 <span class="fas fa-cog" aria-hidden="true"></span><span>System</span><span class="fas fa-chevron-down admin-nav-chevron" aria-hidden="true"></span>
             </button>
-            <ul id="admin-system-menu" class="admin-nav-submenu" data-admin-submenu data-route-active="<?=$isPage('settings') ? 'true' : 'false'?>" <?= $isPage('settings') ? '' : 'hidden' ?>>
+            <ul id="admin-system-menu" class="admin-nav-submenu" data-admin-submenu data-route-active="<?=$isGroup(['settings', 'admin-management']) ? 'true' : 'false'?>" <?= $isGroup(['settings', 'admin-management']) ? '' : 'hidden' ?>>
                 <li><a href="settings" class="<?=$isPage('settings') ? 'active' : ''?>"><span class="fas fa-sliders-h" aria-hidden="true"></span>Site Settings</a></li>
+                <li><a href="admin-management" class="<?=$isPage('admin-management') ? 'active' : ''?>"><span class="fas fa-user-shield" aria-hidden="true"></span>Admin Management</a></li>
                 <li><span class="admin-nav-note">Payments, maintenance, authentication, and landing page settings are organized inside Site Settings</span></li>
             </ul>
         </section>

@@ -138,11 +138,73 @@ if (!function_exists('mmh_admin_forbidden')) {
     }
 }
 
+if (!function_exists('mmh_admin_fresh_session_user')) {
+    /** Read the role/status from the database on every protected admin request. */
+    function mmh_admin_fresh_session_user(): ?array
+    {
+        $username = trim((string) ($_SESSION['admin'] ?? ''));
+        if ($username === '') {
+            return null;
+        }
+        $conn = ($GLOBALS['conn'] ?? null) instanceof mysqli ? $GLOBALS['conn'] : null;
+        static $loading = false;
+        if (!$conn && !$loading) {
+            $config = dirname(__DIR__) . '/connection/config.php';
+            if (is_file($config)) {
+                $loading = true;
+                require_once $config;
+                $loading = false;
+                $conn = ($GLOBALS['conn'] ?? null) instanceof mysqli ? $GLOBALS['conn'] : null;
+            }
+        }
+        if (!$conn) {
+            return null;
+        }
+        $hasArchive = false;
+        $columnCheck = $conn->prepare("SELECT 1 FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'users' AND COLUMN_NAME = 'archived_at' LIMIT 1");
+        if ($columnCheck) {
+            $columnCheck->execute();
+            $hasArchive = (bool) $columnCheck->get_result()->fetch_assoc();
+            $columnCheck->close();
+        }
+        $archiveSelect = $hasArchive ? 'archived_at' : 'NULL AS archived_at';
+        $stmt = $conn->prepare("SELECT user_id, username, role, status, {$archiveSelect} FROM users WHERE LOWER(username) = LOWER(?) LIMIT 1");
+        if (!$stmt) {
+            return null;
+        }
+        $stmt->bind_param('s', $username);
+        $stmt->execute();
+        $row = $stmt->get_result()->fetch_assoc() ?: null;
+        $stmt->close();
+        if (!is_array($row) || strtolower((string) ($row['role'] ?? '')) !== 'admin' || (string) ($row['status'] ?? '') !== '1' || trim((string) ($row['archived_at'] ?? '')) !== '') {
+            return null;
+        }
+        return $row;
+    }
+}
+
+if (!function_exists('mmh_admin_revoke_stale_session')) {
+    function mmh_admin_revoke_stale_session(): void
+    {
+        $username = trim((string) ($_SESSION['admin'] ?? ''));
+        unset($_SESSION['admin'], $_SESSION['mmh_admin_csrf_token']);
+        if ($username !== '') {
+            $_SESSION['username'] = $username;
+        }
+        if (session_status() === PHP_SESSION_ACTIVE) {
+            session_regenerate_id(true);
+        }
+    }
+}
+
 if (!function_exists('mmh_admin_require_admin')) {
     function mmh_admin_require_admin(bool $redirectGet = true): void
     {
-        if (!empty($_SESSION['admin'])) {
+        if (mmh_admin_fresh_session_user() !== null) {
             return;
+        }
+        if (!empty($_SESSION['admin'])) {
+            mmh_admin_revoke_stale_session();
         }
         if ($redirectGet && ($_SERVER['REQUEST_METHOD'] ?? 'GET') === 'GET') {
             $base = function_exists('mmh_current_request_base_url') ? mmh_current_request_base_url() : '';
@@ -174,6 +236,7 @@ if (!function_exists('mmh_admin_allowed_page')) {
         static $pages = [
             'assignment-submissions', 'assignments', 'categories', 'course-content-preview',
             'course-content', 'courses', 'dashboard', 'exam-submissions', 'exams',
+            'admin-management',
             'file-upload', 'files', 'free-learning', 'live-sessions', 'parent-reports',
             'past-papers', 'previous-progress', 'profile', 'recovery-plan-assignments',
             'recovery-plan-templates', 'recovery-plan', 'settings', 'timed-exam-submissions',
@@ -187,7 +250,7 @@ if (!function_exists('mmh_admin_allowed_handler')) {
     function mmh_admin_allowed_handler(string $page, string $action): ?string
     {
         static $files = [
-            'add-assignment.php', 'add-category.php', 'add-course.php', 'add-exam.php',
+            'save-admin-management.php', 'add-assignment.php', 'add-category.php', 'add-course.php', 'add-exam.php',
             'add-item.php', 'add-section.php', 'add-user.php', 'addBalance-user.php',
             'addUser-course.php', 'archive-resource-free-learning.php', 'assign-recovery-plan-template.php',
             'bulk-import-past-papers.php', 'bulk-items.php', 'bulk-preview-past-papers.php',

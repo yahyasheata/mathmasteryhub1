@@ -75,6 +75,21 @@ if (!function_exists('mmh_auth_regenerate_session')) {
     }
 }
 
+if (!function_exists('mmh_auth_password_matches')) {
+    /** Verify modern hashes and legacy plaintext values during migration. */
+    function mmh_auth_password_matches(string $providedPassword, string $storedPassword): bool
+    {
+        if ($storedPassword === '') {
+            return false;
+        }
+        $passwordInfo = password_get_info($storedPassword);
+        if (($passwordInfo['algoName'] ?? 'unknown') !== 'unknown') {
+            return password_verify($providedPassword, $storedPassword);
+        }
+        return hash_equals($storedPassword, $providedPassword);
+    }
+}
+
 if (!function_exists('mmh_auth_logout')) {
     function mmh_auth_logout(): void
     {

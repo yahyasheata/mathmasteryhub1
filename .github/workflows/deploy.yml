@@ -66,6 +66,7 @@ jobs:
             php database/migrations/20260812_create_password_reset_tokens.php
             php database/migrations/20260813_create_assignment_model_answer_access.php
             php database/migrations/20260821_add_assignment_submission_files.php
+            php database/migrations/20260823_create_admin_security_audit.php
             php database/migrations/verify_student_learning_evidence.php
             php scripts/finalize-timed-exams.php --dry-run
             php -l index.php

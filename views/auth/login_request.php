@@ -38,15 +38,10 @@ $passwordMatches = false;
 $legacyPassword = false;
 if ($userData) {
     $storedPassword = (string) $userData['password'];
+    // Existing accounts remain usable and are upgraded after a successful login.
     $passwordInfo = password_get_info($storedPassword);
-
-    if (($passwordInfo['algoName'] ?? 'unknown') !== 'unknown') {
-        $passwordMatches = password_verify($password, $storedPassword);
-    } else {
-        // Existing accounts remain usable and are upgraded after a successful login.
-        $legacyPassword = true;
-        $passwordMatches = hash_equals($storedPassword, $password);
-    }
+    $legacyPassword = (($passwordInfo['algoName'] ?? 'unknown') === 'unknown');
+    $passwordMatches = mmh_auth_password_matches($password, $storedPassword);
 }
 
 if (!$userData || !$passwordMatches || (string) $userData['status'] !== '1') {

@@ -2,6 +2,7 @@
 require_once 'connection/config.php';
 require_once '__init.php';
 require_once 'inc/functions.php';
+require_once 'inc/Auth.php';
 
 if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
     header('Allow: POST');
@@ -53,7 +54,7 @@ if ((string) ($_POST['update_password'] ?? '') === '1') {
     $row = $lookup->get_result()->fetch_assoc();
     $lookup->close();
     $stored = (string) ($row['password'] ?? '');
-    $validOld = password_get_info($stored)['algo'] !== 0 ? password_verify($oldPassword, $stored) : hash_equals($stored, $oldPassword);
+    $validOld = mmh_auth_password_matches($oldPassword, $stored);
     if (!$validOld) { $json(false, 'The current password is incorrect!'); }
 
     $hash = password_hash($password, PASSWORD_DEFAULT);
