@@ -290,7 +290,7 @@ try {
     $assert(is_string($source) && str_contains($source, 'mmh_timed_exam_state_completes_learning'), 'Learning Journey is not using the canonical Timed Exam completion rule.');
     $assert(is_string($uploadSource) && str_contains($uploadSource, 'mmh_timed_exam_upload_capacity($conn, $exam, $attemptId, true)'), 'Upload handler does not enforce the locked database-backed limit.');
     $assert(is_string($submitHandler) && str_contains($submitHandler, 'student_course_csrf_valid') && str_contains($submitHandler, 'student_course_access_enrolled'), 'Student submit authorization/CSRF regression.');
-    $assert(is_string($gradeHandler) && str_contains($gradeHandler, 'mmh_auth_csrf_valid') && str_contains($gradeHandler, 'mmh_timed_exam_save_grade'), 'Admin grading authorization/service regression.');
+    $assert(is_string($gradeHandler) && str_contains($gradeHandler, 'mmh_admin_require_mutation') && str_contains($gradeHandler, 'mmh_timed_exam_save_marking'), 'Admin grading authorization/service regression.');
     $assert(is_string($cliSource) && str_contains($cliSource, "PHP_SAPI !== 'cli'"), 'Lifecycle finalizer is not CLI-only.');
     $assert(is_string($htaccess) && str_contains($htaccess, 'database|scripts|vendor'), 'Web-server rules do not block direct lifecycle script access.');
 

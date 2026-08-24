@@ -263,6 +263,12 @@ $router->mount('/admin', function() use ($router) {
         require __DIR__ . '/views/admin/requests/download-timed-exam-answer.php';
     });
 
+    $router->get('/timed-exam-marked/{attemptId}', function($attemptId) {
+        require_once '__init.php';
+        mmh_admin_require_admin(false);
+        require __DIR__ . '/views/admin/requests/download-timed-exam-marked.php';
+    });
+
     // Temporary, admin-only diagnostic for validating the exact SharePoint
     // Stream URL supplied by the administrator. This intentionally bypasses
     // all course/resource handling so the existing viewer remains untouched.
@@ -390,6 +396,14 @@ $router->mount('/user', function() use ($router) {
             exit();
         }
         include('views/user/requests/open-course-resource.php');
+    });
+
+    // Marked result files are protected by both ownership and result release.
+    // Register this route before the shorter exam workspace pattern.
+    $router->get('/course/{courseId}/exam/{examId}/marked-paper/{attemptId}', function($courseId, $examId, $attemptId) {
+        require_once '__init.php';
+        if (!isset($_SESSION['username'])) { http_response_code(401); exit('Sign in required.'); }
+        include('views/user/requests/open-timed-exam-marked.php');
     });
 
     // Register the paper endpoint before the shorter exam workspace pattern.

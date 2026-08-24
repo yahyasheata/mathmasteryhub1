@@ -699,8 +699,10 @@ if (!function_exists('mmh_timed_exam_save_grade')) {
         if ($examId <= 0 || $attemptId <= 0 || ($grade !== null && $grade < 0) || ($maxMarks !== null && $grade !== null && $grade > (float) $maxMarks)) {
             return ['success' => false, 'message' => 'Invalid Timed Exam grade.'];
         }
+        $transactionStarted = false;
         try {
-            $conn->begin_transaction();
+            if (!$conn->begin_transaction()) throw new RuntimeException('Unable to start the marking transaction.');
+            $transactionStarted = true;
             $lock = $conn->prepare('SELECT * FROM timed_exam_attempts WHERE id = ? AND timed_exam_id = ? FOR UPDATE');
             if (!$lock) throw new RuntimeException('Unable to lock the submitted Timed Exam attempt.');
             $lock->bind_param('ii', $attemptId, $examId);
@@ -718,7 +720,7 @@ if (!function_exists('mmh_timed_exam_save_grade')) {
             $conn->commit();
             return ['success' => true, 'attempt_id' => $attemptId, 'released' => !empty($attempt['results_released_at_utc'])];
         } catch (Throwable $exception) {
-            $conn->rollback();
+            if ($transactionStarted) $conn->rollback();
             mmh_timed_exam_log_lifecycle_error('save_grade', ['exam_id' => $examId, 'attempt_id' => $attemptId, 'student_id' => 0], $exception);
             return ['success' => false, 'message' => $exception->getMessage() ?: 'The Timed Exam grade could not be saved.'];
         }
@@ -994,6 +996,170 @@ if (!function_exists('mmh_timed_exam_answer_download')) {
     }
 }
 
+if (!function_exists('mmh_timed_exam_marked_paper_schema_available')) {
+    function mmh_timed_exam_marked_paper_schema_available(mysqli $conn): bool
+    {
+        static $cache = [];
+        $key = spl_object_id($conn);
+        if (array_key_exists($key, $cache)) return $cache[$key];
+        $stmt = $conn->prepare("SELECT 1 FROM INFORMATION_SCHEMA.TABLES WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'timed_exam_marked_papers' LIMIT 1");
+        if (!$stmt) return $cache[$key] = false;
+        $stmt->execute();
+        $cache[$key] = (bool) $stmt->get_result()->fetch_assoc();
+        $stmt->close();
+        return $cache[$key];
+    }
+}
+
+if (!function_exists('mmh_timed_exam_marked_paper_load')) {
+    function mmh_timed_exam_marked_paper_load(mysqli $conn, int $attemptId): ?array
+    {
+        if ($attemptId <= 0 || !mmh_timed_exam_marked_paper_schema_available($conn)) return null;
+        $stmt = $conn->prepare('SELECT * FROM timed_exam_marked_papers WHERE attempt_id = ? LIMIT 1');
+        if (!$stmt) return null;
+        $stmt->bind_param('i', $attemptId);
+        $stmt->execute();
+        $row = $stmt->get_result()->fetch_assoc() ?: null;
+        $stmt->close();
+        return is_array($row) ? $row : null;
+    }
+}
+
+if (!function_exists('mmh_timed_exam_marked_paper_for_admin')) {
+    function mmh_timed_exam_marked_paper_for_admin(mysqli $conn, int $attemptId): ?array
+    {
+        if ($attemptId <= 0 || !mmh_timed_exam_marked_paper_schema_available($conn)) return null;
+        $stmt = $conn->prepare('SELECT mp.*, a.timed_exam_id, a.student_id, a.state, a.results_released_at_utc FROM timed_exam_marked_papers mp INNER JOIN timed_exam_attempts a ON a.id = mp.attempt_id WHERE mp.attempt_id = ? LIMIT 1');
+        if (!$stmt) return null;
+        $stmt->bind_param('i', $attemptId);
+        $stmt->execute();
+        $row = $stmt->get_result()->fetch_assoc() ?: null;
+        $stmt->close();
+        return is_array($row) ? $row : null;
+    }
+}
+
+if (!function_exists('mmh_timed_exam_marked_paper_for_student')) {
+    function mmh_timed_exam_marked_paper_for_student(mysqli $conn, int $attemptId, int $examId, int $studentId): ?array
+    {
+        if ($attemptId <= 0 || $examId <= 0 || $studentId <= 0 || !mmh_timed_exam_marked_paper_schema_available($conn)) return null;
+        $stmt = $conn->prepare("SELECT mp.*, a.state, a.results_released_at_utc FROM timed_exam_marked_papers mp INNER JOIN timed_exam_attempts a ON a.id = mp.attempt_id WHERE mp.attempt_id = ? AND a.timed_exam_id = ? AND a.student_id = ? AND a.state = 'graded' AND a.results_released_at_utc IS NOT NULL LIMIT 1");
+        if (!$stmt) return null;
+        $stmt->bind_param('iii', $attemptId, $examId, $studentId);
+        $stmt->execute();
+        $row = $stmt->get_result()->fetch_assoc() ?: null;
+        $stmt->close();
+        return is_array($row) ? $row : null;
+    }
+}
+
+if (!function_exists('mmh_timed_exam_marked_paper_store_path')) {
+    function mmh_timed_exam_marked_paper_store_path(string $relative): ?string
+    {
+        $relative = ltrim($relative, '/');
+        if ($relative === '' || str_contains($relative, '..') || !str_starts_with($relative, 'storage/private/timed-exams/marked/')) return null;
+        $root = realpath(dirname(__DIR__));
+        $path = dirname(__DIR__) . '/' . $relative;
+        $directory = realpath(dirname($path));
+        $allowedRoot = $root !== false ? $root . '/storage/private/timed-exams/marked' : '';
+        if ($root === false || $directory === false || !($directory === $allowedRoot || str_starts_with($directory, $allowedRoot . '/'))) return null;
+        return is_file($path) ? $path : null;
+    }
+}
+
+if (!function_exists('mmh_timed_exam_marked_paper_serve')) {
+    function mmh_timed_exam_marked_paper_serve(mysqli $conn, array $paper, bool $download = false): void
+    {
+        $key = (string) ($paper['storage_key'] ?? '');
+        $path = mmh_timed_exam_marked_paper_store_path($key);
+        if (!$path || (string) ($paper['mime_type'] ?? '') !== 'application/pdf') { http_response_code(404); exit('Marked paper not found.'); }
+        header('Content-Type: application/pdf');
+        header('Content-Length: ' . (string) filesize($path));
+        header('X-Content-Type-Options: nosniff');
+        header('Cache-Control: private, no-store, max-age=0');
+        header('Pragma: no-cache');
+        $filename = basename((string) ($paper['original_filename'] ?? 'marked-exam.pdf'));
+        $filename = preg_replace('/[^A-Za-z0-9._ -]/', '_', $filename) ?: 'marked-exam.pdf';
+        header('Content-Disposition: ' . ($download ? 'attachment' : 'inline') . '; filename="' . $filename . '"');
+        readfile($path);
+        exit;
+    }
+}
+
+if (!function_exists('mmh_timed_exam_save_marking')) {
+    /** Save score/report and replace, remove, or retain one marked PDF atomically. */
+    function mmh_timed_exam_save_marking(mysqli $conn, array $exam, int $attemptId, ?float $grade, string $feedback, ?array $markedFile = null, bool $removeMarked = false, ?int $adminId = null): array
+    {
+        $examId = (int) ($exam['id'] ?? 0);
+        $maxMarks = $exam['max_marks'] ?? null;
+        if ($examId <= 0 || $attemptId <= 0 || ($grade !== null && $grade < 0) || ($maxMarks !== null && $grade !== null && $grade > (float) $maxMarks)) return ['success' => false, 'message' => 'Invalid Timed Exam grade.'];
+        $hasNewFile = is_array($markedFile) && (int) ($markedFile['error'] ?? UPLOAD_ERR_NO_FILE) !== UPLOAD_ERR_NO_FILE;
+        $newRelative = null; $newPath = null; $newOriginal = null; $newSize = 0; $transactionStarted = false;
+        try {
+            if (($hasNewFile || $removeMarked) && !mmh_timed_exam_marked_paper_schema_available($conn)) throw new RuntimeException('Run the Timed Exam marked-paper migration before saving marking.');
+            if ($hasNewFile) {
+                if ((int) ($markedFile['error'] ?? UPLOAD_ERR_NO_FILE) !== UPLOAD_ERR_OK || !is_uploaded_file((string) ($markedFile['tmp_name'] ?? ''))) throw new InvalidArgumentException('The marked PDF upload is invalid.');
+                $original = trim((string) ($markedFile['name'] ?? ''));
+                $tmp = (string) ($markedFile['tmp_name'] ?? '');
+                $newSize = (int) ($markedFile['size'] ?? 0);
+                if ($original === '' || strtolower(pathinfo($original, PATHINFO_EXTENSION)) !== 'pdf' || $newSize <= 0 || $newSize > 52428800) throw new InvalidArgumentException('Marked paper must be a PDF no larger than 50 MB.');
+                $finfo = function_exists('finfo_open') ? finfo_open(FILEINFO_MIME_TYPE) : false;
+                if (!$finfo) throw new RuntimeException('PDF validation is unavailable on this server.');
+                $mime = (string) finfo_file($finfo, $tmp);
+                finfo_close($finfo);
+                if ($mime !== 'application/pdf') throw new InvalidArgumentException('The marked paper content is not a valid PDF.');
+                $month = gmdate('Y/m');
+                $dir = dirname(__DIR__) . '/storage/private/timed-exams/marked/' . $month;
+                if (!is_dir($dir) && !mkdir($dir, 0700, true) && !is_dir($dir)) throw new RuntimeException('Unable to prepare secure marked-paper storage.');
+                $storedName = bin2hex(random_bytes(20)) . '.pdf';
+                $newPath = $dir . '/' . $storedName;
+                if (!move_uploaded_file($tmp, $newPath)) throw new RuntimeException('The marked paper could not be saved securely.');
+                $newRelative = 'storage/private/timed-exams/marked/' . $month . '/' . $storedName;
+                $newOriginal = substr($original, 0, 255);
+            }
+            $conn->begin_transaction();
+            $lock = $conn->prepare('SELECT * FROM timed_exam_attempts WHERE id = ? AND timed_exam_id = ? FOR UPDATE');
+            if (!$lock) throw new RuntimeException('Unable to lock the submitted Timed Exam attempt.');
+            $lock->bind_param('ii', $attemptId, $examId); $lock->execute();
+            $attempt = $lock->get_result()->fetch_assoc() ?: null; $lock->close();
+            if (!$attempt || !in_array((string) ($attempt['state'] ?? ''), ['submitted', 'auto_submitted', 'graded'], true)) throw new InvalidArgumentException('Only a submitted Timed Exam can be graded.');
+            $existing = mmh_timed_exam_marked_paper_load($conn, $attemptId);
+            $update = $conn->prepare("UPDATE timed_exam_attempts SET state = 'graded', grade = ?, feedback = ? WHERE id = ? AND timed_exam_id = ?");
+            if (!$update) throw new RuntimeException('Unable to save the Timed Exam marking.');
+            $update->bind_param('dsii', $grade, $feedback, $attemptId, $examId);
+            if (!$update->execute()) throw new RuntimeException($update->error ?: 'Unable to save the Timed Exam marking.');
+            $update->close();
+            if ($newRelative !== null) {
+                $upsert = $conn->prepare('INSERT INTO timed_exam_marked_papers (attempt_id, original_filename, storage_key, mime_type, file_size_bytes, uploaded_by, uploaded_at_utc, updated_at_utc) VALUES (?, ?, ?, \'application/pdf\', ?, ?, UTC_TIMESTAMP(), UTC_TIMESTAMP()) ON DUPLICATE KEY UPDATE original_filename = VALUES(original_filename), storage_key = VALUES(storage_key), mime_type = VALUES(mime_type), file_size_bytes = VALUES(file_size_bytes), uploaded_by = VALUES(uploaded_by), updated_at_utc = UTC_TIMESTAMP()');
+                if (!$upsert) throw new RuntimeException('Unable to save the marked paper.');
+                $uploadedBy = (int) ($adminId ?? 0);
+                $upsert->bind_param('issii', $attemptId, $newOriginal, $newRelative, $newSize, $uploadedBy);
+                if (!$upsert->execute()) throw new RuntimeException($upsert->error ?: 'Unable to save the marked paper.');
+                $upsert->close();
+            } elseif ($removeMarked) {
+                $delete = $conn->prepare('DELETE FROM timed_exam_marked_papers WHERE attempt_id = ? LIMIT 1');
+                if (!$delete) throw new RuntimeException('Unable to remove the marked paper.');
+                $delete->bind_param('i', $attemptId); if (!$delete->execute()) throw new RuntimeException($delete->error ?: 'Unable to remove the marked paper.'); $delete->close();
+            }
+            $conn->commit();
+            if ($existing && (($newRelative !== null) || $removeMarked)) {
+                $oldPath = mmh_timed_exam_marked_paper_store_path((string) ($existing['storage_key'] ?? ''));
+                if ($oldPath && is_file($oldPath) && !unlink($oldPath)) error_log('Timed Exam marked paper cleanup failed attempt_id=' . $attemptId);
+            }
+            return ['success' => true, 'attempt_id' => $attemptId, 'marked_paper' => $newRelative !== null ? ['original_filename' => $newOriginal, 'storage_key' => $newRelative] : ($removeMarked ? null : $existing)];
+        } catch (InvalidArgumentException $e) {
+            if ($newPath && is_file($newPath)) unlink($newPath);
+            if ($transactionStarted) $conn->rollback();
+            return ['success' => false, 'message' => $e->getMessage()];
+        } catch (Throwable $e) {
+            if ($newPath && is_file($newPath)) unlink($newPath);
+            if ($transactionStarted) $conn->rollback();
+            mmh_timed_exam_log_lifecycle_error('save_marking', ['exam_id' => $examId, 'attempt_id' => $attemptId, 'student_id' => 0], $e);
+            return ['success' => false, 'message' => 'Timed Exam marking could not be saved. No existing marked paper was changed.'];
+        }
+    }
+}
+
 if (!function_exists('mmh_timed_exam_save_config')) {
     /** Save the normalized configuration attached to a canonical course item. */
     function mmh_timed_exam_save_config(mysqli $conn, string $courseId, string $itemId, array $data, ?array $paperFile, ?int $adminId = null): int
@@ -1097,7 +1263,9 @@ if (!function_exists('mmh_timed_exam_admin_attempts')) {
                 error_log('Timed Exam admin release fallback had failures exam_id=' . $examId . ' failed=' . (int) $release['failed']);
             }
         }
-        $stmt = $conn->prepare('SELECT a.*, u.username, u.full_name, v.id AS version_id, v.original_filename, v.storage_key, v.mime_type, v.file_size_bytes, v.uploaded_at_utc, v.submitted_at_utc AS version_submitted_at_utc, v.status AS version_status FROM timed_exam_attempts a INNER JOIN users u ON u.user_id = a.student_id LEFT JOIN timed_exam_submission_versions v ON v.id = a.latest_version_id WHERE a.timed_exam_id = ? ORDER BY u.full_name ASC, u.username ASC, a.attempt_number ASC');
+        $markedJoin = mmh_timed_exam_marked_paper_schema_available($conn) ? ' LEFT JOIN timed_exam_marked_papers mp ON mp.attempt_id = a.id ' : '';
+        $markedSelect = mmh_timed_exam_marked_paper_schema_available($conn) ? ', mp.id AS marked_paper_id, mp.original_filename AS marked_paper_filename' : ', NULL AS marked_paper_id, NULL AS marked_paper_filename';
+        $stmt = $conn->prepare('SELECT a.*, u.username, u.full_name, v.id AS version_id, v.original_filename, v.storage_key, v.mime_type, v.file_size_bytes, v.uploaded_at_utc, v.submitted_at_utc AS version_submitted_at_utc, v.status AS version_status' . $markedSelect . ' FROM timed_exam_attempts a INNER JOIN users u ON u.user_id = a.student_id LEFT JOIN timed_exam_submission_versions v ON v.id = a.latest_version_id' . $markedJoin . ' WHERE a.timed_exam_id = ? ORDER BY u.full_name ASC, u.username ASC, a.attempt_number ASC');
         if (!$stmt) return [];
         $stmt->bind_param('i', $examId); $stmt->execute(); $rows = $stmt->get_result()->fetch_all(MYSQLI_ASSOC); $stmt->close(); return $rows;
     }
