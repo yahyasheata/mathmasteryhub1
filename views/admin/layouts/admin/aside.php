@@ -73,13 +73,14 @@ $isGroup = static function (array $names) use ($adminPageName, $adminSubPageName
         </section>
 
         <section class="admin-nav-group" data-admin-nav-group="support">
-            <button type="button" class="admin-nav-group-toggle <?=$isGroup(['recovery_plan', 'recovery_plan_templates', 'recovery_plan_assignments', 'parent_reports']) ? 'active' : ''?>" data-admin-submenu-toggle="admin-support-menu" aria-controls="admin-support-menu" aria-expanded="<?=$isGroup(['recovery_plan', 'recovery_plan_templates', 'recovery_plan_assignments', 'parent_reports']) ? 'true' : 'false'?>">
+            <button type="button" class="admin-nav-group-toggle <?=$isGroup(['recovery_plan', 'recovery_plan_templates', 'recovery_plan_assignments', 'revision_plans', 'parent_reports']) ? 'active' : ''?>" data-admin-submenu-toggle="admin-support-menu" aria-controls="admin-support-menu" aria-expanded="<?=$isGroup(['recovery_plan', 'recovery_plan_templates', 'recovery_plan_assignments', 'revision_plans', 'parent_reports']) ? 'true' : 'false'?>">
                 <span class="fas fa-life-ring" aria-hidden="true"></span><span>Student Support</span><span class="fas fa-chevron-down admin-nav-chevron" aria-hidden="true"></span>
             </button>
-            <ul id="admin-support-menu" class="admin-nav-submenu" data-admin-submenu data-route-active="<?=$isGroup(['recovery_plan', 'recovery_plan_templates', 'recovery_plan_assignments', 'parent_reports']) ? 'true' : 'false'?>" <?= $isGroup(['recovery_plan', 'recovery_plan_templates', 'recovery_plan_assignments', 'parent_reports']) ? '' : 'hidden' ?>>
+            <ul id="admin-support-menu" class="admin-nav-submenu" data-admin-submenu data-route-active="<?=$isGroup(['recovery_plan', 'recovery_plan_templates', 'recovery_plan_assignments', 'revision_plans', 'parent_reports']) ? 'true' : 'false'?>" <?= $isGroup(['recovery_plan', 'recovery_plan_templates', 'recovery_plan_assignments', 'revision_plans', 'parent_reports']) ? '' : 'hidden' ?>>
                 <li><a href="recovery-plan" class="<?=$isPage('recovery_plan') ? 'active' : ''?>"><span class="fas fa-route" aria-hidden="true"></span>Recovery Plans</a></li>
                 <li><a href="recovery-plan-templates" class="<?=$isPage('recovery_plan_templates') ? 'active' : ''?>"><span class="fas fa-layer-group" aria-hidden="true"></span>Templates</a></li>
                 <li><a href="recovery-plan-assignments" class="<?=$isPage('recovery_plan_assignments') ? 'active' : ''?>"><span class="fas fa-user-check" aria-hidden="true"></span>Assignments</a></li>
+                <li><a href="revision-plans" class="<?=$isPage('revision_plans') ? 'active' : ''?>"><span class="fas fa-calendar-check" aria-hidden="true"></span>Revision Plans</a></li>
                 <li><a href="parent-reports" class="<?=$isPage('parent_reports') ? 'active' : ''?>"><span class="fas fa-file-alt" aria-hidden="true"></span>Parent Reports</a></li>
             </ul>
         </section>

@@ -239,7 +239,7 @@ if (!function_exists('mmh_admin_allowed_page')) {
             'admin-management',
             'file-upload', 'files', 'free-learning', 'live-sessions', 'parent-reports',
             'past-papers', 'previous-progress', 'profile', 'recovery-plan-assignments',
-            'recovery-plan-templates', 'recovery-plan', 'settings', 'timed-exam-submissions',
+            'recovery-plan-templates', 'recovery-plan', 'revision-plans', 'settings', 'timed-exam-submissions',
             'users',
         ];
         return in_array($page, $pages, true);
@@ -271,7 +271,7 @@ if (!function_exists('mmh_admin_allowed_handler')) {
             'reanalyze-drive-past-papers.php', 'reorder-collections-free-learning.php',
             'restore-resource-free-learning.php', 'save-attendance-live-session.php',
             'save-board-past-papers.php', 'save-collection-free-learning.php', 'save-paper-past-papers.php',
-            'save-previous-progress.php', 'save-recovery-plan-template.php', 'save-recovery-plan.php',
+            'save-previous-progress.php', 'save-recovery-plan-template.php', 'save-recovery-plan.php', 'save-revision-plan.php',
             'save-resource-free-learning.php', 'save-resource-past-papers.php', 'save-schedule-live-session.php',
             'save-syllabus-past-papers.php', 'scan-drive-past-papers.php', 'search-resource-free-learning.php',
             'status-collection-free-learning.php', 'status-course.php', 'status-item.php',

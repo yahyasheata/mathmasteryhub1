@@ -8,6 +8,7 @@ RewriteRule (^|/)\.(?!well-known(?:/|$)) - [F,L,NC]
 # through the front controller (or an explicitly public endpoint), while still
 # remaining includable by PHP.  These rules work with Apache and LiteSpeed.
 RewriteRule ^(?:views|connection|inc|database|scripts|vendor)/.*\.php$ - [R=404,L,NC]
+RewriteRule ^storage/private(?:/|$) - [R=404,L,NC]
 RewriteRule ^(?:__init|composer|phpunit)\.php$ - [R=404,L,NC]
 
 RewriteCond %{REQUEST_FILENAME} !-f
