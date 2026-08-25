@@ -8,6 +8,12 @@
    correct colors are established before any other stylesheet paints, avoiding
    a flash of incorrect theme/layout right after the post-login redirect. */
 require_once 'connection/config.php';
+// The shared Admin shell consumes Site Settings and the common admin helpers.
+// Most legacy Admin views load these helpers before including the shell, but
+// the shell must also be self-sufficient for every allowlisted Admin entry
+// point (including newer pages).  This loads the one canonical implementation
+// of getSiteSettings() without redefining it or relying on page-specific order.
+require_once __DIR__ . '/../../../../inc/functions.php';
 $adminCsrfToken = mmh_admin_csrf_token();
 $adminBrandSettings = isset($site_settings) && is_array($site_settings) ? $site_settings : getSiteSettings();
 $adminSiteName = trim((string) ($site_name ?? ($adminBrandSettings['website_name'] ?? 'Math Mastery Hub')));
