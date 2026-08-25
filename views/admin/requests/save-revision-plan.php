@@ -77,6 +77,32 @@ try {
         $redirect(true, 'Version ' . (int) $version['version_number'] . ' is now finalized and immutable.', (int) $version['template_id'], $versionId);
     }
 
+    if ($action === 'publish_and_assign') {
+        $template = mmh_revision_template($conn, $templateId);
+        $version = mmh_revision_version($conn, $versionId);
+        if (!$template || !$version || (int) $version['template_id'] !== $templateId) throw new InvalidArgumentException('The selected Revision Plan version could not be found.');
+        if ((string) $version['status'] !== 'draft') throw new InvalidArgumentException('This plan is already published. Create a new version to change it.');
+        $json = (string) ($_POST['structure_json'] ?? '');
+        $structure = json_decode($json, true);
+        if (!is_array($structure)) throw new InvalidArgumentException('The plan structure is invalid.');
+        mmh_revision_save_draft(
+            $conn,
+            $versionId,
+            $structure,
+            mb_substr(trim((string) ($_POST['title'] ?? $template['title'])), 0, 180),
+            mb_substr(trim((string) ($_POST['description'] ?? $template['description'] ?? '')), 0, 1000),
+            !empty($_POST['allow_work_ahead'])
+        );
+        mmh_revision_publish_version($conn, $versionId, $adminId);
+        try {
+            $assigned = mmh_revision_assign_students($conn, $versionId, (array) ($_POST['student_ids'] ?? []), (string) ($_POST['start_date'] ?? ''), $adminId);
+        } catch (Throwable $assignmentError) {
+            throw new RuntimeException('The Version was published, but student assignment failed. Open the published plan and assign students again.');
+        }
+        if ($assigned < 1) throw new InvalidArgumentException('The Version was published, but no new students were assigned.');
+        $redirect(true, 'Published and assigned to ' . $assigned . ' student' . ($assigned === 1 ? '' : 's') . '.', $templateId, $versionId);
+    }
+
     if ($action === 'assign_students') {
         $versionId = (int) ($_POST['version_id'] ?? 0);
         $assigned = mmh_revision_assign_students($conn, $versionId, (array) ($_POST['student_ids'] ?? []), (string) ($_POST['start_date'] ?? ''), $adminId);

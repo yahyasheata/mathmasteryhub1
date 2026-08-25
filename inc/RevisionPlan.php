@@ -550,7 +550,7 @@ if (!function_exists('mmh_revision_assignment')) {
                 INNER JOIN revision_plan_template_versions v ON v.id = a.template_version_id AND v.template_id = a.template_id
                 INNER JOIN courses c ON c.course_id = a.course_id
                 INNER JOIN users u ON u.user_id = a.user_id
-                WHERE a.id = ? AND c.archived_at IS NULL";
+                WHERE a.id = ? AND a.archived_at IS NULL AND (a.ended_at IS NULL OR a.ended_at > UTC_TIMESTAMP()) AND c.archived_at IS NULL";
         if ($studentId > 0) $sql .= ' AND a.user_id = ?';
         $sql .= ' LIMIT 1';
         $stmt = $conn->prepare($sql);
@@ -668,8 +668,24 @@ if (!function_exists('mmh_revision_student_assignments')) {
     function mmh_revision_student_assignments(mysqli $conn, int $studentId): array
     {
         if ($studentId <= 0 || !mmh_revision_assignment_schema_available($conn)) return [];
-        $stmt = $conn->prepare("SELECT a.id, a.course_id, a.start_date, a.status, a.assigned_at, t.title, c.course_title, v.version_number FROM revision_plan_assignments a INNER JOIN revision_plan_templates t ON t.id = a.template_id INNER JOIN revision_plan_template_versions v ON v.id = a.template_version_id INNER JOIN courses c ON c.course_id = a.course_id WHERE a.user_id = ? AND a.status = 'active' AND t.status <> 'archived' AND v.status = 'published' AND c.course_state IN ('public','private') ORDER BY a.start_date ASC, a.id ASC");
-        if (!$stmt) return [];
+        $stmt = $conn->prepare("SELECT DISTINCT a.id, a.course_id, a.start_date, a.status, a.assigned_at, t.title, c.course_title, v.version_number,
+                       CASE WHEN a.start_date > CURRENT_DATE THEN 'upcoming' WHEN a.start_date = CURRENT_DATE THEN 'active' ELSE 'past' END AS schedule_state
+                FROM revision_plan_assignments a
+                INNER JOIN users u ON u.user_id = a.user_id AND u.role = 'user' AND u.status = '1' AND u.archived_at IS NULL
+                INNER JOIN course_logs cl ON cl.user_id = a.user_id AND cl.course_id = a.course_id
+                INNER JOIN revision_plan_templates t ON t.id = a.template_id AND t.course_id = a.course_id
+                INNER JOIN revision_plan_template_versions v ON v.id = a.template_version_id AND v.template_id = t.id
+                INNER JOIN courses c ON c.course_id = a.course_id AND c.archived_at IS NULL
+                WHERE a.user_id = ?
+                  AND LOWER(TRIM(COALESCE(a.status, ''))) = 'active'
+                  AND a.archived_at IS NULL
+                  AND (a.ended_at IS NULL OR a.ended_at > UTC_TIMESTAMP())
+                  AND LOWER(TRIM(COALESCE(t.status, ''))) <> 'archived'
+                  AND LOWER(TRIM(COALESCE(v.status, ''))) = 'published'
+                  AND (LOWER(TRIM(COALESCE(c.course_state, ''))) IN ('public', 'private')
+                       OR (COALESCE(c.course_state, '') = '' AND c.course_status = '1' AND LOWER(TRIM(COALESCE(c.course_visibility, 'public'))) IN ('public', 'private')))
+                ORDER BY a.start_date ASC, a.id ASC");
+        if (!$stmt) { error_log('Revision Plan student list query could not be prepared: ' . $conn->error); return []; }
         $stmt->bind_param('i', $studentId);
         $stmt->execute();
         $rows = $stmt->get_result()->fetch_all(MYSQLI_ASSOC);

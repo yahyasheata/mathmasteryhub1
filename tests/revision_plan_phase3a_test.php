@@ -24,7 +24,7 @@ foreach (['mmh_revision_assign_students', 'mmh_revision_assignment_context', 'mm
 foreach (['data-add-days', 'data-duplicate="day"', 'data-duplicate="requirement"', 'data-duplicate="batch"', 'Assign selected students', 'allow_work_ahead'] as $marker) {
     if (!str_contains($adminView, $marker)) throw new RuntimeException('Builder UX contract is missing: ' . $marker);
 }
-if (!str_contains($adminHandler, "action === 'assign_students'")) throw new RuntimeException('Assignment handler is missing.');
+if (!str_contains($adminHandler, "action === 'assign_students'") || !str_contains($adminHandler, "action === 'publish_and_assign'")) throw new RuntimeException('Assignment handler is missing.');
 foreach (['revision_assignment', 'revision_requirement', 'mmh_revision_assignment_context'] as $marker) {
     if (!str_contains($gateway, $marker)) throw new RuntimeException('Gateway Revision context is missing: ' . $marker);
 }
