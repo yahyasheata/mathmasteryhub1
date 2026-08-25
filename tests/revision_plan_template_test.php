@@ -38,7 +38,7 @@ if (!str_contains($service, "status'] !== 'draft") || !str_contains($service, 'O
 if (!str_contains($service, 'status = \'published\'') || !str_contains($service, 'version_number')) {
     throw new RuntimeException('Immutable publication/version behavior is missing.');
 }
-if (!str_contains($service, 'course_items WHERE course_id = ?') || !str_contains($service, 'linked_course_item_id')) {
+if (!str_contains($service, 'mmh_revision_course_items') || !str_contains($service, 'linked_course_item_id')) {
     throw new RuntimeException('Same-course Course Item validation is missing.');
 }
 if (!str_contains($service, 'storage/private/revision-plans') || !str_contains($service, 'application/pdf')) {

@@ -45,7 +45,29 @@ if (!function_exists('mmh_revision_courses')) {
 if (!function_exists('mmh_revision_course_items')) {
     function mmh_revision_course_items(mysqli $conn, string $courseId): array
     {
-        $stmt = $conn->prepare("SELECT i.item_id, i.item_title, i.item_description, i.section_id, i.item_type, i.template_type, i.template_data, i.assignment_id, i.duration_minutes, i.sort_order, i.page_order, s.title AS section_title, s.sort_order AS section_sort_order FROM course_items i LEFT JOIN course_sections s ON s.course_id = i.course_id AND s.section_id = i.section_id WHERE i.course_id = ? AND (i.status IS NULL OR i.status = '' OR i.status = 'published') AND (s.status IS NULL OR s.status = '' OR s.status = 'published') ORDER BY COALESCE(s.sort_order, 0), COALESCE(i.sort_order, 0), COALESCE(i.page_order, 0), i.item_id ASC, i.id ASC");
+        $columnExists = static function (string $table, string $column) use ($conn): bool {
+            $check = $conn->prepare('SELECT 1 FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = ? AND COLUMN_NAME = ? LIMIT 1');
+            if (!$check) return false;
+            $check->bind_param('ss', $table, $column);
+            $check->execute();
+            $exists = (bool) $check->get_result()->fetch_assoc();
+            $check->close();
+            return $exists;
+        };
+        $itemFilters = ['i.course_id = ?'];
+        $sectionFilters = [];
+        foreach (['archived_at', 'deleted_at'] as $column) {
+            if ($columnExists('course_items', $column)) $itemFilters[] = "(i.{$column} IS NULL OR i.{$column} = '')";
+            if ($columnExists('course_sections', $column)) $sectionFilters[] = "(s.{$column} IS NULL OR s.{$column} = '')";
+        }
+        // Admin authoring intentionally ignores publication/release state. It
+        // only excludes archived/deleted rows; student access is enforced later.
+        $where = implode(' AND ', $itemFilters);
+        if ($sectionFilters) $where .= ' AND (' . implode(' AND ', $sectionFilters) . ')';
+        // A non-empty section reference must resolve to a real section. Items
+        // without a section remain valid general course content.
+        $where .= " AND (i.section_id IS NULL OR i.section_id = '' OR s.section_id IS NOT NULL)";
+        $stmt = $conn->prepare("SELECT i.item_id, i.item_title, i.item_description, i.section_id, i.item_type, i.template_type, i.template_data, i.assignment_id, i.duration_minutes, i.sort_order, i.page_order, s.title AS section_title, s.sort_order AS section_sort_order FROM course_items i LEFT JOIN course_sections s ON s.course_id = i.course_id AND s.section_id = i.section_id WHERE {$where} ORDER BY COALESCE(s.sort_order, 2147483647), COALESCE(i.sort_order, 2147483647), COALESCE(i.page_order, 2147483647), i.item_id ASC, i.id ASC");
         if (!$stmt) return [];
         $stmt->bind_param('s', $courseId);
         $stmt->execute();
@@ -219,7 +241,21 @@ if (!function_exists('mmh_revision_create_template')) {
             if (!$version) throw new RuntimeException('Unable to create the draft version.');
             $version->bind_param('iisi', $templateId, $versionNumber, $versionStatus, $adminId);
             if (!$version->execute()) throw new RuntimeException('Unable to create the draft version.');
+            $versionId = (int) $version->insert_id;
             $version->close();
+            $batch = $conn->prepare('INSERT INTO revision_plan_template_batches (version_id, title, description, suggested_days, sort_order) VALUES (?, ?, ?, ?, ?)');
+            if (!$batch) throw new RuntimeException('Unable to create the first plan batch.');
+            $batchTitle = 'Week 1'; $batchDescription = ''; $suggestedDays = 0; $batchOrder = 0;
+            $batch->bind_param('issii', $versionId, $batchTitle, $batchDescription, $suggestedDays, $batchOrder);
+            if (!$batch->execute()) throw new RuntimeException('Unable to create the first plan batch.');
+            $batchId = (int) $batch->insert_id;
+            $batch->close();
+            $day = $conn->prepare('INSERT INTO revision_plan_template_days (batch_id, version_id, day_number, title, description, sort_order) VALUES (?, ?, ?, ?, ?, ?)');
+            if (!$day) throw new RuntimeException('Unable to create the first plan day.');
+            $dayNumber = 1; $dayTitle = 'Day 1'; $dayDescription = ''; $dayOrder = 0;
+            $day->bind_param('iiissi', $batchId, $versionId, $dayNumber, $dayTitle, $dayDescription, $dayOrder);
+            if (!$day->execute()) throw new RuntimeException('Unable to create the first plan day.');
+            $day->close();
             $conn->commit();
             return $templateId;
         } catch (Throwable $e) {
@@ -270,7 +306,7 @@ if (!function_exists('mmh_revision_validate_structure')) {
                     $type = strtolower(trim((string) ($requirement['requirement_type'] ?? 'checklist')));
                     if (!in_array($type, ['checklist', 'resource', 'course_item', 'upload'], true)) throw new InvalidArgumentException('Unsupported requirement type.');
                     $itemId = trim((string) ($requirement['linked_course_item_id'] ?? ''));
-                    if ($type === 'course_item' && ($itemId === '' || !isset($itemMap[$itemId]))) throw new InvalidArgumentException('Course Item requirements must reference a published item in the selected course.');
+                    if ($type === 'course_item' && ($itemId === '' || !isset($itemMap[$itemId]))) throw new InvalidArgumentException('Course Item requirements must reference an active item in the selected course.');
                     if ($itemId !== '' && !isset($itemMap[$itemId])) throw new InvalidArgumentException('A linked Course Item does not belong to the selected course.');
                     $selectedResources = [];
                     foreach ((array) ($requirement['resource_ids'] ?? []) as $resourceId) {
@@ -442,7 +478,13 @@ if (!function_exists('mmh_revision_save_resource')) {
         $name = mb_substr(trim((string) ($input['display_name'] ?? '')), 0, 180); if ($name === '') throw new InvalidArgumentException('Enter a resource name.');
         $external = ''; $storage = ''; $original = ''; $mime = ''; $size = 0; $itemId = trim((string) ($input['linked_course_item_id'] ?? ''));
         if ($type === 'external_link') { $external = trim((string) ($input['external_url'] ?? '')); $parts = parse_url($external); if (!$parts || strtolower((string) ($parts['scheme'] ?? '')) !== 'https' || empty($parts['host']) || preg_match('/[\r\n]/', $external)) throw new InvalidArgumentException('External resources must use a valid HTTPS URL.'); }
-        if ($type === 'course_item') { $check = $conn->prepare("SELECT item_id FROM course_items WHERE course_id = ? AND item_id = ? AND (status IS NULL OR status = '' OR status = 'published') LIMIT 1"); $check->bind_param('ss', $version['course_id'], $itemId); $check->execute(); if (!$check->get_result()->fetch_assoc()) throw new InvalidArgumentException('Choose a published Course Item from this course.'); $check->close(); }
+        if ($type === 'course_item') {
+            $validItem = false;
+            foreach (mmh_revision_course_items($conn, (string) $version['course_id']) as $courseItem) {
+                if ((string) ($courseItem['item_id'] ?? '') === $itemId) { $validItem = true; break; }
+            }
+            if (!$validItem) throw new InvalidArgumentException('Choose a Course Item from this course that has not been archived.');
+        }
         if ($type === 'uploaded_pdf') {
             if (($file['error'] ?? UPLOAD_ERR_NO_FILE) !== UPLOAD_ERR_OK) throw new InvalidArgumentException('Choose a PDF file to upload.');
             if ((int) ($file['size'] ?? 0) > 50 * 1024 * 1024) throw new InvalidArgumentException('PDF resources must be 50 MB or smaller.');
