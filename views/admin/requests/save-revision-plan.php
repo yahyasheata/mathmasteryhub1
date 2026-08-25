@@ -21,7 +21,11 @@ $redirect = static function (bool $ok, string $message, int $templateId = 0, int
     exit;
 };
 
-if (!mmh_auth_csrf_valid()) $redirect(false, 'Your session has expired. Refresh and try again.', $templateId, $versionId);
+// The Admin route and Revision Plan forms use the canonical Admin CSRF token.
+// Validate the submitted token explicitly before any mutation; passing the
+// field is required because the Auth CSRF helper has a mandatory argument and
+// is a different token namespace.
+if (!mmh_admin_csrf_valid($_POST['_token'] ?? '')) $redirect(false, 'Your session has expired. Refresh and try again.', $templateId, $versionId);
 
 try {
     $adminId = mmh_auth_user_id($conn, (string) ($_SESSION['admin'] ?? ''));

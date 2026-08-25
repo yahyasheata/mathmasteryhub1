@@ -9,6 +9,7 @@ if (PHP_SAPI !== 'cli') {
 $root = dirname(__DIR__);
 $header = file_get_contents($root . '/views/admin/layouts/admin/header.php');
 $revisionView = file_get_contents($root . '/views/admin/revision-plans.php');
+$revisionHandler = file_get_contents($root . '/views/admin/requests/save-revision-plan.php');
 $functions = file_get_contents($root . '/inc/functions.php');
 $dashboard = file_get_contents($root . '/views/admin/dashboard.php');
 
@@ -26,6 +27,12 @@ if (!str_contains($revisionView, "include 'layouts/admin/header.php';")) {
 }
 if (preg_match('/function\s+getSiteSettings\s*\(/', $revisionView)) {
     throw new RuntimeException('Revision Plans must not define a page-specific Site Settings helper.');
+}
+if (!str_contains($revisionHandler, "mmh_admin_csrf_valid(\$_POST['_token'] ?? '')")) {
+    throw new RuntimeException('Revision Plan mutations must validate the submitted Admin CSRF token.');
+}
+if (preg_match('/mmh_auth_csrf_valid\s*\(\s*\)/', $revisionHandler)) {
+    throw new RuntimeException('Revision Plan handler must not call the typed Auth CSRF helper without a token.');
 }
 if (!str_contains($dashboard, "include 'layouts/admin/header.php';")) {
     throw new RuntimeException('The known working Admin page no longer uses the shared shell.');
