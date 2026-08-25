@@ -451,6 +451,30 @@ $router->mount('/user', function() use ($router) {
         include('views/user/recovery-plan.php');
     });
 
+    $router->get('/revision-plans', function() {
+        require_once '__init.php';
+        if (!isset($_SESSION['username'])) {
+            header('Location: ' . mmh_current_request_base_url() . '/auth/login');
+            exit();
+        }
+        include('views/user/revision-plans.php');
+    });
+
+    $router->get('/revision-plan/{assignmentId}', function($assignmentId) {
+        require_once '__init.php';
+        if (!isset($_SESSION['username'])) {
+            header('Location: ' . mmh_current_request_base_url() . '/auth/login');
+            exit();
+        }
+        include('views/user/revision-plan.php');
+    });
+
+    $router->get('/revision-resource/{assignmentId}/{resourceId}', function($assignmentId, $resourceId) {
+        require_once '__init.php';
+        if (!isset($_SESSION['username'])) { http_response_code(401); exit('Sign in required.'); }
+        include('views/user/requests/open-revision-resource.php');
+    });
+
     $router->get('/{pageName}/{courseId}?', function($pageName, $courseId = null) {
         require_once '__init.php';
         if (!isset($_SESSION['username'])) {

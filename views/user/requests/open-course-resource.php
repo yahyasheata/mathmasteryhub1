@@ -301,6 +301,8 @@ if ($courseId === null || $itemId === null || $userId === null) {
 }
 $requestedPlanId = (int) ($_GET['recovery_plan'] ?? 0);
 $requestedTaskId = (int) ($_GET['recovery_task'] ?? 0);
+$requestedRevisionAssignmentId = (int) ($_GET['revision_assignment'] ?? 0);
+$requestedRevisionRequirementId = (int) ($_GET['revision_requirement'] ?? 0);
 
 $part = strtolower(trim((string) ($_GET['part'] ?? '')));
 if ($part === '' && ($_GET['homework_open'] ?? '') === '1') {
@@ -310,13 +312,15 @@ $gateway = mmh_student_resource_gateway($conn, (int) $userId, $courseId, $itemId
     'base_url' => $baseUrl,
     'recovery_plan_id' => $requestedPlanId,
     'recovery_task_id' => $requestedTaskId,
+    'revision_assignment_id' => $requestedRevisionAssignmentId,
+    'revision_requirement_id' => $requestedRevisionRequirementId,
     'homework_part' => $part,
 ]);
 if (empty($gateway['authorized'])) {
     $gatewayCourseId = (string) (($gateway['course']['course_id'] ?? '') ?: $courseId);
     course_resource_notice(
         (int) ($gateway['status'] ?? 403),
-        $requestedPlanId > 0 || $requestedTaskId > 0 ? 'Recovery Plan unavailable' : 'Resource unavailable',
+        $requestedPlanId > 0 || $requestedTaskId > 0 ? 'Recovery Plan unavailable' : ($requestedRevisionAssignmentId > 0 || $requestedRevisionRequirementId > 0 ? 'Revision Plan unavailable' : 'Resource unavailable'),
         (string) ($gateway['reason'] ?? 'This learning resource is unavailable.'),
         $gatewayCourseId
     );

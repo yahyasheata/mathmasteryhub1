@@ -261,7 +261,8 @@ if (!function_exists('mmh_revision_validate_structure')) {
                 if (!is_array($day)) continue;
                 $dayTitle = mb_substr(trim((string) ($day['title'] ?? '')), 0, 180);
                 if ($dayTitle === '') throw new InvalidArgumentException('Every day needs a title.');
-                $cleanDay = ['day_number' => max(1, (int) ($day['day_number'] ?? ($dayIndex + 1))), 'title' => $dayTitle, 'description' => mb_substr(trim((string) ($day['description'] ?? '')), 0, 1000), 'sort_order' => count($cleanBatch['days']), 'requirements' => [], 'activity_groups' => []];
+                // Day numbers are presentation sequence, never a client-controlled ID.
+                $cleanDay = ['day_number' => count($cleanBatch['days']) + 1, 'title' => $dayTitle, 'description' => mb_substr(trim((string) ($day['description'] ?? '')), 0, 1000), 'sort_order' => count($cleanBatch['days']), 'requirements' => [], 'activity_groups' => []];
                 $normalizeRequirement = static function ($requirement, int $sort, ?int $activityId, array &$cleanDay) use ($itemMap, $resourceIds): array {
                     if (!is_array($requirement)) return [];
                     $title = mb_substr(trim((string) ($requirement['title'] ?? '')), 0, 180);
@@ -297,7 +298,7 @@ if (!function_exists('mmh_revision_validate_structure')) {
 }
 
 if (!function_exists('mmh_revision_save_draft')) {
-    function mmh_revision_save_draft(mysqli $conn, int $versionId, array $structure, string $title, string $description): void
+    function mmh_revision_save_draft(mysqli $conn, int $versionId, array $structure, string $title, string $description, bool $allowWorkAhead = false): void
     {
         $version = mmh_revision_version($conn, $versionId);
         if (!$version || (string) $version['status'] !== 'draft') throw new InvalidArgumentException('Only a Draft Version can be edited. Create a new version to change finalized content.');
@@ -311,6 +312,12 @@ if (!function_exists('mmh_revision_save_draft')) {
             $template->bind_param('ssi', $title, $description, $version['template_id']);
             if (!$template->execute()) throw new RuntimeException('Unable to save the template details.');
             $template->close();
+            $workAhead = $allowWorkAhead ? 1 : 0;
+            $workAheadStmt = $conn->prepare('UPDATE revision_plan_template_versions SET allow_work_ahead = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ? AND status = \'draft\'');
+            if (!$workAheadStmt) throw new RuntimeException('Unable to save the work-ahead setting.');
+            $workAheadStmt->bind_param('ii', $workAhead, $versionId);
+            if (!$workAheadStmt->execute()) throw new RuntimeException('Unable to save the work-ahead setting.');
+            $workAheadStmt->close();
             $clear = $conn->prepare('DELETE FROM revision_plan_template_batches WHERE version_id = ?');
             if (!$clear) throw new RuntimeException('Unable to replace the Draft Version structure.');
             $clear->bind_param('i', $versionId); if (!$clear->execute()) throw new RuntimeException('Unable to replace the Draft Version structure.'); $clear->close();
@@ -457,3 +464,188 @@ if (!function_exists('mmh_revision_delete_resource')) {
     }
 }
 
+if (!function_exists('mmh_revision_assignment_schema_available')) {
+    function mmh_revision_assignment_schema_available(mysqli $conn): bool
+    {
+        $stmt = $conn->prepare("SELECT COUNT(*) AS total FROM INFORMATION_SCHEMA.TABLES WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'revision_plan_assignments'");
+        if (!$stmt) return false;
+        $stmt->execute();
+        $ok = (int) (($stmt->get_result()->fetch_assoc()['total'] ?? 0)) > 0;
+        $stmt->close();
+        return $ok;
+    }
+}
+
+if (!function_exists('mmh_revision_eligible_students')) {
+    function mmh_revision_eligible_students(mysqli $conn, string $courseId, string $search = ''): array
+    {
+        $search = trim($search);
+        $sql = "SELECT DISTINCT u.user_id, u.full_name, u.username
+                FROM users u INNER JOIN course_logs cl ON cl.user_id = u.user_id AND cl.course_id = ?
+                WHERE u.role = 'user' AND u.status = '1' AND u.archived_at IS NULL";
+        if ($search !== '') $sql .= " AND (u.full_name LIKE ? OR u.username LIKE ?)";
+        $sql .= ' ORDER BY u.full_name ASC, u.username ASC';
+        $stmt = $conn->prepare($sql);
+        if (!$stmt) return [];
+        if ($search !== '') { $like = '%' . $search . '%'; $stmt->bind_param('sss', $courseId, $like, $like); }
+        else $stmt->bind_param('s', $courseId);
+        $stmt->execute();
+        $rows = $stmt->get_result()->fetch_all(MYSQLI_ASSOC);
+        $stmt->close();
+        return $rows;
+    }
+}
+
+if (!function_exists('mmh_revision_assignment')) {
+    function mmh_revision_assignment(mysqli $conn, int $assignmentId, int $studentId = 0): ?array
+    {
+        if ($assignmentId <= 0 || !mmh_revision_assignment_schema_available($conn)) return null;
+        $sql = "SELECT a.*, t.title, t.description, t.status AS template_status,
+                       v.status AS version_status, v.version_number, v.allow_work_ahead,
+                       c.course_title, c.course_state, u.full_name, u.username
+                FROM revision_plan_assignments a
+                INNER JOIN revision_plan_templates t ON t.id = a.template_id
+                INNER JOIN revision_plan_template_versions v ON v.id = a.template_version_id AND v.template_id = a.template_id
+                INNER JOIN courses c ON c.course_id = a.course_id
+                INNER JOIN users u ON u.user_id = a.user_id
+                WHERE a.id = ? AND c.archived_at IS NULL";
+        if ($studentId > 0) $sql .= ' AND a.user_id = ?';
+        $sql .= ' LIMIT 1';
+        $stmt = $conn->prepare($sql);
+        if (!$stmt) return null;
+        if ($studentId > 0) $stmt->bind_param('ii', $assignmentId, $studentId); else $stmt->bind_param('i', $assignmentId);
+        $stmt->execute();
+        $row = $stmt->get_result()->fetch_assoc() ?: null;
+        $stmt->close();
+        if (!is_array($row)) return null;
+        $row['version'] = mmh_revision_version($conn, (int) $row['template_version_id']);
+        return $row;
+    }
+}
+
+if (!function_exists('mmh_revision_assignment_enrolled')) {
+    function mmh_revision_assignment_enrolled(mysqli $conn, int $studentId, string $courseId): bool
+    {
+        $stmt = $conn->prepare("SELECT cl.id FROM course_logs cl INNER JOIN users u ON u.user_id = cl.user_id WHERE cl.user_id = ? AND cl.course_id = ? AND u.role = 'user' AND u.status = '1' AND u.archived_at IS NULL LIMIT 1");
+        if (!$stmt) return false;
+        $stmt->bind_param('is', $studentId, $courseId);
+        $stmt->execute();
+        $ok = $stmt->get_result()->num_rows === 1;
+        $stmt->close();
+        return $ok;
+    }
+}
+
+if (!function_exists('mmh_revision_assignment_days')) {
+    /** Flatten immutable Version days into one deterministic sequential timeline. */
+    function mmh_revision_assignment_days(array $assignment): array
+    {
+        $version = is_array($assignment['version'] ?? null) ? $assignment['version'] : [];
+        $timezone = new DateTimeZone(date_default_timezone_get());
+        $start = DateTimeImmutable::createFromFormat('!Y-m-d', (string) ($assignment['start_date'] ?? ''), $timezone);
+        if (!$start) $start = new DateTimeImmutable('today', $timezone);
+        $today = new DateTimeImmutable('today', $timezone);
+        $allowAhead = !empty($assignment['allow_work_ahead']) || !empty($version['allow_work_ahead']);
+        $days = [];
+        $offset = 0;
+        foreach ((array) ($version['batches'] ?? []) as $batch) {
+            foreach ((array) ($batch['days'] ?? []) as $day) {
+                $scheduled = $start->modify('+' . $offset . ' days');
+                $day['batch_title'] = (string) ($batch['title'] ?? 'Batch');
+                $day['absolute_day_number'] = $offset + 1;
+                $day['scheduled_date'] = $scheduled->format('Y-m-d');
+                $day['availability'] = $scheduled < $today ? 'previous' : ($scheduled == $today ? 'today' : ($allowAhead ? 'upcoming' : 'locked'));
+                $day['accessible'] = $allowAhead || $scheduled <= $today;
+                $days[] = $day;
+                $offset++;
+            }
+        }
+        return $days;
+    }
+}
+
+if (!function_exists('mmh_revision_assignment_context')) {
+    /** Validate student ownership, enrollment, published Version, and day availability. */
+    function mmh_revision_assignment_context(mysqli $conn, int $assignmentId, int $studentId, ?int $requirementId = null, ?int $resourceId = null): ?array
+    {
+        $assignment = mmh_revision_assignment($conn, $assignmentId, $studentId);
+        if (!$assignment || (string) $assignment['status'] !== 'active' || (string) $assignment['template_status'] === 'archived' || (string) $assignment['version_status'] !== 'published' || !in_array((string) ($assignment['course_state'] ?? ''), ['public', 'private'], true)) return null;
+        if (!mmh_revision_assignment_enrolled($conn, $studentId, (string) $assignment['course_id'])) return null;
+        $days = mmh_revision_assignment_days($assignment);
+        $resources = [];
+        foreach ((array) ($assignment['version']['resources'] ?? []) as $resource) $resources[(int) $resource['id']] = $resource;
+        $foundRequirement = null;
+        $foundDay = null;
+        $resourceRequirement = null;
+        $resourceDay = null;
+        foreach ($days as $day) {
+            $requirements = (array) ($day['requirements'] ?? []);
+            foreach ((array) ($day['activity_groups'] ?? []) as $group) $requirements = array_merge($requirements, (array) ($group['requirements'] ?? []));
+            foreach ($requirements as $requirement) {
+                if ($requirementId !== null && (int) ($requirement['id'] ?? 0) === $requirementId) { $foundRequirement = $requirement; $foundDay = $day; }
+                if ($resourceId !== null && in_array($resourceId, array_map('intval', (array) ($requirement['resource_ids'] ?? [])), true)) { $resourceRequirement = $requirement; $resourceDay = $day; }
+            }
+        }
+        if ($requirementId !== null && !$foundRequirement) return null;
+        if ($resourceId !== null && (!$resourceRequirement || empty($resources[$resourceId]))) return null;
+        if ($requirementId !== null && $resourceId !== null && (int) ($foundRequirement['id'] ?? 0) !== (int) ($resourceRequirement['id'] ?? 0)) return null;
+        if ($requirementId === null && $resourceId !== null) { $foundRequirement = $resourceRequirement; $foundDay = $resourceDay; }
+        if ($foundDay && empty($foundDay['accessible'])) return null;
+        return ['assignment' => $assignment, 'version' => $assignment['version'], 'days' => $days, 'day' => $foundDay, 'requirement' => $foundRequirement, 'resource' => $resourceId !== null ? ($resources[$resourceId] ?? null) : null];
+    }
+}
+
+if (!function_exists('mmh_revision_assign_students')) {
+    function mmh_revision_assign_students(mysqli $conn, int $versionId, array $studentIds, string $startDate, int $adminId): int
+    {
+        $version = mmh_revision_version($conn, $versionId);
+        if (!$version || (string) ($version['status'] ?? '') !== 'published') throw new InvalidArgumentException('Only a published Revision Plan Version can be assigned.');
+        $date = DateTimeImmutable::createFromFormat('!Y-m-d', trim($startDate));
+        if (!$date || $date->format('Y-m-d') !== trim($startDate)) throw new InvalidArgumentException('Choose a valid start date.');
+        $ids = array_values(array_unique(array_filter(array_map('intval', $studentIds), static fn(int $id): bool => $id > 0)));
+        if (!$ids) throw new InvalidArgumentException('Select at least one enrolled student.');
+        $conn->begin_transaction();
+        try {
+            $courseId = (string) $version['course_id'];
+            $templateId = (int) $version['template_id'];
+            $count = 0;
+            $check = $conn->prepare("SELECT u.user_id FROM users u INNER JOIN course_logs cl ON cl.user_id = u.user_id AND cl.course_id = ? WHERE u.user_id = ? AND u.role = 'user' AND u.status = '1' AND u.archived_at IS NULL LIMIT 1");
+            $insert = $conn->prepare('INSERT INTO revision_plan_assignments (template_id, template_version_id, course_id, user_id, start_date, assigned_by) VALUES (?, ?, ?, ?, ?, ?) ON DUPLICATE KEY UPDATE id = id');
+            if (!$check || !$insert) throw new RuntimeException('Unable to prepare Revision Plan assignment.');
+            foreach ($ids as $studentId) { $check->bind_param('si', $courseId, $studentId); $check->execute(); if (!$check->get_result()->fetch_assoc()) throw new InvalidArgumentException('Every selected student must be an active enrollee in this course.'); }
+            foreach ($ids as $studentId) { $insert->bind_param('iisisi', $templateId, $versionId, $courseId, $studentId, $startDate, $adminId); if (!$insert->execute()) throw new RuntimeException('Unable to assign the Revision Plan.'); $count += $insert->affected_rows === 1 ? 1 : 0; }
+            $check->close();
+            $insert->close();
+            $conn->commit();
+            return $count;
+        } catch (Throwable $e) { $conn->rollback(); throw $e; }
+    }
+}
+
+if (!function_exists('mmh_revision_student_assignments')) {
+    function mmh_revision_student_assignments(mysqli $conn, int $studentId): array
+    {
+        if ($studentId <= 0 || !mmh_revision_assignment_schema_available($conn)) return [];
+        $stmt = $conn->prepare("SELECT a.id, a.course_id, a.start_date, a.status, a.assigned_at, t.title, c.course_title, v.version_number FROM revision_plan_assignments a INNER JOIN revision_plan_templates t ON t.id = a.template_id INNER JOIN revision_plan_template_versions v ON v.id = a.template_version_id INNER JOIN courses c ON c.course_id = a.course_id WHERE a.user_id = ? AND a.status = 'active' AND t.status <> 'archived' AND v.status = 'published' AND c.course_state IN ('public','private') ORDER BY a.start_date ASC, a.id ASC");
+        if (!$stmt) return [];
+        $stmt->bind_param('i', $studentId);
+        $stmt->execute();
+        $rows = $stmt->get_result()->fetch_all(MYSQLI_ASSOC);
+        $stmt->close();
+        return $rows;
+    }
+}
+
+if (!function_exists('mmh_revision_assignments_for_version')) {
+    function mmh_revision_assignments_for_version(mysqli $conn, int $versionId): array
+    {
+        if ($versionId <= 0 || !mmh_revision_assignment_schema_available($conn)) return [];
+        $stmt = $conn->prepare("SELECT a.id, a.user_id, a.start_date, a.status, u.full_name, u.username FROM revision_plan_assignments a INNER JOIN users u ON u.user_id = a.user_id WHERE a.template_version_id = ? ORDER BY u.full_name ASC, u.username ASC");
+        if (!$stmt) return [];
+        $stmt->bind_param('i', $versionId);
+        $stmt->execute();
+        $rows = $stmt->get_result()->fetch_all(MYSQLI_ASSOC);
+        $stmt->close();
+        return $rows;
+    }
+}

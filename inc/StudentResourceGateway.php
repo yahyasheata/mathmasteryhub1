@@ -13,6 +13,7 @@ require_once __DIR__ . '/CourseResourceNavigation.php';
 require_once __DIR__ . '/RecoveryPlan.php';
 require_once __DIR__ . '/TimedExam.php';
 require_once __DIR__ . '/AssignmentModelAnswerAccess.php';
+require_once __DIR__ . '/RevisionPlan.php';
 
 if (!function_exists('mmh_student_resource_url')) {
     /** Build the one canonical authenticated course-item URL. */
@@ -31,6 +32,12 @@ if (!function_exists('mmh_student_resource_url')) {
         if ($planId > 0 && $taskId > 0) {
             $query['recovery_plan'] = $planId;
             $query['recovery_task'] = $taskId;
+        }
+        $revisionAssignmentId = (int) ($context['revision_assignment_id'] ?? 0);
+        $revisionRequirementId = (int) ($context['revision_requirement_id'] ?? 0);
+        if ($revisionAssignmentId > 0 && $revisionRequirementId > 0) {
+            $query['revision_assignment'] = $revisionAssignmentId;
+            $query['revision_requirement'] = $revisionRequirementId;
         }
         $part = strtolower(trim((string) ($context['homework_part'] ?? $context['part'] ?? '')));
         if (in_array($part, ['homework', 'model-answer'], true)) {
@@ -163,6 +170,20 @@ if (!function_exists('mmh_student_resource_gateway')) {
             }
         }
 
+        $requestedRevisionAssignmentId = (int) ($options['revision_assignment_id'] ?? 0);
+        $requestedRevisionRequirementId = (int) ($options['revision_requirement_id'] ?? 0);
+        if (($requestedRevisionAssignmentId > 0) !== ($requestedRevisionRequirementId > 0)) {
+            return mmh_student_resource_denial(403, 'The Revision Plan context is incomplete.', $studentId, $course);
+        }
+        $revisionContext = [];
+        if ($requestedRevisionAssignmentId > 0 && $requestedRevisionRequirementId > 0) {
+            $revisionContext = mmh_revision_assignment_context($conn, $requestedRevisionAssignmentId, $studentId, $requestedRevisionRequirementId);
+            $revisionRequirement = $revisionContext['requirement'] ?? null;
+            if (!$revisionContext || !$revisionRequirement || (string) ($revisionRequirement['requirement_type'] ?? '') !== 'course_item' || (string) ($revisionRequirement['linked_course_item_id'] ?? '') !== $itemKey) {
+                return mmh_student_resource_denial(403, 'This Revision Plan resource is not available for your account.', $studentId, $course);
+            }
+        }
+
         $resource = mmh_course_resource_resolve($selection['item']);
         $homeworkPart = strtolower(trim((string) ($options['homework_part'] ?? $options['part'] ?? '')));
         if ($homeworkPart !== '' && !in_array($homeworkPart, ['homework', 'model-answer'], true)) {
@@ -231,6 +252,7 @@ if (!function_exists('mmh_student_resource_gateway')) {
             'completion' => $completion,
             'learning_journey' => ['entity_key' => $completion['entity_key'], 'kind' => $journeyKind],
             'recovery_context' => $recoveryContext,
+            'revision_context' => $revisionContext,
             'homework_part' => $homeworkPart !== '' ? $homeworkPart : null,
             'timed_exam' => $timedExam,
         ];

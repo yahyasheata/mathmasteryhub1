@@ -25,6 +25,7 @@ $statements = [
         template_id BIGINT UNSIGNED NOT NULL,
         version_number INT UNSIGNED NOT NULL,
         status VARCHAR(16) NOT NULL DEFAULT 'draft',
+        allow_work_ahead TINYINT(1) NOT NULL DEFAULT 0,
         created_by INT NOT NULL,
         created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
         updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,

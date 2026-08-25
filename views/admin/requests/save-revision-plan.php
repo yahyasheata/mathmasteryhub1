@@ -57,7 +57,8 @@ try {
             $versionId,
             $structure,
             mb_substr(trim((string) ($_POST['title'] ?? $template['title'])), 0, 180),
-            mb_substr(trim((string) ($_POST['description'] ?? $template['description'] ?? '')), 0, 1000)
+            mb_substr(trim((string) ($_POST['description'] ?? $template['description'] ?? '')), 0, 1000),
+            !empty($_POST['allow_work_ahead'])
         );
         $redirect(true, 'Draft Version saved.', $templateId, $versionId);
     }
@@ -70,10 +71,16 @@ try {
         if ($json !== '') {
             $structure = json_decode($json, true);
             if (!is_array($structure)) throw new InvalidArgumentException('The template structure is invalid.');
-            mmh_revision_save_draft($conn, $versionId, $structure, mb_substr(trim((string) ($_POST['title'] ?? $template['title'] ?? '')), 0, 180), mb_substr(trim((string) ($_POST['description'] ?? $template['description'] ?? '')), 0, 1000));
+            mmh_revision_save_draft($conn, $versionId, $structure, mb_substr(trim((string) ($_POST['title'] ?? $template['title'] ?? '')), 0, 180), mb_substr(trim((string) ($_POST['description'] ?? $template['description'] ?? '')), 0, 1000), !empty($_POST['allow_work_ahead']));
         }
         mmh_revision_publish_version($conn, $versionId, $adminId);
         $redirect(true, 'Version ' . (int) $version['version_number'] . ' is now finalized and immutable.', (int) $version['template_id'], $versionId);
+    }
+
+    if ($action === 'assign_students') {
+        $versionId = (int) ($_POST['version_id'] ?? 0);
+        $assigned = mmh_revision_assign_students($conn, $versionId, (array) ($_POST['student_ids'] ?? []), (string) ($_POST['start_date'] ?? ''), $adminId);
+        $redirect(true, $assigned > 0 ? $assigned . ' student' . ($assigned === 1 ? '' : 's') . ' assigned.' : 'Those students already have this Version assigned.', (int) ($_POST['template_id'] ?? 0), $versionId);
     }
 
     if ($action === 'new_version') {

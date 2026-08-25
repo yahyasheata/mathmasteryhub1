@@ -9,6 +9,9 @@
                                     <a href="<?=rtrim((string)$baseUrl, '/')?>/user/analytics" class="user-menu student-nav-link d-flex align-items-center col-auto justify-content-lg-center justify-content-start py-3 px-2 <?= ($pageName == 'analytics') ? 'active' : ''; ?>" style="min-width:120px;border-bottom:6px solid transparent;height: 100%;color: inherit;transition: 0s all ease;">
                                         <span class="fas fa-chart-line mx-2"></span> My Progress
                                     </a>
+                                    <a href="<?=rtrim((string)$baseUrl, '/')?>/user/revision-plans" class="user-menu student-nav-link d-flex align-items-center col-auto justify-content-lg-center justify-content-start py-3 px-2 <?= ($pageName == 'revision_plans') ? 'active' : ''; ?>" style="min-width:120px;border-bottom:6px solid transparent;height: 100%;color: inherit;transition: 0s all ease;">
+                                        <span class="fas fa-route mx-2"></span> Your Plans
+                                    </a>
                                     <a href="<?=rtrim((string)$baseUrl, '/')?>/user/assignments" class="user-menu student-nav-link d-flex align-items-center col-auto justify-content-lg-center justify-content-start py-3 px-2 <?= ($pageName == 'assignments' || $pageName == 'assignment_submissions') ? 'active' : ''; ?>" style="min-width:120px;border-bottom:6px solid transparent;height: 100%;color: inherit;transition: 0s all ease;">
                                         <span class="fas fa-tasks mx-2"></span> Assignments
                                     </a>
