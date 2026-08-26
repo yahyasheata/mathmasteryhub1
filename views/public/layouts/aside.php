@@ -44,6 +44,7 @@ $publicAnnouncement = mmh_site_settings_active_announcement($site_settings, $pub
 $publicAccountItems = [
     ['label' => 'My Courses', 'href' => $publicBaseUrl . '/user/my-courses'],
     ['label' => 'My Progress', 'href' => $publicBaseUrl . '/user/analytics'],
+    ['label' => 'Revision Plans', 'href' => $publicBaseUrl . '/user/revision-plans'],
     ['label' => 'Assignments', 'href' => $publicBaseUrl . '/user/assignments'],
     ['label' => 'Live Sessions', 'href' => $publicBaseUrl . '/user/live-sessions'],
     ['label' => 'Notifications', 'href' => $publicBaseUrl . '/user/notifications'],

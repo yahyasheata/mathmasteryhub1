@@ -652,10 +652,16 @@ if (!function_exists('mmh_revision_assign_students')) {
             $templateId = (int) $version['template_id'];
             $count = 0;
             $check = $conn->prepare("SELECT u.user_id FROM users u INNER JOIN course_logs cl ON cl.user_id = u.user_id AND cl.course_id = ? WHERE u.user_id = ? AND u.role = 'user' AND u.status = '1' AND u.archived_at IS NULL LIMIT 1");
-            $insert = $conn->prepare('INSERT INTO revision_plan_assignments (template_id, template_version_id, course_id, user_id, start_date, assigned_by) VALUES (?, ?, ?, ?, ?, ?) ON DUPLICATE KEY UPDATE id = id');
+            /*
+             * The unique key prevents duplicate student/version assignments.  A
+             * re-assignment must also make an older archived/ended row active
+             * again; leaving that row untouched makes the admin confirmation say
+             * "assigned" while the student list correctly hides it.
+             */
+            $insert = $conn->prepare("INSERT INTO revision_plan_assignments (template_id, template_version_id, course_id, user_id, start_date, assigned_by) VALUES (?, ?, ?, ?, ?, ?) ON DUPLICATE KEY UPDATE course_id = VALUES(course_id), start_date = VALUES(start_date), status = 'active', assigned_by = VALUES(assigned_by), assigned_at = CURRENT_TIMESTAMP, archived_at = NULL, ended_at = NULL");
             if (!$check || !$insert) throw new RuntimeException('Unable to prepare Revision Plan assignment.');
             foreach ($ids as $studentId) { $check->bind_param('si', $courseId, $studentId); $check->execute(); if (!$check->get_result()->fetch_assoc()) throw new InvalidArgumentException('Every selected student must be an active enrollee in this course.'); }
-            foreach ($ids as $studentId) { $insert->bind_param('iisisi', $templateId, $versionId, $courseId, $studentId, $startDate, $adminId); if (!$insert->execute()) throw new RuntimeException('Unable to assign the Revision Plan.'); $count += $insert->affected_rows === 1 ? 1 : 0; }
+            foreach ($ids as $studentId) { $insert->bind_param('iisisi', $templateId, $versionId, $courseId, $studentId, $startDate, $adminId); if (!$insert->execute()) throw new RuntimeException('Unable to assign the Revision Plan.'); $count++; }
             $check->close();
             $insert->close();
             $conn->commit();
@@ -665,9 +671,20 @@ if (!function_exists('mmh_revision_assign_students')) {
 }
 
 if (!function_exists('mmh_revision_student_assignments')) {
-    function mmh_revision_student_assignments(mysqli $conn, int $studentId): array
+    /**
+     * Return the assignments visible to a student.  The optional error output
+     * lets callers distinguish a real empty result from an unavailable schema
+     * or failed query, so a database problem is never presented as "no plans".
+     */
+    function mmh_revision_student_assignments(mysqli $conn, int $studentId, ?string &$error = null): array
     {
-        if ($studentId <= 0 || !mmh_revision_assignment_schema_available($conn)) return [];
+        $error = null;
+        if ($studentId <= 0) return [];
+        if (!mmh_revision_assignment_schema_available($conn)) {
+            $error = 'Revision Plan assignments are temporarily unavailable.';
+            error_log('Revision Plan assignment schema is unavailable while loading student assignments.');
+            return [];
+        }
         $stmt = $conn->prepare("SELECT DISTINCT a.id, a.course_id, a.start_date, a.status, a.assigned_at, t.title, c.course_title, v.version_number,
                        CASE WHEN a.start_date > CURRENT_DATE THEN 'upcoming' WHEN a.start_date = CURRENT_DATE THEN 'active' ELSE 'past' END AS schedule_state
                 FROM revision_plan_assignments a
@@ -685,9 +702,18 @@ if (!function_exists('mmh_revision_student_assignments')) {
                   AND (LOWER(TRIM(COALESCE(c.course_state, ''))) IN ('public', 'private')
                        OR (COALESCE(c.course_state, '') = '' AND c.course_status = '1' AND LOWER(TRIM(COALESCE(c.course_visibility, 'public'))) IN ('public', 'private')))
                 ORDER BY a.start_date ASC, a.id ASC");
-        if (!$stmt) { error_log('Revision Plan student list query could not be prepared: ' . $conn->error); return []; }
+        if (!$stmt) {
+            $error = 'Revision Plan assignments are temporarily unavailable.';
+            error_log('Revision Plan student list query could not be prepared: ' . $conn->error);
+            return [];
+        }
         $stmt->bind_param('i', $studentId);
-        $stmt->execute();
+        if (!$stmt->execute()) {
+            $error = 'Revision Plan assignments are temporarily unavailable.';
+            error_log('Revision Plan student list query failed: ' . $stmt->error);
+            $stmt->close();
+            return [];
+        }
         $rows = $stmt->get_result()->fetch_all(MYSQLI_ASSOC);
         $stmt->close();
         return $rows;

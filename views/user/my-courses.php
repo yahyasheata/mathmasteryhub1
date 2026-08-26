@@ -16,6 +16,8 @@ $userInfo = $username !== '' ? getUserInfo($username) : false;
 $userData = is_object($userInfo) ? get_object_vars($userInfo) : [];
 $userId = (int) ($userData['user_id'] ?? 0);
 $conn = db();
+$revisionAssignmentsError = null;
+$revisionAssignments = $userId > 0 ? mmh_revision_student_assignments($conn, $userId, $revisionAssignmentsError) : [];
 
 function student_courses_html($value)
 {
@@ -246,6 +248,38 @@ foreach ($enrolledCourses as $course) {
             </div>
         </header>
         <section class="container student-courses-shell" aria-label="Enrolled courses">
+            <?php if ($revisionAssignmentsError): ?>
+                <section class="student-revision-plans-strip is-error" aria-label="Revision Plans" role="alert">
+                    <div class="student-revision-plans-strip-heading"><div><span class="student-dashboard-eyebrow"><span class="fas fa-route" aria-hidden="true"></span> Revision Plans</span><h2>Plans are temporarily unavailable</h2><p>Please try again in a moment.</p></div></div>
+                </section>
+            <?php elseif ($revisionAssignments): ?>
+                <section class="student-revision-plans-strip" aria-labelledby="student-revision-plans-title">
+                    <div class="student-revision-plans-strip-heading">
+                        <div>
+                            <span class="student-dashboard-eyebrow"><span class="fas fa-route" aria-hidden="true"></span> Personal study paths</span>
+                            <h2 id="student-revision-plans-title">Revision Plans</h2>
+                            <p>Teacher-assigned plans for your enrolled courses.</p>
+                        </div>
+                        <a href="<?= student_courses_html(rtrim((string) $baseUrl, '/') . '/user/revision-plans'); ?>" class="student-dashboard-btn secondary">View all plans <span class="fas fa-arrow-right" aria-hidden="true"></span></a>
+                    </div>
+                    <div class="student-revision-plans-strip-list">
+                        <?php foreach (array_slice($revisionAssignments, 0, 3) as $revisionAssignment): ?>
+                            <?php
+                            $revisionSchedule = (string) ($revisionAssignment['schedule_state'] ?? 'active');
+                            $revisionAction = $revisionSchedule === 'upcoming' ? 'View plan' : 'Open plan';
+                            ?>
+                            <article class="student-revision-plan-summary">
+                                <div>
+                                    <strong><?= student_courses_html($revisionAssignment['title'] ?? 'Revision Plan'); ?></strong>
+                                    <span><?= student_courses_html($revisionAssignment['course_title'] ?? 'Course'); ?></span>
+                                    <small><b><?= student_courses_html(ucfirst($revisionSchedule)); ?></b> · <?= student_courses_html(date('j M Y', strtotime((string) ($revisionAssignment['start_date'] ?? '')))); ?></small>
+                                </div>
+                                <a href="<?= student_courses_html(rtrim((string) $baseUrl, '/') . '/user/revision-plan/' . (int) ($revisionAssignment['id'] ?? 0)); ?>" class="student-dashboard-btn primary"><?= $revisionAction; ?></a>
+                            </article>
+                        <?php endforeach; ?>
+                    </div>
+                </section>
+            <?php endif; ?>
             <?php if (!$courseCards): ?>
                 <div class="student-dashboard-empty student-courses-empty">
                     <span class="fas fa-book-open" aria-hidden="true"></span>

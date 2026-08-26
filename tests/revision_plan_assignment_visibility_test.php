@@ -15,9 +15,17 @@ foreach ([
     "LOWER(TRIM(COALESCE(v.status, ''))) = 'published'",
     "CURRENT_DATE THEN 'upcoming'",
     "ELSE 'past'",
+    'temporarily unavailable',
 ] as $marker) {
     if (!str_contains($service, $marker)) throw new RuntimeException('Assignment visibility contract is missing: ' . $marker);
 }
 if (!str_contains($studentList, 'schedule_state') || !str_contains($studentList, 'View Plan')) throw new RuntimeException('Upcoming student-plan presentation is missing.');
-if (!str_contains($service, 'ON DUPLICATE KEY UPDATE id = id')) throw new RuntimeException('Duplicate assignment protection is missing.');
+foreach ([
+    'ON DUPLICATE KEY UPDATE',
+    "status = 'active'",
+    'archived_at = NULL',
+    'ended_at = NULL',
+] as $marker) {
+    if (!str_contains($service, $marker)) throw new RuntimeException('Assignment reactivation contract is missing: ' . $marker);
+}
 echo "assignment_visibility=canonical_identity=course_enrollment_status=present upcoming=visible past=visible\n";

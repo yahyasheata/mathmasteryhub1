@@ -321,6 +321,61 @@ html[data-student-theme] body.body:not(.course-learning-page) .student-nav-link.
   transform: translateY(-1px);
 }
 
+/* Revision Plans are a normal student destination, not a hidden deep link. */
+html[data-student-theme] body.student-my-courses-page .student-revision-plans-strip {
+  display: grid;
+  gap: 14px;
+  margin: 0 0 18px;
+  padding: 18px;
+  border: 1px solid color-mix(in srgb, var(--primary) 28%, var(--border));
+  border-radius: var(--radius-lg);
+  background: color-mix(in srgb, var(--primary) 6%, var(--surface));
+}
+html[data-student-theme] body.student-my-courses-page .student-revision-plans-strip-heading,
+html[data-student-theme] body.student-my-courses-page .student-revision-plan-summary {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
+}
+html[data-student-theme] body.student-my-courses-page .student-revision-plans-strip-heading h2 {
+  margin: 2px 0 3px;
+  color: var(--text-primary);
+  font-size: 1.12rem;
+}
+html[data-student-theme] body.student-my-courses-page .student-revision-plans-strip-heading p {
+  margin: 0;
+  color: var(--text-muted);
+  font-size: .82rem;
+}
+html[data-student-theme] body.student-my-courses-page .student-revision-plans-strip-list {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(230px, 1fr));
+  gap: 10px;
+}
+html[data-student-theme] body.student-my-courses-page .student-revision-plan-summary {
+  min-width: 0;
+  padding: 12px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  background: var(--surface);
+}
+html[data-student-theme] body.student-my-courses-page .student-revision-plan-summary > div { min-width: 0; }
+html[data-student-theme] body.student-my-courses-page .student-revision-plan-summary strong,
+html[data-student-theme] body.student-my-courses-page .student-revision-plan-summary span,
+html[data-student-theme] body.student-my-courses-page .student-revision-plan-summary small { display: block; overflow-wrap: anywhere; }
+html[data-student-theme] body.student-my-courses-page .student-revision-plan-summary strong { color: var(--text-primary); font-size: .9rem; }
+html[data-student-theme] body.student-my-courses-page .student-revision-plan-summary span { margin-top: 3px; color: var(--text-secondary); font-size: .78rem; }
+html[data-student-theme] body.student-my-courses-page .student-revision-plan-summary small { margin-top: 5px; color: var(--text-muted); font-size: .74rem; }
+html[data-student-theme] body.student-my-courses-page .student-revision-plan-summary small b { color: var(--primary); }
+
+@media (max-width: 640px) {
+  html[data-student-theme] body.student-my-courses-page .student-revision-plans-strip-heading { align-items: flex-start; flex-direction: column; }
+  html[data-student-theme] body.student-my-courses-page .student-revision-plans-strip-heading .student-dashboard-btn { width: 100%; }
+  html[data-student-theme] body.student-my-courses-page .student-revision-plan-summary { align-items: flex-start; flex-direction: column; }
+  html[data-student-theme] body.student-my-courses-page .student-revision-plan-summary .student-dashboard-btn { width: 100%; }
+}
+
 html[data-student-theme] body.body:not(.course-learning-page) .card,
 html[data-student-theme] body.body:not(.course-learning-page) .main-box,
 html[data-student-theme] body.body:not(.course-learning-page) .assignment-card {
