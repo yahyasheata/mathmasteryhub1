@@ -87,6 +87,17 @@ if ($selectedBatchId > 0) {
         }
     }
 }
+$uploadSubmissionFiles = [];
+foreach ($selectedRequirements as $uploadRequirement) {
+    if (strtolower(trim((string) ($uploadRequirement['requirement_type'] ?? ''))) !== 'upload') continue;
+    $uploadRequirementId = (int) ($uploadRequirement['id'] ?? 0);
+    if ($uploadRequirementId <= 0) continue;
+    $uploadSubmission = mmh_revision_requirement_submission($conn, $assignmentId, (int) $userId, $uploadRequirementId);
+    $uploadSubmissionFiles[(string) $uploadRequirementId] = [
+        'submitted' => is_array($uploadSubmission),
+        'files' => is_array($uploadSubmission) ? array_values(array_map(static fn(array $file): string => (string) ($file['original_filename'] ?? 'PDF file'), (array) ($uploadSubmission['files'] ?? []))) : [],
+    ];
+}
 ?>
 <!doctype html>
 <html lang="en" dir="ltr">
@@ -119,11 +130,15 @@ if ($selectedBatchId > 0) {
         $releasedBatchSummaries = [];
         foreach ($days as $day) {
             $batchKey = (int) ($day['batch_id'] ?? 0);
-            if (!isset($releasedBatchSummaries[$batchKey])) $releasedBatchSummaries[$batchKey] = ['title' => (string) ($day['batch_title'] ?? 'Batch'), 'days' => 0];
+            if (!isset($releasedBatchSummaries[$batchKey])) $releasedBatchSummaries[$batchKey] = ['title' => (string) ($day['batch_title'] ?? 'Batch'), 'days' => 0, 'completed' => 0, 'total' => 0, 'first_day' => (int) ($day['absolute_day_number'] ?? 0)];
             $releasedBatchSummaries[$batchKey]['days']++;
+            $dayNumber = (int) ($day['absolute_day_number'] ?? 0);
+            $batchDayProgress = $progressSummary['days'][$dayNumber] ?? ['completed' => 0, 'total' => 0];
+            $releasedBatchSummaries[$batchKey]['completed'] += (int) ($batchDayProgress['completed'] ?? 0);
+            $releasedBatchSummaries[$batchKey]['total'] += (int) ($batchDayProgress['total'] ?? 0);
         }
         ?>
-        <?php if ($releasedBatchSummaries || $unreleasedBatches): ?><section class="revision-batch-strip" aria-label="Revision plan batches"><?php foreach ($releasedBatchSummaries as $batchId => $batchSummary): ?><div class="revision-batch-summary <?= $batchId === $selectedBatchId ? 'is-active' : '' ?>"><span class="revision-student-card-kicker"><?= $esc($batchSummary['title']) ?></span><strong>Active</strong><small><?= (int) $batchSummary['days'] ?> <?= $batchSummary['days'] === 1 ? 'day' : 'days' ?></small></div><?php endforeach; ?><?php foreach ($unreleasedBatches as $batch): ?><div class="revision-batch-summary is-locked"><span class="revision-student-card-kicker"><?= $esc($batch['title'] ?? 'Upcoming Batch') ?></span><strong>Coming soon</strong><small>Content will appear when released. More revision content is on the way.</small></div><?php endforeach; ?></section><?php endif; ?>
+        <?php if ($releasedBatchSummaries || $unreleasedBatches): ?><section class="revision-batch-navigation" aria-labelledby="revision-batches-title"><div class="revision-batch-navigation-heading"><span class="revision-student-card-kicker" id="revision-batches-title">Batches</span><span class="revision-help">Your plan is released in stages.</span></div><div class="revision-batch-strip"><?php $batchNumber = 0; foreach ($releasedBatchSummaries as $batchId => $batchSummary): $batchNumber++; $batchHref = $base . '/user/revision-plan/' . $assignmentId . '?day=' . (int) $batchSummary['first_day']; $batchIsSelected = $batchId === $selectedBatchId; ?><a class="revision-batch-summary <?= $batchIsSelected ? 'is-active' : '' ?>" href="<?= $esc($batchHref) ?>" <?= $batchIsSelected ? 'aria-current="page"' : '' ?>><span class="revision-student-card-kicker">Batch <?= $batchNumber ?></span><strong><?= $esc($batchSummary['title'] ?: 'Batch ' . $batchNumber) ?></strong><small>Active · <?= (int) $batchSummary['days'] ?> <?= $batchSummary['days'] === 1 ? 'day' : 'days' ?><?php if ((int) $batchSummary['total'] > 0): ?> · <?= (int) $batchSummary['completed'] ?>/<?= (int) $batchSummary['total'] ?> tasks<?php endif; ?></small></a><?php endforeach; ?><?php foreach ($unreleasedBatches as $batch): $batchNumber++; ?><div class="revision-batch-summary is-locked"><span class="revision-student-card-kicker">Batch <?= $batchNumber ?></span><strong><?= $esc($batch['title'] ?? 'Upcoming Batch') ?></strong><small>Coming soon · Content will appear when released. More revision content is on the way.</small></div><?php endforeach; ?></div></section><?php endif; ?>
         <nav class="revision-day-nav" aria-label="Revision plan days">
             <?php foreach ($days as $day): $number = (int) ($day['absolute_day_number'] ?? 0); $availability = (string) ($day['availability'] ?? 'upcoming'); $accessible = !empty($day['accessible']); $dayProgress = $progressSummary['days'][$number] ?? ['completed' => 0, 'total' => 0]; $completeDay = $accessible && $dayProgress['total'] > 0 && $dayProgress['completed'] >= $dayProgress['total']; $state = $availability === 'today' ? 'Today' : ($availability === 'previous' ? 'Previous' : ($availability === 'upcoming' ? 'Upcoming' : 'Locked')); $stateClass = !$accessible ? 'is-locked' : ($completeDay ? 'is-complete' : ($availability === 'today' ? 'is-today' : 'is-neutral')); ?>
                 <a class="revision-day-tab <?= $number === $selectedDayNumber ? 'is-selected' : '' ?> <?= !$accessible ? 'is-locked' : '' ?>" href="<?= $esc($base . '/user/revision-plan/' . $assignmentId . '?day=' . $number) ?>" <?= $number === $selectedDayNumber ? 'aria-current="page"' : '' ?> title="<?= $esc($state) ?>"><span class="revision-day-state <?= $stateClass ?>" aria-hidden="true"></span><span>Day <?= $number ?></span><small><?= $esc($state) ?></small></a>
@@ -148,5 +163,72 @@ if ($selectedBatchId > 0) {
         <?php endif; ?>
     </section>
 </main></div>
+<script>
+(function(){
+    'use strict';
+    var submissionState = <?= json_encode($uploadSubmissionFiles, JSON_HEX_TAG|JSON_HEX_AMP|JSON_HEX_APOS|JSON_HEX_QUOT) ?>;
+    document.querySelectorAll('.revision-upload-control form[enctype="multipart/form-data"]').forEach(function(form){
+        var input = form.querySelector('input[type="file"]');
+        var control = form.closest('.revision-upload-control');
+        if (!input || !control) return;
+        var match = (form.getAttribute('action') || '').match(/\/requirement\/(\d+)\/upload/);
+        var requirementId = match ? match[1] : '';
+        var state = submissionState[requirementId] || {submitted:false, files:[]};
+        var label = input.closest('.revision-upload-label');
+        var submit = form.querySelector('button[type="submit"]');
+        var zone = document.createElement('div');
+        zone.className = 'revision-upload-dropzone';
+        zone.setAttribute('role', 'group');
+        zone.innerHTML = '<strong>Upload PDF files</strong><span>Drag files here or choose from your device</span><button type="button" class="student-dashboard-btn secondary revision-upload-choose"><span class="fas fa-folder-open" aria-hidden="true"></span>Choose PDF files</button><div class="revision-upload-selected" aria-live="polite"></div>';
+        if (label) { zone.appendChild(input); label.replaceWith(zone); }
+        var choose = zone.querySelector('.revision-upload-choose');
+        var selected = zone.querySelector('.revision-upload-selected');
+        var files = [];
+        var replace = null;
+        function formatSize(bytes){ if (bytes < 1024 * 1024) return Math.max(1, Math.round(bytes / 1024)) + ' KB'; return (bytes / (1024 * 1024)).toFixed(1) + ' MB'; }
+        function syncInput(){
+            if (!window.DataTransfer) return;
+            var transfer = new DataTransfer();
+            files.forEach(function(file){ transfer.items.add(file); });
+            input.files = transfer.files;
+        }
+        function renderFiles(){
+            selected.innerHTML = '';
+            if (!files.length) { selected.textContent = 'No files selected'; submit.disabled = true; submit.classList.remove('primary'); return; }
+            var heading = document.createElement('strong'); heading.className = 'revision-upload-selected-count'; heading.textContent = files.length + (files.length === 1 ? ' PDF selected' : ' PDFs selected'); selected.appendChild(heading);
+            files.forEach(function(file, index){
+                var row = document.createElement('div'); row.className = 'revision-upload-file';
+                row.innerHTML = '<span class="revision-upload-file-icon" aria-hidden="true"><span class="fas fa-file-pdf"></span></span><span class="revision-upload-file-name"></span><small></small><button type="button" class="revision-upload-remove" aria-label="Remove ' + String(file.name).replace(/"/g,'&quot;') + '">Remove</button>';
+                row.querySelector('.revision-upload-file-name').textContent = file.name;
+                row.querySelector('small').textContent = formatSize(file.size);
+                row.querySelector('.revision-upload-remove').addEventListener('click', function(){ files.splice(index, 1); syncInput(); renderFiles(); });
+                selected.appendChild(row);
+            });
+            submit.disabled = false; submit.classList.add('primary');
+        }
+        function accept(list){
+            var incoming = Array.from(list || []).filter(function(file){ return file && (file.type === 'application/pdf' || /\.pdf$/i.test(file.name)); });
+            incoming.forEach(function(file){ if (!files.some(function(existing){ return existing.name === file.name && existing.size === file.size && existing.lastModified === file.lastModified; })) files.push(file); });
+            if (files.length > 10) files = files.slice(0, 10);
+            syncInput(); renderFiles();
+        }
+        choose.addEventListener('click', function(){ input.click(); });
+        input.addEventListener('change', function(){ accept(input.files); });
+        ['dragenter','dragover'].forEach(function(eventName){ zone.addEventListener(eventName, function(event){ event.preventDefault(); zone.classList.add('is-dragging'); }); });
+        ['dragleave','drop'].forEach(function(eventName){ zone.addEventListener(eventName, function(event){ event.preventDefault(); zone.classList.remove('is-dragging'); if (eventName === 'drop') accept(event.dataTransfer.files); }); });
+        if (state.submitted && state.files.length) {
+            var submitted = document.createElement('div'); submitted.className = 'revision-upload-submitted';
+            submitted.innerHTML = '<strong><span class="revision-upload-check" aria-hidden="true">✓</span> Submitted</strong><span>Submitted files</span><ul></ul><button type="button" class="student-dashboard-btn secondary revision-upload-replace">Replace submission</button>';
+            var list = submitted.querySelector('ul'); state.files.forEach(function(name){ var li = document.createElement('li'); li.textContent = name; list.appendChild(li); });
+            control.insertBefore(submitted, form);
+            replace = submitted.querySelector('.revision-upload-replace');
+            replace.addEventListener('click', function(){ submitted.hidden = true; form.hidden = false; input.focus(); });
+            form.hidden = true;
+        }
+        form.addEventListener('submit', function(event){ if (!files.length) { event.preventDefault(); return; } submit.disabled = true; submit.classList.add('is-uploading'); submit.innerHTML = '<span class="fas fa-spinner fa-spin" aria-hidden="true"></span> Uploading…'; });
+        renderFiles();
+    });
+})();
+</script>
 </body>
 </html>
