@@ -47,6 +47,8 @@ foreach ((array) ($context['version']['resources'] ?? []) as $resource) $resourc
 $resourceUrl = static function (int $resourceId, int $requirementId = 0) use ($base, $assignmentId): string { $url = $base . '/user/revision-resource/' . $assignmentId . '/' . $resourceId; return $requirementId > 0 ? $url . '?requirement=' . $requirementId : $url; };
 $itemUrl = static function (string $itemId, int $requirementId) use ($base, $assignmentId, $assignment): string { return mmh_student_resource_url($base, (string) $assignment['course_id'], $itemId, ['revision_assignment_id' => $assignmentId, 'revision_requirement_id' => $requirementId]); };
 $completionUrl = $base . '/user/revision-plan/' . $assignmentId . '/requirement/';
+$revisionCssPath = dirname(__DIR__, 2) . '/resources/css/revision-plans.css';
+$revisionCssVersion = is_file($revisionCssPath) ? (string) filemtime($revisionCssPath) : '1';
 $metatags = $metatags ?? ''; $keywords = $keywords ?? ''; $openGraph = $openGraph ?? ''; $schema = $schema ?? '';
 
 $selectedRequirements = [];
@@ -64,7 +66,7 @@ $selectedAvailable = is_array($selectedDay) && !empty($selectedDay['accessible']
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title><?= $esc($assignment['title']) ?> | Your Plans</title>
     <?php include 'layouts/user/header.php'; ?>
-    <link rel="stylesheet" href="<?= $esc($base . '/resources/css/revision-plans.css') ?>">
+    <link rel="stylesheet" href="<?= $esc($base . '/resources/css/revision-plans.css?v=' . $revisionCssVersion) ?>">
 </head>
 <body class="body ds-bg-primary revision-plan-workspace" style="margin-top:65px">
 <div id="app"><div id="body-overlay"></div><?php include 'layouts/user/aside.php'; ?>
