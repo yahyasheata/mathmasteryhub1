@@ -182,6 +182,7 @@ $admin_base = rtrim((string) $baseUrl, '/') . '/admin/';
                             <small class="form-text text-muted">The copy is appended to the end of the selected section.</small>
                         </div>
                         <div id="course-copy-feedback" class="course-copy-feedback" role="status" aria-live="polite"></div>
+                        <button type="button" id="course-copy-retry" class="btn btn-link btn-sm d-none" data-copy-action="retry">Retry</button>
                     </div>
                     <div class="course-copy-modal-footer">
                         <button type="button" class="btn btn-outline-secondary" data-copy-action="close">Cancel</button>
@@ -200,6 +201,10 @@ $admin_base = rtrim((string) $baseUrl, '/') . '/admin/';
   var courseId = $('.course-manager-page').data('course-id');
   var baseUrl = <?=json_encode(rtrim((string) $baseUrl, '/'));?>;
   var adminCsrfToken = <?=json_encode(mmh_admin_csrf_token());?>;
+  // Resolve admin requests from the canonical application origin. The page
+  // also has a <base> tag for legacy links, but AJAX endpoints must not depend
+  // on browser base-URL handling (which differs when served through a sub-path).
+  function adminRequestUrl(path) { return baseUrl + '/admin/' + String(path || '').replace(/^\/+/, ''); }
   var listRequest = null;
   var sortingTimer = null;
   var sortingInFlight = false;
@@ -523,6 +528,26 @@ $admin_base = rtrim((string) $baseUrl, '/') . '/admin/';
     $('#course-copy-modal').addClass('d-none');
     copyState = { kind: '', sourceId: '', sourceIds: [], title: '', courses: [], sourceCourseId: String(courseId || '') };
   }
+  function setCopyLoadError(message) {
+    $('#course-copy-feedback').text(message || 'Couldn’t load courses.');
+    $('#course-copy-retry').removeClass('d-none');
+    $('#course-copy-destination-course').prop('disabled', true).html('<option value="">Select a destination course</option>');
+  }
+  function loadCopyCourses() {
+    $('#course-copy-retry').addClass('d-none');
+    $('#course-copy-feedback').text('');
+    $('#course-copy-destination-course').html('<option>Loading courses…</option>').prop('disabled', true);
+    $.ajax({ type: 'GET', url: adminRequestUrl('requests/course-copy/options'), dataType: 'json', headers: { Accept: 'application/json' } }).done(function(response) {
+      if (!responseOk(response)) { setCopyLoadError(responseMessage(response, 'Couldn’t load courses.')); return; }
+      copyState.courses = Array.isArray(response.courses) ? response.courses : [];
+      if (!copyState.courses.length) { setCopyLoadError('No destination courses are available.'); return; }
+      $('#course-copy-destination-course').prop('disabled', false);
+      copyCourses('');
+    }).fail(function(xhr) {
+      var message = xhr && xhr.responseJSON ? responseMessage(xhr.responseJSON, '') : '';
+      setCopyLoadError(message || 'Couldn’t load courses.');
+    });
+  }
   function copyCourses(query) {
     query = String(query || '').toLowerCase().trim();
     var $select = $('#course-copy-destination-course');
@@ -555,15 +580,7 @@ $admin_base = rtrim((string) $baseUrl, '/') . '/admin/';
     $('#course-copy-submit [data-copy-submit-label]').text(kind === 'section' ? 'Copy section' : (kind === 'bulk' ? 'Copy lessons' : 'Copy item'));
     $('#course-copy-feedback').empty(); $('#course-copy-course-search').val('');
     $('#course-copy-modal').removeClass('d-none');
-    if (!copyState.courses.length) {
-      $('#course-copy-destination-course').html('<option>Loading courses…</option>').prop('disabled', true);
-      $.getJSON('requests/course-copy/options').done(function(response) {
-        if (!responseOk(response)) { $('#course-copy-feedback').text(responseMessage(response, 'Courses could not be loaded.')); return; }
-        copyState.courses = Array.isArray(response.courses) ? response.courses : [];
-        $('#course-copy-destination-course').prop('disabled', false);
-        copyCourses('');
-      }).fail(function() { $('#course-copy-feedback').text('Courses could not be loaded. Please try again.'); });
-    } else { copyCourses(''); }
+    if (!copyState.courses.length) { loadCopyCourses(); } else { copyCourses(''); }
   }
   function submitCopy() {
     var destinationCourseId = String($('#course-copy-destination-course').val() || '');
@@ -581,7 +598,7 @@ $admin_base = rtrim((string) $baseUrl, '/') . '/admin/';
     if (copyState.kind === 'section') data.source_section_id = copyState.sourceId;
     else if (copyState.kind === 'bulk') { data._method = 'BULK'; data.action = 'copy'; data.course_id = copyState.sourceCourseId; data.item_ids = copyState.sourceIds; }
     else data.source_item_id = copyState.sourceId;
-    $.ajax({ type: 'POST', url: endpoint, data: data, dataType: 'json' }).done(function(response) {
+    $.ajax({ type: 'POST', url: adminRequestUrl(endpoint), data: data, dataType: 'json' }).done(function(response) {
       if (!responseOk(response)) { $('#course-copy-feedback').text(responseMessage(response, 'The copy could not be created.')); return; }
       var destination = copyState.courses.find(function(item) { return String(item.id) === destinationCourseId; });
       var sectionTitle = destinationSectionId ? ((destination && destination.sections || []).find(function(item) { return String(item.id) === destinationSectionId; }) || {}).title : 'General';
@@ -623,6 +640,7 @@ $admin_base = rtrim((string) $baseUrl, '/') . '/admin/';
   $(document).on('input.courseManager', '#course-copy-course-search', function() { copyCourses($(this).val()); });
   $(document).on('change.courseManager', '#course-copy-destination-course', updateCopySections);
   $(document).on('click.courseManager', '[data-copy-action="close"]', closeCopyModal);
+  $(document).on('click.courseManager', '#course-copy-retry', loadCopyCourses);
   $(document).on('click.courseManager', '#course-copy-submit', submitCopy);
   $(document).on('input.courseManager change.courseManager', '#lesson-manager-search, #lesson-manager-status, #lesson-manager-type, #lesson-manager-visibility, #lesson-manager-locked', applyFilters);
   $(document).on('click.courseManager', '[data-manager-bulk]', function() {
