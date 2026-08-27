@@ -10,7 +10,7 @@ $handler = file_get_contents($root . '/views/user/requests/revision-plan-progres
 $routes = file_get_contents($root . '/index.php');
 $migration = file_get_contents($root . '/database/migrations/20260827_create_revision_plan_requirement_progress.php');
 
-foreach (['mmh_revision_requirement_is_actionable', "['checklist', 'resource', 'course_item']", 'mmh_revision_assignment_progress', 'mmh_revision_progress_summary', 'mmh_revision_set_requirement_complete', 'mmh_revision_assignment_context'] as $marker) {
+foreach (['mmh_revision_requirement_is_actionable', "['checklist', 'resource', 'course_item', 'upload']", 'mmh_revision_assignment_progress', 'mmh_revision_progress_summary', 'mmh_revision_set_requirement_complete', 'mmh_revision_assignment_context'] as $marker) {
     if (!str_contains($service, $marker)) throw new RuntimeException('Revision progress service contract is missing: ' . $marker);
 }
 foreach (['revision_plan_requirement_progress', 'uq_revision_progress_assignment_requirement', 'fk_revision_progress_assignment', 'fk_revision_progress_requirement'] as $marker) {

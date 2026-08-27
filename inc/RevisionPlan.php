@@ -2,11 +2,11 @@
 declare(strict_types=1);
 
 /**
- * Definition-only Revision Plan domain.
+ * Revision Plan domain services.
  *
  * This service deliberately does not assign plans to students, write Learning
- * Journey state, or handle student submissions. Those concerns belong to the
- * later Revision Plan phases. Recovery Plan tables and services are separate.
+ * Journey state. Revision uploads are kept in their own evidence tables;
+ * Homework/Assignment submissions and Recovery Plan tables remain separate.
  */
 
 if (!function_exists('mmh_revision_schema_available')) {
@@ -368,6 +368,17 @@ if (!function_exists('mmh_revision_save_draft')) {
         $title = trim($title);
         if ($title === '') throw new InvalidArgumentException('Enter a template title.');
         $clean = mmh_revision_validate_structure($conn, (string) $version['course_id'], $versionId, $structure);
+        /* Saving a Draft replaces its structural rows so IDs are intentionally
+         * not stable. Preserve Batch-level material ownership by recording the
+         * old Batch position before the replacement and restoring it onto the
+         * newly-created Batch at the same position. */
+        $resourceBatchPositions = [];
+        $batchPositions = [];
+        foreach ((array) ($version['batches'] ?? []) as $position => $existingBatch) $batchPositions[(int) ($existingBatch['id'] ?? 0)] = (int) $position;
+        foreach ((array) ($version['resources'] ?? []) as $resource) {
+            $oldBatchId = (int) ($resource['batch_id'] ?? 0);
+            if ($oldBatchId > 0 && isset($batchPositions[$oldBatchId])) $resourceBatchPositions[(int) ($resource['id'] ?? 0)] = $batchPositions[$oldBatchId];
+        }
         $conn->begin_transaction();
         try {
             $template = $conn->prepare('UPDATE revision_plan_templates SET title = ?, description = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ? AND status <> \'archived\'');
@@ -384,9 +395,17 @@ if (!function_exists('mmh_revision_save_draft')) {
             $clear = $conn->prepare('DELETE FROM revision_plan_template_batches WHERE version_id = ?');
             if (!$clear) throw new RuntimeException('Unable to replace the Draft Version structure.');
             $clear->bind_param('i', $versionId); if (!$clear->execute()) throw new RuntimeException('Unable to replace the Draft Version structure.'); $clear->close();
-            foreach ($clean['batches'] as $batch) {
+            foreach ($clean['batches'] as $batchPosition => $batch) {
                 $stmt = $conn->prepare('INSERT INTO revision_plan_template_batches (version_id, title, description, suggested_days, sort_order) VALUES (?, ?, ?, ?, ?)');
                 $stmt->bind_param('issii', $versionId, $batch['title'], $batch['description'], $batch['suggested_days'], $batch['sort_order']); if (!$stmt->execute()) throw new RuntimeException('Unable to save a batch.'); $batchId = (int) $stmt->insert_id; $stmt->close();
+                foreach ($resourceBatchPositions as $resourceId => $resourcePosition) {
+                    if ($resourcePosition !== (int) $batchPosition) continue;
+                    $resourceUpdate = $conn->prepare('UPDATE revision_plan_template_resources SET batch_id = ? WHERE id = ? AND version_id = ?');
+                    if (!$resourceUpdate) throw new RuntimeException('Unable to preserve a Batch material association.');
+                    $resourceUpdate->bind_param('iii', $batchId, $resourceId, $versionId);
+                    if (!$resourceUpdate->execute()) throw new RuntimeException('Unable to preserve a Batch material association.');
+                    $resourceUpdate->close();
+                }
                 foreach ($batch['days'] as $day) {
                     $stmt = $conn->prepare('INSERT INTO revision_plan_template_days (batch_id, version_id, day_number, title, description, sort_order) VALUES (?, ?, ?, ?, ?, ?)');
                     $stmt->bind_param('iiissi', $batchId, $versionId, $day['day_number'], $day['title'], $day['description'], $day['sort_order']); if (!$stmt->execute()) throw new RuntimeException('Unable to save a day.'); $dayId = (int) $stmt->insert_id; $stmt->close();
@@ -680,7 +699,8 @@ if (!function_exists('mmh_revision_save_resource')) {
         $version = mmh_revision_version($conn, $versionId); if (!$version || $version['status'] !== 'draft') throw new InvalidArgumentException('Resources can only be changed on a Draft Version.');
         $type = strtolower(trim((string) ($input['resource_type'] ?? ''))); if (!in_array($type, ['uploaded_pdf', 'external_link', 'course_item'], true)) throw new InvalidArgumentException('Choose a supported resource type.');
         $name = mb_substr(trim((string) ($input['display_name'] ?? '')), 0, 180); if ($name === '') throw new InvalidArgumentException('Enter a resource name.');
-        $external = ''; $storage = ''; $original = ''; $mime = ''; $size = 0; $itemId = trim((string) ($input['linked_course_item_id'] ?? ''));
+        $external = ''; $storage = ''; $original = ''; $mime = ''; $size = 0; $itemId = trim((string) ($input['linked_course_item_id'] ?? '')); $batchId = (int) ($input['batch_id'] ?? 0);
+        if ($batchId > 0) { $validBatch = false; foreach ((array) ($version['batches'] ?? []) as $batch) if ((int) ($batch['id'] ?? 0) === $batchId) { $validBatch = true; break; } if (!$validBatch) throw new InvalidArgumentException('Choose a Batch from this Revision Plan.'); }
         if ($type === 'external_link') { $external = trim((string) ($input['external_url'] ?? '')); $parts = parse_url($external); if (!$parts || strtolower((string) ($parts['scheme'] ?? '')) !== 'https' || empty($parts['host']) || preg_match('/[\r\n]/', $external)) throw new InvalidArgumentException('External resources must use a valid HTTPS URL.'); }
         if ($type === 'course_item') {
             $validItem = false;
@@ -696,7 +716,7 @@ if (!function_exists('mmh_revision_save_resource')) {
             $relativeDir = 'storage/private/revision-plans/' . $versionId; $absoluteDir = dirname(__DIR__) . '/' . $relativeDir; if (!is_dir($absoluteDir) && !mkdir($absoluteDir, 0750, true) && !is_dir($absoluteDir)) throw new RuntimeException('The private resource directory could not be created.');
             $stored = bin2hex(random_bytes(20)) . '.pdf'; if (!move_uploaded_file($tmp, $absoluteDir . '/' . $stored)) throw new RuntimeException('The PDF could not be saved securely.'); $storage = $relativeDir . '/' . $stored; $original = mb_substr((string) ($file['name'] ?? 'resource.pdf'), 0, 255); $mime = 'application/pdf'; $size = (int) $file['size'];
         }
-        $stmt = $conn->prepare('INSERT INTO revision_plan_template_resources (version_id, resource_type, display_name, external_url, storage_key, original_filename, mime_type, file_size_bytes, linked_course_item_id, sort_order, created_by) VALUES (?, ?, ?, ?, ?, ?, ?, ?, NULLIF(?, \'\'), ?, ?)'); if (!$stmt) throw new RuntimeException('Unable to save the resource.'); $sort = 0; $max = $conn->prepare('SELECT COALESCE(MAX(sort_order), -1) + 1 AS next_order FROM revision_plan_template_resources WHERE version_id = ?'); if ($max) { $max->bind_param('i', $versionId); $max->execute(); $sort = (int) (($max->get_result()->fetch_assoc()['next_order'] ?? 0)); $max->close(); } $stmt->bind_param('issssssisii', $versionId, $type, $name, $external, $storage, $original, $mime, $size, $itemId, $sort, $adminId); if (!$stmt->execute()) throw new RuntimeException('Unable to save the resource.'); $id = (int) $stmt->insert_id; $stmt->close(); return $id;
+        $stmt = $conn->prepare('INSERT INTO revision_plan_template_resources (version_id, batch_id, resource_type, display_name, external_url, storage_key, original_filename, mime_type, file_size_bytes, linked_course_item_id, sort_order, created_by) VALUES (?, NULLIF(?, 0), ?, ?, ?, ?, ?, ?, ?, NULLIF(?, \'\'), ?, ?)'); if (!$stmt) throw new RuntimeException('Unable to save the resource.'); $sort = 0; $max = $conn->prepare('SELECT COALESCE(MAX(sort_order), -1) + 1 AS next_order FROM revision_plan_template_resources WHERE version_id = ?'); if ($max) { $max->bind_param('i', $versionId); $max->execute(); $sort = (int) (($max->get_result()->fetch_assoc()['next_order'] ?? 0)); $max->close(); } $stmt->bind_param('iissssssisii', $versionId, $batchId, $type, $name, $external, $storage, $original, $mime, $size, $itemId, $sort, $adminId); if (!$stmt->execute()) throw new RuntimeException('Unable to save the resource.'); $id = (int) $stmt->insert_id; $stmt->close(); return $id;
     }
 }
 
@@ -903,7 +923,20 @@ if (!function_exists('mmh_revision_assignment_context')) {
             }
         }
         if ($requirementId !== null && !$foundRequirement) return null;
-        if ($resourceId !== null && (!$resourceRequirement || empty($resources[$resourceId]))) return null;
+        if ($resourceId !== null && empty($resources[$resourceId])) return null;
+        /* A shared Batch material may be intentionally unlinked from a
+         * requirement. It is still protected by the released Batch and the
+         * normal day schedule; it must not require a fabricated requirement
+         * id in the URL. Requirement-linked resources continue through the
+         * stricter relationship check below. */
+        if ($resourceId !== null && !$resourceRequirement) {
+            $resourceBatchId = (int) ($resources[$resourceId]['batch_id'] ?? 0);
+            if ($resourceBatchId <= 0) return null;
+            foreach ($days as $day) {
+                if ((int) ($day['batch_id'] ?? 0) === $resourceBatchId) { $resourceDay = $day; break; }
+            }
+            if (!$resourceDay) return null;
+        }
         if ($requirementId !== null && $resourceId !== null && (int) ($foundRequirement['id'] ?? 0) !== (int) ($resourceRequirement['id'] ?? 0)) return null;
         if ($requirementId === null && $resourceId !== null) { $foundRequirement = $resourceRequirement; $foundDay = $resourceDay; }
         if ($foundDay && empty($foundDay['accessible'])) return null;
@@ -923,11 +956,148 @@ if (!function_exists('mmh_revision_progress_schema_available')) {
     }
 }
 
+if (!function_exists('mmh_revision_submission_schema_available')) {
+    function mmh_revision_submission_schema_available(mysqli $conn): bool
+    {
+        foreach (['revision_plan_requirement_submissions', 'revision_plan_submission_files'] as $table) {
+            $stmt = $conn->prepare("SELECT COUNT(*) AS total FROM INFORMATION_SCHEMA.TABLES WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = ?");
+            if (!$stmt) return false;
+            $stmt->bind_param('s', $table);
+            $stmt->execute();
+            $exists = (int) (($stmt->get_result()->fetch_assoc()['total'] ?? 0)) > 0;
+            $stmt->close();
+            if (!$exists) return false;
+        }
+        return true;
+    }
+}
+
+if (!function_exists('mmh_revision_requirement_submission')) {
+    /** Return a student's owned Revision upload and its files, if present. */
+    function mmh_revision_requirement_submission(mysqli $conn, int $assignmentId, int $studentId, int $requirementId): ?array
+    {
+        if ($assignmentId <= 0 || $studentId <= 0 || $requirementId <= 0 || !mmh_revision_submission_schema_available($conn)) return null;
+        $stmt = $conn->prepare('SELECT s.id, s.assignment_id, s.requirement_id, s.submitted_at, s.updated_at FROM revision_plan_requirement_submissions s INNER JOIN revision_plan_assignments a ON a.id = s.assignment_id AND a.user_id = ? WHERE s.assignment_id = ? AND s.requirement_id = ? LIMIT 1');
+        if (!$stmt) return null;
+        $stmt->bind_param('iii', $studentId, $assignmentId, $requirementId);
+        $stmt->execute();
+        $submission = $stmt->get_result()->fetch_assoc() ?: null;
+        $stmt->close();
+        if (!is_array($submission)) return null;
+        $files = $conn->prepare('SELECT id, original_filename, mime_type, file_size_bytes, sort_order, uploaded_at FROM revision_plan_submission_files WHERE submission_id = ? ORDER BY sort_order ASC, id ASC');
+        if ($files) {
+            $submissionId = (int) $submission['id'];
+            $files->bind_param('i', $submissionId);
+            $files->execute();
+            $submission['files'] = $files->get_result()->fetch_all(MYSQLI_ASSOC);
+            $files->close();
+        } else $submission['files'] = [];
+        return $submission;
+    }
+}
+
+if (!function_exists('mmh_revision_upload_requirement')) {
+    /**
+     * Store one Revision upload (one logical submission with child files) and
+     * satisfy the requirement's existing progress identity.
+     */
+    function mmh_revision_upload_requirement(mysqli $conn, int $assignmentId, int $studentId, int $requirementId, array $rawFiles): array
+    {
+        $context = mmh_revision_assignment_context($conn, $assignmentId, $studentId, $requirementId, null);
+        $requirement = $context['requirement'] ?? null;
+        if (!$context || !is_array($requirement) || strtolower(trim((string) ($requirement['requirement_type'] ?? ''))) !== 'upload') throw new InvalidArgumentException('This upload requirement is not available.');
+        if (!mmh_revision_submission_schema_available($conn) || !mmh_revision_progress_schema_available($conn)) throw new RuntimeException('Revision uploads are temporarily unavailable.');
+
+        $names = is_array($rawFiles['name'] ?? null) ? $rawFiles['name'] : [$rawFiles['name'] ?? ''];
+        $tmpNames = is_array($rawFiles['tmp_name'] ?? null) ? $rawFiles['tmp_name'] : [$rawFiles['tmp_name'] ?? ''];
+        $errors = is_array($rawFiles['error'] ?? null) ? $rawFiles['error'] : [$rawFiles['error'] ?? UPLOAD_ERR_NO_FILE];
+        $sizes = is_array($rawFiles['size'] ?? null) ? $rawFiles['size'] : [$rawFiles['size'] ?? 0];
+        $maxFiles = !empty($requirement['allow_multiple_files']) ? 10 : 1;
+        $maxBytes = 20 * 1024 * 1024;
+        if (count($names) < 1 || count($names) > $maxFiles) throw new InvalidArgumentException('Choose between 1 and ' . $maxFiles . ' PDF files.');
+        $finfo = function_exists('finfo_open') ? finfo_open(FILEINFO_MIME_TYPE) : false;
+        if (!$finfo) throw new RuntimeException('PDF validation is unavailable on this server.');
+        $entries = [];
+        foreach ($names as $index => $name) {
+            $tmp = (string) ($tmpNames[$index] ?? '');
+            $size = (int) ($sizes[$index] ?? 0);
+            $extension = strtolower(pathinfo((string) $name, PATHINFO_EXTENSION));
+            $error = (int) ($errors[$index] ?? UPLOAD_ERR_NO_FILE);
+            if ($error !== UPLOAD_ERR_OK || $tmp === '' || !is_uploaded_file($tmp) || $size <= 0 || $size > $maxBytes || $extension !== 'pdf') { finfo_close($finfo); throw new InvalidArgumentException('Every answer file must be a valid PDF within the upload limit.'); }
+            $mime = strtolower((string) finfo_file($finfo, $tmp));
+            if ($mime !== 'application/pdf') { finfo_close($finfo); throw new InvalidArgumentException('Every answer file must be a valid PDF.'); }
+            $entries[] = ['temporary' => $tmp, 'name' => mb_substr(trim((string) $name), 0, 255), 'mime' => $mime, 'size' => $size, 'sort' => $index];
+        }
+        finfo_close($finfo);
+        $relativeDir = 'storage/private/revision-plan-submissions/' . $assignmentId . '/' . $requirementId;
+        $absoluteDir = dirname(__DIR__) . '/' . $relativeDir;
+        if (!is_dir($absoluteDir) && !mkdir($absoluteDir, 0750, true) && !is_dir($absoluteDir)) throw new RuntimeException('The private upload directory could not be created.');
+        $newPaths = [];
+        foreach ($entries as &$entry) {
+            $relative = $relativeDir . '/' . bin2hex(random_bytes(20)) . '.pdf';
+            $absolute = dirname(__DIR__) . '/' . $relative;
+            if (!move_uploaded_file($entry['temporary'], $absolute)) { foreach ($newPaths as $path) if (is_file($path)) @unlink($path); throw new RuntimeException('The PDF could not be saved securely.'); }
+            $entry['path'] = $relative;
+            $newPaths[] = $absolute;
+        }
+        unset($entry);
+        $oldPaths = [];
+        $conn->begin_transaction();
+        try {
+            $existingStmt = $conn->prepare('SELECT id FROM revision_plan_requirement_submissions WHERE assignment_id = ? AND requirement_id = ? FOR UPDATE');
+            if (!$existingStmt) throw new RuntimeException('Unable to prepare Revision upload replacement.');
+            $existingStmt->bind_param('ii', $assignmentId, $requirementId);
+            $existingStmt->execute();
+            $existing = $existingStmt->get_result()->fetch_assoc() ?: null;
+            $existingStmt->close();
+            if ($existing) {
+                $submissionId = (int) $existing['id'];
+                $oldStmt = $conn->prepare('SELECT file_path FROM revision_plan_submission_files WHERE submission_id = ?');
+                if ($oldStmt) { $oldStmt->bind_param('i', $submissionId); $oldStmt->execute(); $oldResult = $oldStmt->get_result(); while ($row = $oldResult->fetch_assoc()) if (!empty($row['file_path'])) $oldPaths[] = (string) $row['file_path']; $oldStmt->close(); }
+                $deleteFiles = $conn->prepare('DELETE FROM revision_plan_submission_files WHERE submission_id = ?');
+                if (!$deleteFiles) throw new RuntimeException('Unable to replace Revision upload files.');
+                $deleteFiles->bind_param('i', $submissionId);
+                if (!$deleteFiles->execute()) throw new RuntimeException('Unable to replace Revision upload files.');
+                $deleteFiles->close();
+                $touch = $conn->prepare('UPDATE revision_plan_requirement_submissions SET submitted_at = CURRENT_TIMESTAMP, updated_at = CURRENT_TIMESTAMP WHERE id = ?');
+                if (!$touch) throw new RuntimeException('Unable to update Revision upload.'); $touch->bind_param('i', $submissionId); if (!$touch->execute()) throw new RuntimeException('Unable to update Revision upload.'); $touch->close();
+            } else {
+                $insert = $conn->prepare('INSERT INTO revision_plan_requirement_submissions (assignment_id, requirement_id) VALUES (?, ?)');
+                if (!$insert) throw new RuntimeException('Unable to save Revision upload.');
+                $insert->bind_param('ii', $assignmentId, $requirementId);
+                if (!$insert->execute()) throw new RuntimeException('Unable to save Revision upload.');
+                $submissionId = (int) $insert->insert_id;
+                $insert->close();
+            }
+            $fileInsert = $conn->prepare('INSERT INTO revision_plan_submission_files (submission_id, file_path, original_filename, mime_type, file_size_bytes, sort_order) VALUES (?, ?, ?, ?, ?, ?)');
+            if (!$fileInsert) throw new RuntimeException('Unable to save Revision upload files.');
+            foreach ($entries as $entry) { $fileInsert->bind_param('isssii', $submissionId, $entry['path'], $entry['name'], $entry['mime'], $entry['size'], $entry['sort']); if (!$fileInsert->execute()) throw new RuntimeException('Unable to save Revision upload files.'); }
+            $fileInsert->close();
+            $progress = $conn->prepare('INSERT INTO revision_plan_requirement_progress (assignment_id, requirement_id, completed_at) VALUES (?, ?, CURRENT_TIMESTAMP) ON DUPLICATE KEY UPDATE completed_at = CURRENT_TIMESTAMP, updated_at = CURRENT_TIMESTAMP');
+            if (!$progress) throw new RuntimeException('Unable to save Revision upload progress.');
+            $progress->bind_param('ii', $assignmentId, $requirementId);
+            if (!$progress->execute()) throw new RuntimeException('Unable to save Revision upload progress.');
+            $progress->close();
+            $conn->commit();
+        } catch (Throwable $e) {
+            $conn->rollback();
+            foreach ($newPaths as $path) if (is_file($path)) @unlink($path);
+            throw $e;
+        }
+        foreach (array_unique($oldPaths) as $old) {
+            $path = realpath(dirname(__DIR__) . '/' . ltrim($old, '/'));
+            $root = realpath(dirname(__DIR__) . '/storage/private/revision-plan-submissions');
+            if ($path && $root && is_file($path) && str_starts_with(str_replace('\\\\', '/', $path), rtrim(str_replace('\\\\', '/', $root), '/') . '/')) @unlink($path);
+        }
+        return ['submission_id' => $submissionId, 'file_count' => count($entries)];
+    }
+}
+
 if (!function_exists('mmh_revision_requirement_is_actionable')) {
     /** Phase 3B-A supports manual completion for usable checklist/resource/content requirements. */
     function mmh_revision_requirement_is_actionable(array $requirement): bool
     {
-        return in_array(strtolower(trim((string) ($requirement['requirement_type'] ?? ''))), ['checklist', 'resource', 'course_item'], true);
+        return in_array(strtolower(trim((string) ($requirement['requirement_type'] ?? ''))), ['checklist', 'resource', 'course_item', 'upload'], true);
     }
 }
 
@@ -980,6 +1150,7 @@ if (!function_exists('mmh_revision_set_requirement_complete')) {
         $context = mmh_revision_assignment_context($conn, $assignmentId, $studentId, $requirementId, null);
         $requirement = $context['requirement'] ?? null;
         if (!$context || !is_array($requirement) || !mmh_revision_requirement_is_actionable($requirement)) throw new InvalidArgumentException('This Revision Plan requirement is not available.');
+        if (strtolower(trim((string) ($requirement['requirement_type'] ?? ''))) === 'upload') throw new InvalidArgumentException('Upload requirements are completed by submitting a PDF.');
         if (!mmh_revision_progress_schema_available($conn)) throw new RuntimeException('Revision Plan progress is temporarily unavailable.');
         $conn->begin_transaction();
         try {

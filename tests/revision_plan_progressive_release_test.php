@@ -13,7 +13,7 @@ $workflow = file_get_contents($root . '/.github/workflows/deploy.yml');
 foreach (['revision_plan_batch_releases', 'uq_revision_batch_release_position', 'source_version_id', 'source_batch_id'] as $marker) {
     if (!str_contains($migration, $marker)) throw new RuntimeException('Batch release migration contract is missing: ' . $marker);
 }
-foreach (['mmh_revision_batch_release_schema_available', 'mmh_revision_batch_has_content', 'mmh_revision_apply_batch_releases', 'released_at <= UTC_TIMESTAMP()', 'Prepare the first Batch before publishing', 'begin_transaction'] as $marker) {
+foreach (['mmh_revision_batch_release_schema_available', 'mmh_revision_batch_has_content', 'mmh_revision_apply_batch_releases', 'released_at <= UTC_TIMESTAMP()', 'Prepare the first Batch before publishing', 'begin_transaction', 'modify(', 'date_default_timezone_get()'] as $marker) {
     if (!str_contains($service, $marker)) throw new RuntimeException('Progressive release service contract is missing: ' . $marker);
 }
 foreach (['unreleased_batches', 'Coming soon', 'More revision content is on the way'] as $marker) {

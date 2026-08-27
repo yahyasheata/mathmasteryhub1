@@ -475,6 +475,12 @@ $router->mount('/user', function() use ($router) {
         include('views/user/requests/revision-plan-progress.php');
     });
 
+    $router->post('/revision-plan/{assignmentId}/requirement/{requirementId}/upload', function($assignmentId, $requirementId) {
+        require_once '__init.php';
+        if (!isset($_SESSION['username'])) { http_response_code(401); exit('Sign in required.'); }
+        include('views/user/requests/revision-plan-upload.php');
+    });
+
     $router->get('/revision-resource/{assignmentId}/{resourceId}', function($assignmentId, $resourceId) {
         require_once '__init.php';
         if (!isset($_SESSION['username'])) { http_response_code(401); exit('Sign in required.'); }
