@@ -122,6 +122,14 @@ try {
         $redirect(true, 'Revision Plan template archived.', $templateId);
     }
 
+    if ($action === 'delete_template') {
+        if ($templateId <= 0) throw new InvalidArgumentException('Revision Plan not found.');
+        $confirmed = strtoupper(trim((string) ($_POST['delete_confirmation'] ?? ''))) === 'DELETE';
+        $hasActivity = mmh_revision_template_has_student_activity($conn, $templateId);
+        mmh_revision_delete_template($conn, $templateId, !$hasActivity || $confirmed);
+        $redirect(true, 'Revision Plan deleted.');
+    }
+
     if ($action === 'add_resource') {
         $version = mmh_revision_version($conn, $versionId);
         if (!$version) throw new InvalidArgumentException('Version not found.');

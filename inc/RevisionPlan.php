@@ -554,6 +554,119 @@ if (!function_exists('mmh_revision_archive_template')) {
     }
 }
 
+if (!function_exists('mmh_revision_template_has_student_activity')) {
+    /**
+     * Return whether a template has student-facing history that warrants the
+     * destructive confirmation.  This is deliberately a read-only check; the
+     * delete service repeats it while holding the template lock.
+     */
+    function mmh_revision_template_has_student_activity(mysqli $conn, int $templateId): bool
+    {
+        if ($templateId <= 0 || !mmh_revision_assignment_schema_available($conn)) return false;
+        $stmt = $conn->prepare('SELECT COUNT(*) AS total FROM revision_plan_assignments WHERE template_id = ?');
+        if (!$stmt) throw new RuntimeException('Unable to inspect Revision Plan activity.');
+        $stmt->bind_param('i', $templateId);
+        if (!$stmt->execute()) { $stmt->close(); throw new RuntimeException('Unable to inspect Revision Plan activity.'); }
+        $count = (int) (($stmt->get_result()->fetch_assoc()['total'] ?? 0));
+        $stmt->close();
+        return $count > 0;
+    }
+}
+
+if (!function_exists('mmh_revision_delete_template')) {
+    /**
+     * Permanently remove one Revision Plan and only its owned domain rows.
+     * Source course/content rows are never touched.  The database mutation is
+     * one transaction; private uploaded files are cleaned up only after the
+     * transaction commits so a rollback cannot destroy a usable resource.
+     */
+    function mmh_revision_delete_template(mysqli $conn, int $templateId, bool $confirmed = false): void
+    {
+        if ($templateId <= 0) throw new InvalidArgumentException('Revision Plan not found.');
+        if (!mmh_revision_schema_available($conn)) throw new RuntimeException('Revision Plan schema is unavailable.');
+
+        $conn->begin_transaction();
+        $storageKeys = [];
+        try {
+            $lock = $conn->prepare('SELECT id FROM revision_plan_templates WHERE id = ? FOR UPDATE');
+            if (!$lock) throw new RuntimeException('Unable to lock the Revision Plan.');
+            $lock->bind_param('i', $templateId);
+            if (!$lock->execute()) { $lock->close(); throw new RuntimeException('Unable to lock the Revision Plan.'); }
+            $exists = (bool) $lock->get_result()->fetch_assoc();
+            $lock->close();
+            if (!$exists) throw new InvalidArgumentException('Revision Plan not found.');
+
+            $activity = false;
+            if (mmh_revision_assignment_schema_available($conn)) {
+                $check = $conn->prepare('SELECT COUNT(*) AS total FROM revision_plan_assignments WHERE template_id = ?');
+                if (!$check) throw new RuntimeException('Unable to inspect Revision Plan activity.');
+                $check->bind_param('i', $templateId);
+                if (!$check->execute()) { $check->close(); throw new RuntimeException('Unable to inspect Revision Plan activity.'); }
+                $activity = ((int) (($check->get_result()->fetch_assoc()['total'] ?? 0))) > 0;
+                $check->close();
+            }
+            if ($activity && !$confirmed) throw new InvalidArgumentException('Type DELETE to permanently remove a Revision Plan with student activity.');
+
+            // Capture private uploaded resources before deleting their rows.
+            $resources = $conn->prepare('SELECT r.storage_key FROM revision_plan_template_resources r INNER JOIN revision_plan_template_versions v ON v.id = r.version_id WHERE v.template_id = ? AND r.storage_key IS NOT NULL AND r.storage_key <> \'\'');
+            if (!$resources) throw new RuntimeException('Unable to inspect Revision Plan resources.');
+            $resources->bind_param('i', $templateId);
+            if (!$resources->execute()) { $resources->close(); throw new RuntimeException('Unable to inspect Revision Plan resources.'); }
+            $resourceResult = $resources->get_result();
+            while ($row = $resourceResult->fetch_assoc()) { $key = trim((string) ($row['storage_key'] ?? '')); if ($key !== '') $storageKeys[] = $key; }
+            $resources->close();
+
+            $delete = static function (mysqli $db, string $sql, int $id): void {
+                $stmt = $db->prepare($sql);
+                if (!$stmt) throw new RuntimeException('Unable to delete Revision Plan data.');
+                $stmt->bind_param('i', $id);
+                if (!$stmt->execute()) { $stmt->close(); throw new RuntimeException('Unable to delete Revision Plan data.'); }
+                $stmt->close();
+            };
+
+            // Explicit child-first ordering keeps this safe even where FK
+            // cascades differ between older production schemas.
+            if (mmh_revision_progress_schema_available($conn) && mmh_revision_assignment_schema_available($conn)) {
+                $delete($conn, 'DELETE p FROM revision_plan_requirement_progress p INNER JOIN revision_plan_assignments a ON a.id = p.assignment_id WHERE a.template_id = ?', $templateId);
+            }
+            $delete($conn, 'DELETE rr FROM revision_plan_requirement_resources rr INNER JOIN revision_plan_template_requirements r ON r.id = rr.requirement_id INNER JOIN revision_plan_template_versions v ON v.id = r.version_id WHERE v.template_id = ?', $templateId);
+            $delete($conn, 'DELETE r FROM revision_plan_template_requirements r INNER JOIN revision_plan_template_versions v ON v.id = r.version_id WHERE v.template_id = ?', $templateId);
+            $delete($conn, 'DELETE g FROM revision_plan_template_activities g INNER JOIN revision_plan_template_versions v ON v.id = g.version_id WHERE v.template_id = ?', $templateId);
+            $delete($conn, 'DELETE d FROM revision_plan_template_days d INNER JOIN revision_plan_template_versions v ON v.id = d.version_id WHERE v.template_id = ?', $templateId);
+            $delete($conn, 'DELETE r FROM revision_plan_template_resources r INNER JOIN revision_plan_template_versions v ON v.id = r.version_id WHERE v.template_id = ?', $templateId);
+            if (mmh_revision_batch_release_schema_available($conn)) $delete($conn, 'DELETE FROM revision_plan_batch_releases WHERE template_id = ?', $templateId);
+            if (mmh_revision_assignment_schema_available($conn)) $delete($conn, 'DELETE FROM revision_plan_assignments WHERE template_id = ?', $templateId);
+            $delete($conn, 'DELETE b FROM revision_plan_template_batches b INNER JOIN revision_plan_template_versions v ON v.id = b.version_id WHERE v.template_id = ?', $templateId);
+            $delete($conn, 'DELETE FROM revision_plan_template_versions WHERE template_id = ?', $templateId);
+            $delete($conn, 'DELETE FROM revision_plan_templates WHERE id = ?', $templateId);
+            $conn->commit();
+        } catch (Throwable $e) {
+            $conn->rollback();
+            throw $e;
+        }
+
+        // Files are private Revision resources, never shared Course files.
+        $root = realpath(dirname(__DIR__) . '/storage/private/revision-plans');
+        if ($root) {
+            $root = rtrim(str_replace('\\', '/', $root), '/') . '/';
+            foreach (array_unique($storageKeys) as $key) {
+                // A cloned Version may intentionally reference the same
+                // private file.  Never remove a file still referenced by a
+                // surviving Revision resource row.
+                $stillReferenced = $conn->prepare('SELECT COUNT(*) AS total FROM revision_plan_template_resources WHERE storage_key = ?');
+                if (!$stillReferenced) continue;
+                $stillReferenced->bind_param('s', $key);
+                if (!$stillReferenced->execute()) { $stillReferenced->close(); continue; }
+                $inUse = (int) (($stillReferenced->get_result()->fetch_assoc()['total'] ?? 0));
+                $stillReferenced->close();
+                if ($inUse > 0) continue;
+                $path = realpath(dirname(__DIR__) . '/' . ltrim($key, '/'));
+                if ($path && is_file($path) && str_starts_with(str_replace('\\', '/', $path), $root)) @unlink($path);
+            }
+        }
+    }
+}
+
 if (!function_exists('mmh_revision_resource')) {
     function mmh_revision_resource(mysqli $conn, int $resourceId): ?array
     {
