@@ -1,6 +1,7 @@
 <?php
 require_once dirname(__DIR__, 3) . '/connection/config.php';
 require_once dirname(__DIR__, 3) . '/inc/StudentCourseAccess.php';
+require_once dirname(__DIR__, 3) . '/inc/StudentResourceGateway.php';
 require_once dirname(__DIR__, 3) . '/inc/RevisionPlan.php';
 
 $conn = db();
