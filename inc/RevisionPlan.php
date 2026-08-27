@@ -21,6 +21,33 @@ if (!function_exists('mmh_revision_schema_available')) {
     }
 }
 
+if (!function_exists('mmh_revision_batch_release_schema_available')) {
+    function mmh_revision_batch_release_schema_available(mysqli $conn): bool
+    {
+        $stmt = $conn->prepare("SELECT COUNT(*) AS total FROM INFORMATION_SCHEMA.TABLES WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'revision_plan_batch_releases'");
+        if (!$stmt) return false;
+        $stmt->execute();
+        $available = (int) (($stmt->get_result()->fetch_assoc()['total'] ?? 0)) > 0;
+        $stmt->close();
+        return $available;
+    }
+}
+
+if (!function_exists('mmh_revision_batch_has_content')) {
+    /** A batch may remain an empty shell until it is ready for release. */
+    function mmh_revision_batch_has_content(array $batch): bool
+    {
+        foreach ((array) ($batch['days'] ?? []) as $day) {
+            if (!is_array($day)) continue;
+            if (!empty($day['requirements'])) return true;
+            foreach ((array) ($day['activity_groups'] ?? []) as $group) {
+                if (is_array($group) && !empty($group['requirements'])) return true;
+            }
+        }
+        return false;
+    }
+}
+
 if (!function_exists('mmh_revision_course')) {
     function mmh_revision_course(mysqli $conn, string $courseId): ?array
     {
@@ -395,15 +422,79 @@ if (!function_exists('mmh_revision_insert_requirement')) {
 }
 
 if (!function_exists('mmh_revision_publish_version')) {
+    /**
+     * Publish an immutable Version and release each newly prepared contiguous
+     * batch. Existing release rows are never replaced, so later Versions can
+     * add Batch 2 without changing a student's released Batch 1 snapshot.
+     */
     function mmh_revision_publish_version(mysqli $conn, int $versionId, int $adminId): void
     {
         $version = mmh_revision_version($conn, $versionId);
         if (!$version) throw new InvalidArgumentException('Version not found.');
         if ((string) $version['status'] !== 'draft') throw new InvalidArgumentException('Only a Draft Version can be finalized.');
-        $stmt = $conn->prepare("UPDATE revision_plan_template_versions SET status = 'published', published_at = CURRENT_TIMESTAMP, updated_at = CURRENT_TIMESTAMP WHERE id = ? AND status = 'draft'");
-        if (!$stmt) throw new RuntimeException('Unable to finalize the Version.');
-        $stmt->bind_param('i', $versionId); if (!$stmt->execute() || $stmt->affected_rows !== 1) throw new RuntimeException('The Version could not be finalized.'); $stmt->close();
-        $touch = $conn->prepare('UPDATE revision_plan_templates SET updated_at = CURRENT_TIMESTAMP WHERE id = ?'); if ($touch) { $touch->bind_param('i', $version['template_id']); $touch->execute(); $touch->close(); }
+        $conn->begin_transaction();
+        try {
+            $lock = $conn->prepare('SELECT id, status FROM revision_plan_template_versions WHERE id = ? AND template_id = ? FOR UPDATE');
+            if (!$lock) throw new RuntimeException('Unable to lock the Version.');
+            $lock->bind_param('ii', $versionId, $version['template_id']);
+            $lock->execute();
+            $locked = $lock->get_result()->fetch_assoc() ?: null;
+            $lock->close();
+            if (!is_array($locked) || (string) $locked['status'] !== 'draft') throw new InvalidArgumentException('Only a Draft Version can be finalized.');
+            $stmt = $conn->prepare("UPDATE revision_plan_template_versions SET status = 'published', published_at = CURRENT_TIMESTAMP, updated_at = CURRENT_TIMESTAMP WHERE id = ? AND status = 'draft'");
+            if (!$stmt) throw new RuntimeException('Unable to finalize the Version.');
+            $stmt->bind_param('i', $versionId);
+            if (!$stmt->execute() || $stmt->affected_rows !== 1) throw new RuntimeException('The Version could not be finalized.');
+            $stmt->close();
+            if (mmh_revision_batch_release_schema_available($conn)) {
+                $existing = [];
+                $released = $conn->prepare("SELECT batch_position FROM revision_plan_batch_releases WHERE template_id = ? AND status = 'released' FOR UPDATE");
+                if (!$released) throw new RuntimeException('Unable to inspect released Batches.');
+                $released->bind_param('i', $version['template_id']);
+                $released->execute();
+                foreach ($released->get_result()->fetch_all(MYSQLI_ASSOC) as $row) $existing[(int) $row['batch_position']] = true;
+                $released->close();
+                $insert = $conn->prepare("INSERT INTO revision_plan_batch_releases (template_id, source_version_id, source_batch_id, batch_position, released_by) VALUES (?, ?, ?, ?, ?)");
+                if (!$insert) throw new RuntimeException('Unable to prepare Batch release.');
+                $inserted = 0;
+                foreach ((array) ($version['batches'] ?? []) as $position => $batch) {
+                    if (isset($existing[(int) $position])) continue;
+                    if (!mmh_revision_batch_has_content((array) $batch)) break;
+                    $batchId = (int) ($batch['id'] ?? 0);
+                    if ($batchId <= 0) throw new RuntimeException('A Batch could not be released safely.');
+                    $position = (int) $position;
+                    $insert->bind_param('iiiii', $version['template_id'], $versionId, $batchId, $position, $adminId);
+                    if (!$insert->execute()) throw new RuntimeException('Unable to release a Batch.');
+                    $existing[$position] = true;
+                    $inserted++;
+                }
+                $insert->close();
+                if (!$existing && $inserted === 0) throw new InvalidArgumentException('Prepare the first Batch before publishing.');
+            } elseif (!mmh_revision_batch_has_content((array) (($version['batches'] ?? [])[0] ?? []))) {
+                throw new InvalidArgumentException('Prepare the first Batch before publishing.');
+            }
+            $touch = $conn->prepare('UPDATE revision_plan_templates SET updated_at = CURRENT_TIMESTAMP WHERE id = ?');
+            if ($touch) { $touch->bind_param('i', $version['template_id']); $touch->execute(); $touch->close(); }
+            $conn->commit();
+        } catch (Throwable $e) {
+            $conn->rollback();
+            throw $e;
+        }
+    }
+}
+
+if (!function_exists('mmh_revision_batch_release_statuses')) {
+    /** Return released metadata keyed by logical batch position for admin UI. */
+    function mmh_revision_batch_release_statuses(mysqli $conn, int $templateId): array
+    {
+        if ($templateId <= 0 || !mmh_revision_batch_release_schema_available($conn)) return [];
+        $stmt = $conn->prepare("SELECT batch_position, source_version_id, source_batch_id, released_at FROM revision_plan_batch_releases WHERE template_id = ? AND status = 'released' ORDER BY batch_position ASC");
+        if (!$stmt) return [];
+        $stmt->bind_param('i', $templateId); $stmt->execute();
+        $rows = $stmt->get_result()->fetch_all(MYSQLI_ASSOC); $stmt->close();
+        $result = [];
+        foreach ($rows as $row) $result[(int) $row['batch_position']] = $row;
+        return $result;
     }
 }
 
@@ -539,6 +630,75 @@ if (!function_exists('mmh_revision_eligible_students')) {
 }
 
 if (!function_exists('mmh_revision_assignment')) {
+    /** Replace a student's visible Version batches with immutable releases. */
+    function mmh_revision_apply_batch_releases(mysqli $conn, array $assignment, array $version): array
+    {
+        if (!mmh_revision_batch_release_schema_available($conn)) return $version;
+        $templateId = (int) ($assignment['template_id'] ?? $version['template_id'] ?? 0);
+        if ($templateId <= 0) return $version;
+        $stmt = $conn->prepare("SELECT batch_position, source_version_id, source_batch_id, released_at FROM revision_plan_batch_releases WHERE template_id = ? AND status = 'released' AND released_at <= UTC_TIMESTAMP() ORDER BY batch_position ASC");
+        if (!$stmt) return $version;
+        $stmt->bind_param('i', $templateId); $stmt->execute();
+        $releaseRows = $stmt->get_result()->fetch_all(MYSQLI_ASSOC); $stmt->close();
+        // No rows means this is a pre-release plan. Treat its published Version
+        // as fully released so existing students do not lose access.
+        if (!$releaseRows) return $version;
+        $releasedBatches = [];
+        $releasedPositions = [];
+        $resources = [];
+        $baseBatches = [];
+        foreach ((array) ($version['batches'] ?? []) as $position => $batch) $baseBatches[(int) $position] = $batch;
+        $firstReleaseAt = (string) (($releaseRows[0]['released_at'] ?? ''));
+        $publishedAt = (string) ($version['published_at'] ?? '');
+        $legacyMode = $publishedAt !== '' && $firstReleaseAt !== '' && $publishedAt < $firstReleaseAt;
+        if ($legacyMode) foreach ((array) ($version['resources'] ?? []) as $resource) $resources[(int) ($resource['id'] ?? 0)] = $resource;
+        foreach ($releaseRows as $release) {
+            $position = (int) $release['batch_position'];
+            if ($legacyMode && isset($baseBatches[$position]) && mmh_revision_batch_has_content((array) $baseBatches[$position])) {
+                $baseBatch = $baseBatches[$position];
+                $baseBatch['_release_position'] = $position;
+                $releasedBatches[] = $baseBatch;
+                $releasedPositions[$position] = true;
+                continue;
+            }
+            $source = mmh_revision_version($conn, (int) $release['source_version_id']);
+            if (!is_array($source) || (string) ($source['status'] ?? '') !== 'published' || (int) ($source['template_id'] ?? 0) !== $templateId) continue;
+            foreach ((array) ($source['resources'] ?? []) as $resource) $resources[(int) ($resource['id'] ?? 0)] = $resource;
+            foreach ((array) ($source['batches'] ?? []) as $batch) {
+                if ((int) ($batch['id'] ?? 0) !== (int) $release['source_batch_id']) continue;
+                $batch['_release_position'] = $position;
+                $releasedBatches[] = $batch;
+                $releasedPositions[$position] = true;
+                break;
+            }
+        }
+        if ($legacyMode) {
+            foreach ($baseBatches as $position => $baseBatch) {
+                if (isset($releasedPositions[$position]) || !mmh_revision_batch_has_content((array) $baseBatch)) continue;
+                $baseBatch['_release_position'] = $position;
+                $releasedBatches[] = $baseBatch;
+                $releasedPositions[$position] = true;
+            }
+        }
+        if (!$releasedBatches) return $version;
+        usort($releasedBatches, static fn(array $a, array $b): int => ((int) ($a['_release_position'] ?? 0)) <=> ((int) ($b['_release_position'] ?? 0)));
+        $latestPublished = null;
+        $latest = $conn->prepare("SELECT id FROM revision_plan_template_versions WHERE template_id = ? AND status = 'published' ORDER BY version_number DESC, id DESC LIMIT 1");
+        if ($latest) { $latest->bind_param('i', $templateId); $latest->execute(); $latestId = (int) (($latest->get_result()->fetch_assoc()['id'] ?? 0)); $latest->close(); if ($latestId > 0) $latestPublished = mmh_revision_version($conn, $latestId); }
+        $shellSource = is_array($latestPublished) ? $latestPublished : $version;
+        $unreleased = [];
+        foreach ((array) ($shellSource['batches'] ?? []) as $position => $batch) {
+            if (!isset($releasedPositions[(int) $position])) {
+                $batch['_release_position'] = (int) $position;
+                $unreleased[] = $batch;
+            }
+        }
+        $version['batches'] = $releasedBatches;
+        $version['unreleased_batches'] = $unreleased;
+        $version['resources'] = array_values($resources);
+        return $version;
+    }
+
     function mmh_revision_assignment(mysqli $conn, int $assignmentId, int $studentId = 0): ?array
     {
         if ($assignmentId <= 0 || !mmh_revision_assignment_schema_available($conn)) return null;
@@ -561,6 +721,7 @@ if (!function_exists('mmh_revision_assignment')) {
         $stmt->close();
         if (!is_array($row)) return null;
         $row['version'] = mmh_revision_version($conn, (int) $row['template_version_id']);
+        if (is_array($row['version'])) $row['version'] = mmh_revision_apply_batch_releases($conn, $row, $row['version']);
         return $row;
     }
 }
@@ -662,7 +823,10 @@ if (!function_exists('mmh_revision_assignment_progress')) {
     function mmh_revision_assignment_progress(mysqli $conn, int $assignmentId, int $studentId): array
     {
         if ($assignmentId <= 0 || $studentId <= 0 || !mmh_revision_progress_schema_available($conn)) return [];
-        $stmt = $conn->prepare('SELECT p.requirement_id, p.completed_at FROM revision_plan_requirement_progress p INNER JOIN revision_plan_assignments a ON a.id = p.assignment_id AND a.user_id = ? INNER JOIN revision_plan_template_requirements r ON r.id = p.requirement_id AND r.version_id = a.template_version_id WHERE p.assignment_id = ? ORDER BY p.requirement_id ASC');
+        // Requirements may come from different immutable source Versions as
+        // Batches are released over time; the assignment/context checks below
+        // remain the authorization boundary.
+        $stmt = $conn->prepare('SELECT p.requirement_id, p.completed_at FROM revision_plan_requirement_progress p INNER JOIN revision_plan_assignments a ON a.id = p.assignment_id AND a.user_id = ? WHERE p.assignment_id = ? ORDER BY p.requirement_id ASC');
         if (!$stmt) return [];
         $stmt->bind_param('ii', $studentId, $assignmentId);
         if (!$stmt->execute()) { $stmt->close(); return []; }

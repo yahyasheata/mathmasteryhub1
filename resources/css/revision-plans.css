@@ -63,6 +63,8 @@
   .revision-resource-links{width:100%}
 }
 
+.revision-coming-soon{display:flex;align-items:center;justify-content:space-between;gap:18px;margin:0 0 18px;padding:14px 0;border-bottom:1px solid var(--border);color:var(--text-secondary)}.revision-coming-soon strong{display:block;margin-top:3px;color:var(--text-primary);font-size:.95rem}.revision-coming-soon p{margin:3px 0 0;font-size:.8rem}.revision-coming-soon-list{display:flex;flex-wrap:wrap;justify-content:flex-end;gap:7px}.revision-coming-soon-list span{display:inline-flex;align-items:center;gap:6px;padding:6px 9px;border-radius:999px;background:var(--surface-hover);font-size:.75rem;font-weight:700}.revision-lock-mark{display:inline-block;position:relative;width:9px;height:8px;border:1.5px solid var(--text-muted);border-radius:2px}.revision-lock-mark::before{content:"";position:absolute;left:1px;top:-6px;width:5px;height:6px;border:1.5px solid var(--text-muted);border-bottom:0;border-radius:5px 5px 0 0}@media(max-width:780px){.revision-coming-soon{display:grid;gap:10px}.revision-coming-soon-list{justify-content:flex-start}}
+
 /* Lightweight state markers avoid font glyph fallbacks in the day navigator. */
 .revision-day-state{display:inline-block;position:relative;flex:0 0 auto;width:9px;height:9px;border:1px solid var(--border-strong);border-radius:50%;background:transparent}
 .revision-day-state.is-neutral{background:var(--border-strong)}

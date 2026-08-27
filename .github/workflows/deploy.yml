@@ -60,6 +60,7 @@ jobs:
             php database/migrations/20260826_create_revision_plan_templates.php
             php database/migrations/20260827_create_revision_plan_assignments.php
             php database/migrations/20260827_create_revision_plan_requirement_progress.php
+            php database/migrations/20260827_create_revision_plan_batch_releases.php
             php database/migrations/20260804_create_timed_exams.php
             php database/migrations/20260805_add_timed_exam_external_paper.php
             php database/migrations/20260810_timed_exam_drive_only.php

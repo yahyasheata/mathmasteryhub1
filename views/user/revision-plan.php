@@ -15,6 +15,10 @@ $context = $userId > 0 ? mmh_revision_assignment_context($conn, $assignmentId, (
 if (!$context) { http_response_code(404); exit('Revision Plan not found.'); }
 $assignment = $context['assignment'];
 $days = array_values((array) ($context['days'] ?? []));
+$unreleasedBatches = array_values((array) ($assignment['version']['unreleased_batches'] ?? []));
+$unreleasedDayCount = 0;
+foreach ($unreleasedBatches as $batch) $unreleasedDayCount += count((array) ($batch['days'] ?? []));
+$totalPlannedDays = count($days) + $unreleasedDayCount;
 $progress = mmh_revision_assignment_progress($conn, $assignmentId, (int) $userId);
 $progressSummary = mmh_revision_progress_summary($days, $progress);
 $progressFlash = $_SESSION['revision_plan_progress_flash'] ?? null;
@@ -76,7 +80,7 @@ $selectedAvailable = is_array($selectedDay) && !empty($selectedDay['accessible']
             <a class="revision-student-back" href="<?= $esc($base . '/user/revision-plans') ?>"><span class="fas fa-arrow-left" aria-hidden="true"></span> Your Plans</a>
             <span class="revision-student-eyebrow"><?= $esc($assignment['course_title']) ?></span>
             <h1><?= $esc($assignment['title']) ?></h1>
-            <p>Day <?= $selectedDayNumber ?> of <?= count($days) ?> · <?= is_array($selectedDay) ? $esc(date('l, j M', strtotime((string) $selectedDay['scheduled_date']))) : $esc(date('j M', strtotime((string) $assignment['start_date']))) ?></p>
+            <p>Day <?= $selectedDayNumber ?> of <?= max(count($days), $totalPlannedDays) ?> · <?= is_array($selectedDay) ? $esc(date('l, j M', strtotime((string) $selectedDay['scheduled_date']))) : $esc(date('j M', strtotime((string) $assignment['start_date']))) ?></p>
         </div>
         <div class="container p-0"><div class="col-12 row user-menu"><nav class="navbar navbar-expand-lg navbar-light ds-surface-muted"><div class="container-fluid p-0"><?php include 'layouts/user/main-nav.php'; ?></div></nav></div></div>
     </header>
@@ -86,6 +90,7 @@ $selectedAvailable = is_array($selectedDay) && !empty($selectedDay['accessible']
             <div class="revision-progress-heading"><span class="revision-student-card-kicker">Overall progress</span><h2 id="revision-progress-title"><?= (int) $progressSummary['percentage'] ?>%</h2></div>
             <div class="revision-progress-meter-wrap"><div class="revision-progress-meter" role="progressbar" aria-label="Overall revision plan progress" aria-valuemin="0" aria-valuemax="100" aria-valuenow="<?= (int) $progressSummary['percentage'] ?>"><span style="width: <?= (int) $progressSummary['percentage'] ?>%"></span></div><p><?= (int) $progressSummary['completed'] ?> of <?= (int) $progressSummary['total'] ?> tasks completed</p></div>
         </section>
+        <?php if ($unreleasedBatches): ?><section class="revision-coming-soon" aria-label="Upcoming revision batches"><div><span class="revision-student-card-kicker">Coming soon</span><strong>More revision content is on the way</strong><p>Future Batches will appear here when they are released.</p></div><div class="revision-coming-soon-list"><?php foreach ($unreleasedBatches as $batch): ?><span><i class="revision-lock-mark" aria-hidden="true"></i><?= $esc($batch['title'] ?? 'Upcoming Batch') ?> · <?= count((array) ($batch['days'] ?? [])) ?> <?= count((array) ($batch['days'] ?? [])) === 1 ? 'day' : 'days' ?></span><?php endforeach; ?></div></section><?php endif; ?>
         <nav class="revision-day-nav" aria-label="Revision plan days">
             <?php foreach ($days as $day): $number = (int) ($day['absolute_day_number'] ?? 0); $availability = (string) ($day['availability'] ?? 'upcoming'); $accessible = !empty($day['accessible']); $dayProgress = $progressSummary['days'][$number] ?? ['completed' => 0, 'total' => 0]; $completeDay = $accessible && $dayProgress['total'] > 0 && $dayProgress['completed'] >= $dayProgress['total']; $state = $availability === 'today' ? 'Today' : ($availability === 'previous' ? 'Previous' : ($availability === 'upcoming' ? 'Upcoming' : 'Locked')); $stateClass = !$accessible ? 'is-locked' : ($completeDay ? 'is-complete' : ($availability === 'today' ? 'is-today' : 'is-neutral')); ?>
                 <a class="revision-day-tab <?= $number === $selectedDayNumber ? 'is-selected' : '' ?> <?= !$accessible ? 'is-locked' : '' ?>" href="<?= $esc($base . '/user/revision-plan/' . $assignmentId . '?day=' . $number) ?>" <?= $number === $selectedDayNumber ? 'aria-current="page"' : '' ?> title="<?= $esc($state) ?>"><span class="revision-day-state <?= $stateClass ?>" aria-hidden="true"></span><span>Day <?= $number ?></span><small><?= $esc($state) ?></small></a>
