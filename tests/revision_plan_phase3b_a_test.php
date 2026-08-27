@@ -16,7 +16,7 @@ foreach (['mmh_revision_requirement_is_actionable', "['checklist', 'resource', '
 foreach (['revision_plan_requirement_progress', 'uq_revision_progress_assignment_requirement', 'fk_revision_progress_assignment', 'fk_revision_progress_requirement'] as $marker) {
     if (!str_contains($migration, $marker)) throw new RuntimeException('Revision progress migration contract is missing: ' . $marker);
 }
-foreach (['Mark Done', 'Completed · Undo', 'Overall progress', 'tasks completed', 'Open Course Item', 'revision-day-nav', 'revision-selected-day'] as $marker) {
+foreach (['Mark Done', 'Completed · Undo', 'Overall progress', 'tasks completed', 'Open content', 'revision-day-nav', 'revision-selected-day'] as $marker) {
     if (!str_contains($student, $marker)) throw new RuntimeException('Student completion UI is missing: ' . $marker);
 }
 foreach (['csrf_token', "['complete', 'undo']", 'mmh_revision_set_requirement_complete', '303'] as $marker) {
@@ -24,5 +24,6 @@ foreach (['csrf_token', "['complete', 'undo']", 'mmh_revision_set_requirement_co
 }
 if (!str_contains($routes, '/revision-plan/{assignmentId}/requirement/{requirementId}/completion')) throw new RuntimeException('Completion route is missing.');
 if (str_contains($student, 'Read-only checklist') || str_contains($student, 'Read-only revision plan')) throw new RuntimeException('Obsolete read-only wording remains.');
+if (str_contains($student, 'revision-day-tab-icon') || str_contains($student, 'fa-calendar-day')) throw new RuntimeException('Day navigator must not depend on fragile icon-font glyphs.');
 if (str_contains($student, 'StudentLearningJourney') || str_contains($student, 'course_item_progress') || str_contains($student, 'student_learning_evidence')) throw new RuntimeException('Student Revision view must not write canonical Learning Journey state.');
 echo "revision_plan_phase3b_a=checklist_course_item_progress=protected_no_lj_writes=present\n";

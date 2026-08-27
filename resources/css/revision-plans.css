@@ -22,8 +22,6 @@
 .revision-day-tab:hover,.revision-day-tab:focus-visible{color:var(--text-primary);background:var(--surface-hover)}
 .revision-day-tab.is-selected{color:var(--text-primary);border-bottom-color:var(--primary);background:color-mix(in srgb,var(--primary) 7%,var(--surface))}
 .revision-day-tab.is-locked{color:var(--text-muted)}
-.revision-day-tab-icon{font-size:.78rem;color:var(--primary)}
-.revision-day-tab.is-locked .revision-day-tab-icon{color:var(--text-muted)}
 .revision-day-tab small{font-size:.72rem;font-weight:700;color:var(--text-muted)}
 .revision-selected-day{padding:26px 30px 30px;border:1px solid var(--border);border-radius:var(--radius-lg);background:var(--surface);box-shadow:var(--shadow-sm)}
 .revision-selected-day.is-locked{background:color-mix(in srgb,var(--surface-hover) 35%,var(--surface))}
@@ -63,4 +61,27 @@
   .revision-requirement-action,.revision-requirement-actions,.revision-requirement-actions form,.revision-plan-workspace .student-dashboard-btn{width:100%}
   .revision-requirement-actions{display:grid}
   .revision-resource-links{width:100%}
+}
+
+/* Lightweight state markers avoid font glyph fallbacks in the day navigator. */
+.revision-day-state{display:inline-block;position:relative;flex:0 0 auto;width:9px;height:9px;border:1px solid var(--border-strong);border-radius:50%;background:transparent}
+.revision-day-state.is-neutral{background:var(--border-strong)}
+.revision-day-state.is-today{width:10px;height:10px;border-color:var(--primary);background:var(--primary);box-shadow:0 0 0 3px color-mix(in srgb,var(--primary) 18%,transparent)}
+.revision-day-state.is-complete{width:14px;height:14px;border:0;border-radius:50%;background:var(--success)}
+.revision-day-state.is-complete::after{content:"";position:absolute;left:4px;top:2px;width:4px;height:7px;border:solid #fff;border-width:0 2px 2px 0;transform:rotate(45deg)}
+.revision-day-state.is-locked{width:13px;height:10px;border:2px solid var(--text-muted);border-radius:2px;background:transparent;margin-top:3px}
+.revision-day-state.is-locked::before{content:"";position:absolute;left:1px;top:-8px;width:7px;height:8px;border:2px solid var(--text-muted);border-bottom:0;border-radius:7px 7px 0 0}
+.revision-plan-workspace .revision-student-header{background:transparent;border-bottom:0;margin-bottom:18px}
+.revision-plan-workspace .revision-progress-summary{padding:8px 0 14px;border:0;border-bottom:1px solid var(--border);border-radius:0;background:transparent}
+.revision-plan-workspace .revision-day-nav{margin-bottom:18px;border-bottom:1px solid var(--border)}
+.revision-plan-workspace .revision-day-tab.is-selected{background:transparent}
+.revision-plan-workspace .revision-selected-day{padding:4px 0 12px;border:0;border-radius:0;background:transparent;box-shadow:none}
+.revision-plan-workspace .revision-selected-day.is-locked{background:transparent}
+.revision-plan-workspace .revision-selected-day-header{padding-bottom:16px}
+.revision-plan-workspace .revision-student-requirement{padding:19px 0}
+@media(max-width:780px){
+  .revision-plan-workspace .revision-student-header{margin-bottom:12px}
+  .revision-plan-workspace .revision-progress-summary{padding-bottom:12px}
+  .revision-plan-workspace .revision-day-nav{margin-bottom:12px}
+  .revision-plan-workspace .revision-selected-day-header{padding-bottom:12px}
 }
