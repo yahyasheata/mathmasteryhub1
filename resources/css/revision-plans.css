@@ -1,5 +1,66 @@
-.revision-student-page{max-width:1180px;margin:0 auto;padding:28px 16px 60px;color:var(--text-primary)}
+.revision-student-page{width:min(100%,1440px);max-width:none;margin:0 auto;padding:28px 24px 60px;color:var(--text-primary)}
 .revision-student-header{margin:-28px -16px 24px;padding:28px 16px 0;background:var(--surface-muted);border-bottom:1px solid var(--border)}
 .revision-student-header h1{margin:.25rem 0 .4rem}.revision-student-header p{color:var(--text-secondary);max-width:720px}.revision-student-eyebrow,.revision-student-card-kicker{display:block;color:var(--primary);font-size:.72rem;font-weight:800;letter-spacing:.08em;text-transform:uppercase}.revision-student-back{display:inline-flex;gap:7px;color:var(--text-secondary);text-decoration:none;margin-bottom:14px}.revision-student-shell{padding-top:8px}.revision-student-grid{display:grid;gap:12px}.revision-student-card{display:flex;align-items:center;justify-content:space-between;gap:18px;padding:18px;border:1px solid var(--border);border-radius:var(--radius-lg);background:var(--surface);box-shadow:var(--shadow-sm)}.revision-student-card h2{font-size:1.1rem;margin:.35rem 0}.revision-student-card p{margin:0;color:var(--text-muted);font-size:.82rem}.revision-student-empty{padding:48px 20px;text-align:center;border:1px dashed var(--border);border-radius:var(--radius-lg);background:var(--surface)}.revision-student-empty>span{font-size:2rem;color:var(--primary)}.revision-student-empty h2{margin:.8rem 0 .4rem}.revision-student-empty p{color:var(--text-secondary)}.revision-student-empty.small{padding:22px}.revision-plan-timeline{display:grid;grid-template-columns:245px minmax(0,1fr);gap:16px;align-items:start}.revision-day-list{position:sticky;top:78px;padding:14px;border:1px solid var(--border);border-radius:var(--radius-lg);background:var(--surface)}.revision-day-list h2{font-size:.95rem;margin:0 0 10px}.revision-day-link{display:block;padding:10px;border-radius:var(--radius-md);color:var(--text-primary);text-decoration:none}.revision-day-link:hover,.revision-day-link.is-today{background:color-mix(in srgb,var(--primary) 10%,var(--surface))}.revision-day-link.is-locked{opacity:.6}.revision-day-link span,.revision-day-link small{display:block}.revision-day-link small{color:var(--text-muted);font-size:.73rem;margin-top:3px}.revision-day-content{display:grid;gap:14px}.revision-day-panel{padding:18px;border:1px solid var(--border);border-radius:var(--radius-lg);background:var(--surface)}.revision-day-panel.is-today{border-color:color-mix(in srgb,var(--primary) 55%,var(--border))}.revision-day-panel.is-locked{opacity:.82}.revision-day-panel>header{display:flex;align-items:flex-start;justify-content:space-between;gap:14px;margin-bottom:14px}.revision-day-panel h2{font-size:1.1rem;margin:.35rem 0}.revision-day-panel header p{margin:0;color:var(--text-muted);font-size:.8rem}.revision-day-status{padding:5px 9px;border-radius:999px;background:var(--surface-hover);font-size:.72rem;font-weight:800}.revision-day-panel.is-today .revision-day-status{color:var(--primary)}.revision-requirement-list{display:grid;gap:9px}.revision-student-requirement{display:flex;align-items:center;justify-content:space-between;gap:14px;padding:13px;border:1px solid var(--border);border-radius:var(--radius-md);background:var(--surface-elevated)}.revision-student-requirement h3{font-size:.93rem;margin:.35rem 0}.revision-student-requirement p{white-space:pre-wrap;color:var(--text-secondary);font-size:.82rem;margin:.35rem 0}.revision-student-requirement small,.revision-requirement-type,.revision-later-note{color:var(--text-muted);font-size:.73rem}.revision-requirement-type{font-weight:800;text-transform:uppercase;letter-spacing:.05em}.revision-requirement-action{display:flex;justify-content:flex-end;min-width:170px}.revision-resource-links{display:grid;gap:6px}.revision-locked-note{padding:14px;border-radius:var(--radius-md);background:color-mix(in srgb,var(--surface-hover) 70%,transparent);color:var(--text-secondary)}.revision-locked-note span{margin-right:7px;color:var(--text-muted)}
 .revision-progress-summary{display:flex;align-items:center;justify-content:space-between;gap:16px;margin:0 0 16px;padding:16px 18px;border:1px solid color-mix(in srgb,var(--primary) 30%,var(--border));border-radius:var(--radius-lg);background:color-mix(in srgb,var(--primary) 7%,var(--surface))}.revision-progress-summary h2{margin:4px 0;color:var(--text-primary);font-size:1.05rem}.revision-progress-summary p{margin:0;color:var(--text-secondary);font-size:.82rem}.revision-progress-summary>strong{color:var(--primary);font-size:1.45rem}.revision-progress-flash{margin:0 0 12px;padding:10px 13px;border-radius:var(--radius-md);font-size:.82rem;font-weight:700}.revision-progress-flash.is-success{background:color-mix(in srgb,var(--success) 13%,var(--surface));color:var(--success)}.revision-progress-flash.is-error{background:color-mix(in srgb,var(--danger) 13%,var(--surface));color:var(--danger)}.revision-requirement-actions{display:flex;justify-content:flex-end;gap:7px;flex-wrap:wrap}.revision-requirement-actions form{margin:0}.revision-student-requirement.is-complete{border-color:color-mix(in srgb,var(--success) 40%,var(--border))}.revision-student-requirement.is-complete h3{text-decoration:line-through;text-decoration-thickness:1px;text-decoration-color:var(--text-muted)}
 @media(max-width:780px){.revision-student-card,.revision-student-requirement{align-items:flex-start;flex-direction:column}.revision-student-card .student-dashboard-btn,.revision-requirement-action{width:100%;min-width:0}.revision-requirement-actions{width:100%;display:grid}.revision-requirement-actions .student-dashboard-btn,.revision-requirement-actions form{width:100%}.revision-requirement-actions form .student-dashboard-btn{width:100%}.revision-plan-timeline{grid-template-columns:1fr}.revision-day-list{position:static;display:flex;gap:7px;overflow:auto}.revision-day-list h2{display:none}.revision-day-link{min-width:120px}.revision-day-panel>header{flex-direction:column}}
+
+/* Student workspace: keep the day's work in focus instead of rendering a dashboard. */
+.revision-plan-workspace .revision-student-page{width:min(100%,1440px);padding:28px 24px 64px}
+.revision-plan-workspace .revision-student-header{margin:-28px -24px 28px;padding:24px 24px 0}
+.revision-student-header-inner{width:min(100%,1360px);margin:0 auto}
+.revision-plan-workspace .revision-student-header h1{font-size:clamp(1.55rem,2vw,2.15rem);letter-spacing:-.02em}
+.revision-plan-workspace .revision-student-header p{margin-bottom:20px}
+.revision-plan-workspace .revision-student-shell{width:min(100%,1360px);max-width:none;margin:0 auto;padding:0}
+.revision-plan-workspace .revision-progress-summary{display:grid;grid-template-columns:140px minmax(0,1fr);align-items:center;gap:24px;padding:18px 22px;margin-bottom:16px;border:1px solid var(--border);background:var(--surface);box-shadow:none}
+.revision-progress-heading h2{margin:4px 0 0;font-size:1.65rem;line-height:1;color:var(--text-primary)}
+.revision-progress-meter-wrap{min-width:0}
+.revision-progress-meter{height:9px;border-radius:999px;background:var(--surface-hover);overflow:hidden}
+.revision-progress-meter span{display:block;height:100%;border-radius:inherit;background:var(--primary);transition:width .2s ease}
+.revision-progress-meter-wrap p{margin:8px 0 0;color:var(--text-secondary);font-size:.82rem}
+.revision-plan-workspace .revision-day-nav{display:flex;gap:4px;align-items:stretch;overflow-x:auto;scrollbar-width:thin;padding:0 0 2px;margin:0 0 22px;border-bottom:1px solid var(--border)}
+.revision-day-tab{position:relative;display:inline-flex;flex:0 0 auto;align-items:center;gap:7px;padding:11px 14px;color:var(--text-secondary);text-decoration:none;font-weight:800;white-space:nowrap;border-bottom:3px solid transparent;transition:color var(--transition-fast),background var(--transition-fast),border-color var(--transition-fast)}
+.revision-day-tab:hover,.revision-day-tab:focus-visible{color:var(--text-primary);background:var(--surface-hover)}
+.revision-day-tab.is-selected{color:var(--text-primary);border-bottom-color:var(--primary);background:color-mix(in srgb,var(--primary) 7%,var(--surface))}
+.revision-day-tab.is-locked{color:var(--text-muted)}
+.revision-day-tab-icon{font-size:.78rem;color:var(--primary)}
+.revision-day-tab.is-locked .revision-day-tab-icon{color:var(--text-muted)}
+.revision-day-tab small{font-size:.72rem;font-weight:700;color:var(--text-muted)}
+.revision-selected-day{padding:26px 30px 30px;border:1px solid var(--border);border-radius:var(--radius-lg);background:var(--surface);box-shadow:var(--shadow-sm)}
+.revision-selected-day.is-locked{background:color-mix(in srgb,var(--surface-hover) 35%,var(--surface))}
+.revision-selected-day-header{display:flex;align-items:flex-start;justify-content:space-between;gap:18px;padding-bottom:20px;border-bottom:1px solid var(--border)}
+.revision-selected-day-header h2{margin:5px 0 3px;font-size:clamp(1.35rem,2vw,1.85rem);letter-spacing:-.02em}
+.revision-selected-day-header p{margin:0;color:var(--text-secondary)}
+.revision-selected-day-progress{flex:0 0 auto;padding:7px 10px;border-radius:999px;background:color-mix(in srgb,var(--primary) 12%,var(--surface));color:var(--primary);font-size:.78rem;font-weight:800}
+.revision-student-requirement{display:flex;align-items:center;justify-content:space-between;gap:26px;padding:20px 0;border:0;border-bottom:1px solid var(--border);border-radius:0;background:transparent}
+.revision-student-requirement:last-child{border-bottom:0;padding-bottom:4px}
+.revision-task-copy{min-width:0;flex:1}
+.revision-task-meta{display:flex;align-items:center;gap:9px;flex-wrap:wrap}
+.revision-task-optional{color:var(--text-muted);font-size:.72rem;font-weight:700}
+.revision-student-requirement h3{margin:6px 0 4px;font-size:1.05rem}
+.revision-student-requirement p{max-width:760px;margin:0;color:var(--text-secondary);line-height:1.5}
+.revision-requirement-action{flex:0 0 auto;min-width:0}
+.revision-requirement-actions{align-items:center}
+.revision-plan-workspace .student-dashboard-btn{min-height:42px;border-radius:var(--radius-md);font-weight:800;white-space:nowrap}
+.revision-plan-workspace .student-dashboard-btn.primary{box-shadow:0 5px 14px color-mix(in srgb,var(--primary) 22%,transparent)}
+.revision-plan-workspace .student-dashboard-btn.primary:hover,.revision-plan-workspace .student-dashboard-btn.primary:focus-visible{transform:translateY(-1px)}
+.revision-plan-workspace .is-complete-action{color:var(--success);border-color:color-mix(in srgb,var(--success) 45%,var(--border));background:color-mix(in srgb,var(--success) 9%,var(--surface))}
+.revision-plan-workspace .revision-student-requirement.is-complete h3{text-decoration:none;color:var(--text-secondary)}
+.revision-plan-workspace .revision-locked-note{display:flex;align-items:flex-start;gap:12px;margin-top:22px;padding:18px;border:1px solid var(--border);background:var(--surface-hover);color:var(--text-secondary)}
+.revision-plan-workspace .revision-locked-note>span{margin-top:3px;color:var(--primary)}
+.revision-plan-workspace .revision-locked-note strong{display:block;color:var(--text-primary);font-size:1rem}
+.revision-plan-workspace .revision-locked-note p{margin:4px 0 0;color:var(--text-secondary)}
+@media(max-width:780px){
+  .revision-plan-workspace .revision-student-page{padding:18px 14px 42px}
+  .revision-plan-workspace .revision-student-header{margin:-18px -14px 20px;padding:18px 14px 0}
+  .revision-plan-workspace .revision-progress-summary{grid-template-columns:1fr;gap:12px;padding:16px;margin-bottom:12px}
+  .revision-progress-heading{display:flex;align-items:baseline;justify-content:space-between;gap:12px}
+  .revision-progress-heading h2{font-size:1.45rem}
+  .revision-plan-workspace .revision-day-nav{margin-bottom:16px}
+  .revision-day-tab{padding:10px 12px;font-size:.9rem}
+  .revision-selected-day{padding:20px 16px 22px;border-radius:var(--radius-md)}
+  .revision-selected-day-header{padding-bottom:16px}
+  .revision-student-requirement{align-items:flex-start;flex-direction:column;gap:14px;padding:18px 0}
+  .revision-requirement-action,.revision-requirement-actions,.revision-requirement-actions form,.revision-plan-workspace .student-dashboard-btn{width:100%}
+  .revision-requirement-actions{display:grid}
+  .revision-resource-links{width:100%}
+}
