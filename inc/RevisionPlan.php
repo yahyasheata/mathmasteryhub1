@@ -637,6 +637,91 @@ if (!function_exists('mmh_revision_assignment_context')) {
     }
 }
 
+if (!function_exists('mmh_revision_progress_schema_available')) {
+    function mmh_revision_progress_schema_available(mysqli $conn): bool
+    {
+        $stmt = $conn->prepare("SELECT COUNT(*) AS total FROM INFORMATION_SCHEMA.TABLES WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'revision_plan_requirement_progress'");
+        if (!$stmt) return false;
+        $stmt->execute();
+        $available = (int) (($stmt->get_result()->fetch_assoc()['total'] ?? 0)) > 0;
+        $stmt->close();
+        return $available;
+    }
+}
+
+if (!function_exists('mmh_revision_requirement_is_actionable')) {
+    /** Phase 3B-A supports manual completion for usable checklist/resource/content requirements. */
+    function mmh_revision_requirement_is_actionable(array $requirement): bool
+    {
+        return in_array(strtolower(trim((string) ($requirement['requirement_type'] ?? ''))), ['checklist', 'resource', 'course_item'], true);
+    }
+}
+
+if (!function_exists('mmh_revision_assignment_progress')) {
+    /** Return only completion rows belonging to this student-owned assignment. */
+    function mmh_revision_assignment_progress(mysqli $conn, int $assignmentId, int $studentId): array
+    {
+        if ($assignmentId <= 0 || $studentId <= 0 || !mmh_revision_progress_schema_available($conn)) return [];
+        $stmt = $conn->prepare('SELECT p.requirement_id, p.completed_at FROM revision_plan_requirement_progress p INNER JOIN revision_plan_assignments a ON a.id = p.assignment_id AND a.user_id = ? INNER JOIN revision_plan_template_requirements r ON r.id = p.requirement_id AND r.version_id = a.template_version_id WHERE p.assignment_id = ? ORDER BY p.requirement_id ASC');
+        if (!$stmt) return [];
+        $stmt->bind_param('ii', $studentId, $assignmentId);
+        if (!$stmt->execute()) { $stmt->close(); return []; }
+        $rows = $stmt->get_result()->fetch_all(MYSQLI_ASSOC);
+        $stmt->close();
+        $progress = [];
+        foreach ($rows as $row) $progress[(int) $row['requirement_id']] = (string) $row['completed_at'];
+        return $progress;
+    }
+}
+
+if (!function_exists('mmh_revision_progress_summary')) {
+    /** Count actionable requirements without creating completion for other LMS domains. */
+    function mmh_revision_progress_summary(array $days, array $progress): array
+    {
+        $total = 0; $completed = 0; $daySummary = [];
+        foreach ($days as $day) {
+            $requirements = (array) ($day['requirements'] ?? []);
+            foreach ((array) ($day['activity_groups'] ?? []) as $group) $requirements = array_merge($requirements, (array) ($group['requirements'] ?? []));
+            $dayTotal = 0; $dayCompleted = 0;
+            foreach ($requirements as $requirement) {
+                if (!mmh_revision_requirement_is_actionable($requirement)) continue;
+                $requirementId = (int) ($requirement['id'] ?? 0);
+                if ($requirementId <= 0) continue;
+                $dayTotal++; $total++;
+                if (isset($progress[$requirementId])) { $dayCompleted++; $completed++; }
+            }
+            $daySummary[(int) ($day['absolute_day_number'] ?? 0)] = ['total' => $dayTotal, 'completed' => $dayCompleted];
+        }
+        return ['total' => $total, 'completed' => $completed, 'percentage' => $total > 0 ? (int) round(($completed / $total) * 100) : 0, 'days' => $daySummary];
+    }
+}
+
+if (!function_exists('mmh_revision_set_requirement_complete')) {
+    /** Toggle manual completion after validating assignment ownership and day availability. */
+    function mmh_revision_set_requirement_complete(mysqli $conn, int $assignmentId, int $studentId, int $requirementId, bool $complete): void
+    {
+        $context = mmh_revision_assignment_context($conn, $assignmentId, $studentId, $requirementId, null);
+        $requirement = $context['requirement'] ?? null;
+        if (!$context || !is_array($requirement) || !mmh_revision_requirement_is_actionable($requirement)) throw new InvalidArgumentException('This Revision Plan requirement is not available.');
+        if (!mmh_revision_progress_schema_available($conn)) throw new RuntimeException('Revision Plan progress is temporarily unavailable.');
+        $conn->begin_transaction();
+        try {
+            if ($complete) {
+                $stmt = $conn->prepare('INSERT INTO revision_plan_requirement_progress (assignment_id, requirement_id, completed_at) VALUES (?, ?, CURRENT_TIMESTAMP) ON DUPLICATE KEY UPDATE completed_at = CURRENT_TIMESTAMP, updated_at = CURRENT_TIMESTAMP');
+                if (!$stmt) throw new RuntimeException('Unable to save Revision Plan progress.');
+                $stmt->bind_param('ii', $assignmentId, $requirementId);
+            } else {
+                $stmt = $conn->prepare('DELETE p FROM revision_plan_requirement_progress p INNER JOIN revision_plan_assignments a ON a.id = p.assignment_id AND a.user_id = ? WHERE p.assignment_id = ? AND p.requirement_id = ?');
+                if (!$stmt) throw new RuntimeException('Unable to update Revision Plan progress.');
+                $stmt->bind_param('iii', $studentId, $assignmentId, $requirementId);
+            }
+            if (!$stmt->execute()) throw new RuntimeException('Unable to save Revision Plan progress.');
+            $stmt->close();
+            $conn->commit();
+        } catch (Throwable $exception) { $conn->rollback(); throw $exception; }
+    }
+}
+
 if (!function_exists('mmh_revision_assign_students')) {
     function mmh_revision_assign_students(mysqli $conn, int $versionId, array $studentIds, string $startDate, int $adminId): int
     {
