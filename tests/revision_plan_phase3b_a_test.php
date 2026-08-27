@@ -16,7 +16,7 @@ foreach (['mmh_revision_requirement_is_actionable', "['checklist', 'resource', '
 foreach (['revision_plan_requirement_progress', 'uq_revision_progress_assignment_requirement', 'fk_revision_progress_assignment', 'fk_revision_progress_requirement'] as $marker) {
     if (!str_contains($migration, $marker)) throw new RuntimeException('Revision progress migration contract is missing: ' . $marker);
 }
-foreach (['Mark Done', 'Completed · Undo', 'Overall progress', 'tasks completed', 'Open content', 'revision-day-nav', 'revision-selected-day'] as $marker) {
+foreach (['Mark done', '✓ Done', 'Overall progress', 'tasks completed', 'Open content', 'revision-day-nav', 'revision-selected-day'] as $marker) {
     if (!str_contains($student, $marker)) throw new RuntimeException('Student completion UI is missing: ' . $marker);
 }
 foreach (['csrf_token', "['complete', 'undo']", 'mmh_revision_set_requirement_complete', '303'] as $marker) {

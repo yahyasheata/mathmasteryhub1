@@ -95,3 +95,72 @@
 .revision-selected-day>.revision-batch-materials{display:none!important}
 .revision-batch-navigation{margin:0 0 17px}.revision-batch-navigation-heading{display:flex;align-items:baseline;gap:10px;margin-bottom:8px}.revision-batch-navigation-heading .revision-help{font-size:.74rem}.revision-batch-summary{color:var(--text-primary);text-decoration:none}.revision-batch-summary:hover,.revision-batch-summary:focus-visible{border-color:var(--primary);text-decoration:none}.revision-batch-summary.is-active{box-shadow:0 0 0 1px color-mix(in srgb,var(--primary) 20%,transparent)}
 @media(max-width:780px){.revision-upload-file{grid-template-columns:auto minmax(0,1fr) auto}.revision-upload-file small{grid-column:2}.revision-upload-remove{grid-column:3;grid-row:1 / span 2}.revision-upload-choose{width:100%}.revision-batch-navigation-heading{display:grid;gap:3px}}
+
+/* Final student workspace polish: a calm, focused study surface. */
+.revision-plan-workspace .revision-student-page{width:min(100%,1160px);padding-left:28px;padding-right:28px}
+.revision-plan-workspace .revision-student-header{margin-left:-28px;margin-right:-28px;padding-left:28px;padding-right:28px}
+.revision-plan-workspace .revision-student-header-inner,.revision-plan-workspace .revision-student-shell{width:min(100%,1080px)}
+.revision-plan-workspace .revision-student-header h1{font-size:clamp(1.5rem,2.2vw,2rem)}
+.revision-plan-workspace .revision-progress-summary{grid-template-columns:minmax(0,1fr) auto;gap:18px;padding:12px 0 15px;margin-bottom:14px}
+.revision-plan-workspace .revision-progress-heading{display:flex;align-items:baseline;justify-content:space-between;gap:12px}
+.revision-plan-workspace .revision-progress-heading h2{font-size:1.25rem;color:var(--primary)}
+.revision-plan-workspace .revision-progress-meter-wrap p{margin-top:6px}
+.revision-plan-workspace .revision-batch-navigation{margin:0 0 12px}
+.revision-plan-workspace .revision-batch-navigation-heading{margin-bottom:6px}
+.revision-plan-workspace .revision-batch-navigation-heading .revision-student-card-kicker{font-size:.82rem;letter-spacing:.02em;text-transform:none}
+.revision-plan-workspace .revision-batch-navigation-heading .revision-help{display:none}
+.revision-plan-workspace .revision-batch-strip{gap:4px;margin-bottom:10px;padding-bottom:2px}
+.revision-plan-workspace .revision-batch-summary{display:flex;align-items:center;gap:8px;min-width:0;padding:9px 12px;border:0;border-bottom:2px solid transparent;border-radius:0;background:transparent}
+.revision-plan-workspace .revision-batch-summary .revision-student-card-kicker{order:2;font-size:.72rem;letter-spacing:.02em;text-transform:none;color:var(--text-muted)}
+.revision-plan-workspace .revision-batch-summary strong{font-size:.84rem;order:1}
+.revision-plan-workspace .revision-batch-summary small{order:3;font-size:.72rem}
+.revision-plan-workspace .revision-batch-summary.is-active{border-bottom-color:var(--primary);box-shadow:none}
+.revision-plan-workspace .revision-batch-summary.is-locked{background:transparent;opacity:.55}
+.revision-plan-workspace .revision-day-nav{margin-bottom:16px}
+.revision-plan-workspace .revision-day-tab{padding:9px 12px;gap:6px;font-size:.88rem}
+.revision-plan-workspace .revision-day-tab small{font-size:.7rem}
+.revision-plan-workspace .revision-selected-day{padding-top:0}
+.revision-plan-workspace .revision-selected-day-header{padding:5px 0 14px;border-bottom:0}
+.revision-plan-workspace .revision-selected-day-header .revision-student-card-kicker{font-size:.8rem;letter-spacing:.03em}
+.revision-plan-workspace .revision-selected-day-header h2{margin:3px 0 2px;font-size:clamp(1.45rem,2.3vw,1.9rem)}
+.revision-plan-workspace .revision-selected-day-header p{font-size:.88rem}
+.revision-plan-workspace .revision-selected-day-progress{padding:0;background:transparent;color:var(--text-secondary);font-size:.78rem}
+.revision-plan-workspace .revision-requirement-list{gap:0}
+.revision-plan-workspace .revision-student-requirement{display:grid;grid-template-columns:32px minmax(0,1fr) auto;align-items:start;gap:14px;padding:19px 0;border-bottom:1px solid var(--border)}
+.revision-plan-workspace .revision-student-requirement:last-child{border-bottom:0}
+.revision-plan-workspace .revision-task-index{padding-top:4px;color:var(--text-muted);font-size:.72rem;font-variant-numeric:tabular-nums}
+.revision-plan-workspace .revision-task-meta{gap:7px}
+.revision-plan-workspace .revision-requirement-type{font-size:.7rem;letter-spacing:.03em;text-transform:none}
+.revision-plan-workspace .revision-student-requirement h3{margin:4px 0 3px;font-size:1.02rem;line-height:1.3}
+.revision-plan-workspace .revision-student-requirement p{font-size:.84rem}
+.revision-plan-workspace .revision-requirement-action{justify-self:end;max-width:360px}
+.revision-plan-workspace .revision-requirement-actions{justify-content:flex-end;gap:8px}
+.revision-plan-workspace .revision-requirement-actions .student-dashboard-btn,.revision-plan-workspace .revision-requirement-actions form .student-dashboard-btn{min-width:108px}
+.revision-plan-workspace .revision-plan-workspace .student-dashboard-btn,.revision-plan-workspace .student-dashboard-btn{transition:transform .16s ease,box-shadow .16s ease}
+.revision-plan-workspace .student-dashboard-btn.primary{box-shadow:none}
+.revision-plan-workspace .student-dashboard-btn.primary:hover,.revision-plan-workspace .student-dashboard-btn.primary:focus-visible{transform:translateY(-1px);box-shadow:0 4px 10px color-mix(in srgb,var(--primary) 20%,transparent)}
+.revision-plan-workspace .is-complete-action{font-size:.8rem}
+.revision-plan-workspace .revision-upload-control{min-width:260px}
+.revision-plan-workspace .revision-upload-dropzone{padding:13px;border-radius:var(--radius-md)}
+.revision-plan-workspace .revision-upload-choose{font-size:.8rem}
+.revision-plan-workspace .revision-batch-materials-top{margin-top:12px;padding:15px 0 0;border-top:1px solid var(--border)}
+.revision-plan-workspace .revision-batch-materials-top .revision-student-card-kicker{font-size:.82rem;letter-spacing:.02em;text-transform:none}
+.revision-plan-workspace .revision-material-row{padding:10px 0}
+.revision-plan-workspace .revision-material-open{font-size:.78rem}
+@media(max-width:780px){
+  .revision-plan-workspace .revision-student-page{padding-left:16px;padding-right:16px}
+  .revision-plan-workspace .revision-student-header{margin-left:-16px;margin-right:-16px;padding-left:16px;padding-right:16px}
+  .revision-plan-workspace .revision-progress-summary{grid-template-columns:1fr;gap:7px}
+  .revision-plan-workspace .revision-progress-heading h2{font-size:1.2rem}
+  .revision-plan-workspace .revision-batch-summary{display:grid;gap:2px;padding:8px 10px}
+  .revision-plan-workspace .revision-batch-summary .revision-student-card-kicker,.revision-plan-workspace .revision-batch-summary strong,.revision-plan-workspace .revision-batch-summary small{order:initial}
+  .revision-plan-workspace .revision-batch-summary strong{white-space:normal}
+  .revision-plan-workspace .revision-student-requirement{grid-template-columns:24px minmax(0,1fr);gap:9px;padding:17px 0}
+  .revision-plan-workspace .revision-task-index{font-size:.68rem}
+  .revision-plan-workspace .revision-requirement-action{grid-column:2;justify-self:stretch;max-width:none}
+  .revision-plan-workspace .revision-requirement-actions{display:grid;grid-template-columns:1fr;gap:8px}
+  .revision-plan-workspace .revision-requirement-actions .student-dashboard-btn,.revision-plan-workspace .revision-requirement-actions form .student-dashboard-btn{width:100%;min-width:0}
+  .revision-plan-workspace .revision-upload-control{min-width:0;width:100%}
+  .revision-plan-workspace .revision-material-row{align-items:flex-start}
+  .revision-plan-workspace .revision-material-open{padding-top:2px}
+}

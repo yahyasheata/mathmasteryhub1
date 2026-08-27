@@ -32,7 +32,7 @@ if (!str_contains($courseViewer, "revision_assignment_id")) throw new RuntimeExc
 foreach (['mmh_revision_student_assignments', 'Your Plans'] as $marker) {
     if (!str_contains($studentList, $marker)) throw new RuntimeException('Student plan list is missing: ' . $marker);
 }
-foreach (['Today', 'Upload answer PDF', 'Open content', 'mmh_revision_assignment_context'] as $marker) {
+foreach (['Today', 'Your answer', 'Open content', 'mmh_revision_assignment_context'] as $marker) {
     if (!str_contains($studentPlan, $marker)) throw new RuntimeException('Read-only student workspace is missing: ' . $marker);
 }
 foreach (['storage/private/revision-plans', 'Cache-Control', 'mmh_revision_assignment_context'] as $marker) {
