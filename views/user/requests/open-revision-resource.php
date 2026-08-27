@@ -23,9 +23,13 @@ if ($resourceType === 'external_link') {
 if ($resourceType === 'course_item') {
     $itemId = trim((string) ($resource['linked_course_item_id'] ?? ''));
     $requirement = $context['requirement'];
-    if ($itemId === '' || !is_array($requirement) || (string) ($requirement['linked_course_item_id'] ?? '') !== $itemId) { http_response_code(403); exit('Resource unavailable.'); }
+    if ($itemId === '') { http_response_code(403); exit('Resource unavailable.'); }
     $base = rtrim((string) ($baseUrl ?? mmh_current_request_base_url()), '/');
-    header('Location: ' . mmh_student_resource_url($base, (string) $context['assignment']['course_id'], $itemId, ['revision_assignment_id' => (int) $assignmentId, 'revision_requirement_id' => (int) $requirementId]), true, 302);
+    $options = [];
+    if (is_array($requirement) && (string) ($requirement['linked_course_item_id'] ?? '') === $itemId) {
+        $options = ['revision_assignment_id' => (int) $assignmentId, 'revision_requirement_id' => (int) $requirementId];
+    }
+    header('Location: ' . mmh_student_resource_url($base, (string) $context['assignment']['course_id'], $itemId, $options), true, 302);
     exit;
 }
 $storageKey = trim((string) ($resource['storage_key'] ?? ''));

@@ -931,9 +931,20 @@ if (!function_exists('mmh_revision_assignment_context')) {
          * stricter relationship check below. */
         if ($resourceId !== null && !$resourceRequirement) {
             $resourceBatchId = (int) ($resources[$resourceId]['batch_id'] ?? 0);
-            if ($resourceBatchId <= 0) return null;
-            foreach ($days as $day) {
-                if ((int) ($day['batch_id'] ?? 0) === $resourceBatchId) { $resourceDay = $day; break; }
+            if ($resourceBatchId <= 0) {
+                // Legacy published Versions stored shared materials at
+                // Version scope (batch_id NULL). They remain safe to open
+                // only when the plan has no unreleased Batches, or all
+                // released Batches are currently schedule-accessible.
+                $unreleased = (array) ($assignment['version']['unreleased_batches'] ?? []);
+                if (array_key_exists('unreleased_batches', (array) ($assignment['version'] ?? [])) && $unreleased) return null;
+                foreach ($days as $day) {
+                    if (!empty($day['accessible'])) { $resourceDay = $day; break; }
+                }
+            } else {
+                foreach ($days as $day) {
+                    if ((int) ($day['batch_id'] ?? 0) === $resourceBatchId) { $resourceDay = $day; break; }
+                }
             }
             if (!$resourceDay) return null;
         }

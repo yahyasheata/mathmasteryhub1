@@ -19,7 +19,7 @@ foreach (['mmh_revision_batch_release_schema_available', 'mmh_revision_batch_has
 foreach (['unreleased_batches', 'Coming soon', 'More revision content is on the way'] as $marker) {
     if (!str_contains($student, $marker)) throw new RuntimeException('Student coming-soon Batch UI is missing: ' . $marker);
 }
-if (!str_contains($gateway, 'mmh_revision_assignment_context')) throw new RuntimeException('Gateway does not use the released Batch context boundary.');
+if (!str_contains($gateway, 'mmh_revision_assignment_context') || !str_contains($service, 'Legacy published Versions stored shared materials')) throw new RuntimeException('Gateway does not use the released Batch material context boundary.');
 if (!str_contains($workflow, '20260827_create_revision_plan_batch_releases.php')) throw new RuntimeException('Deployment workflow does not run the Batch release migration.');
 
 require_once $root . '/inc/RevisionPlan.php';
