@@ -164,3 +164,29 @@
   .revision-plan-workspace .revision-material-row{align-items:flex-start}
   .revision-plan-workspace .revision-material-open{padding-top:2px}
 }
+
+/* Your Plans list: compact, calm and consistent with the detail workspace. */
+.revision-plan-list-page .revision-student-page{width:min(100%,1160px);padding-left:28px;padding-right:28px}
+.revision-plan-list-page .revision-student-header{margin-left:-28px;margin-right:-28px;padding-left:28px;padding-right:28px}
+.revision-plan-list-page .revision-student-header>.container,
+.revision-plan-list-page .revision-student-shell{width:min(100%,1080px);max-width:none;margin-left:auto;margin-right:auto}
+.revision-plan-list-page .revision-student-header p{margin-top:6px;color:var(--text-muted);font-size:.88rem}
+.revision-plan-list-page .revision-student-shell{padding-top:2px}
+.revision-plan-list-page .revision-student-grid{gap:10px}
+.revision-plan-list-page .revision-student-card-link{display:flex;align-items:center;gap:24px;padding:16px 18px;border:1px solid var(--border);border-radius:var(--radius-md);background:var(--surface);color:var(--text-primary);text-decoration:none;box-shadow:none;transition:border-color .16s ease,background .16s ease,transform .16s ease}
+.revision-plan-list-page .revision-student-card-link:hover{border-color:color-mix(in srgb,var(--primary) 48%,var(--border));background:color-mix(in srgb,var(--primary) 4%,var(--surface));color:var(--text-primary);text-decoration:none;transform:translateY(-1px)}
+.revision-plan-list-page .revision-student-card-link:focus-visible{outline:2px solid var(--primary);outline-offset:3px}
+.revision-plan-list-page .revision-student-card-link>div{min-width:0;flex:1}
+.revision-plan-list-page .revision-student-card-link .revision-student-card-kicker{font-size:.7rem}
+.revision-plan-list-page .revision-student-card-link h2{margin:4px 0 3px;font-size:1.05rem;line-height:1.3;overflow-wrap:anywhere}
+.revision-plan-list-page .revision-student-card-link p{margin:0;color:var(--text-muted);font-size:.78rem}
+.revision-plan-list-page .revision-student-card-link .revision-day-status{padding:0;background:transparent;color:var(--text-secondary);font-size:inherit;font-weight:700}
+.revision-plan-list-page .revision-student-card-link .student-dashboard-btn{flex:0 0 auto;min-height:38px;padding:8px 13px;border-radius:var(--radius-md);font-size:.8rem}
+@media(max-width:780px){
+  .revision-plan-list-page .revision-student-page{padding-left:16px;padding-right:16px}
+  .revision-plan-list-page .revision-student-header{margin-left:-16px;margin-right:-16px;padding-left:16px;padding-right:16px}
+  .revision-plan-list-page .revision-student-header>.container,
+  .revision-plan-list-page .revision-student-shell{width:100%}
+  .revision-plan-list-page .revision-student-card-link{align-items:flex-start;flex-direction:column;gap:12px;padding:15px}
+  .revision-plan-list-page .revision-student-card-link .student-dashboard-btn{width:100%;justify-content:center}
+}
