@@ -236,7 +236,7 @@ try {
             throw new RuntimeException($delete->error ?: $conn->error);
         }
         $delete->close();
-        $message = count($selected) === 1 ? 'Lesson archived successfully.' : count($selected) . ' lessons archived successfully.';
+        $message = count($selected) === 1 ? 'Item deleted.' : count($selected) . ' items deleted.';
     }
 
     $conn->commit();

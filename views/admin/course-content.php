@@ -30,7 +30,10 @@ if (!$course) {
     exit('Course not found.');
 }
 
-$count_stmt = $conn->prepare('SELECT COUNT(*) AS total FROM course_items WHERE course_id = ?');
+$item_archive_filter = '';
+$archive_column = $conn->prepare("SELECT 1 FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'course_items' AND COLUMN_NAME = 'archived_at' LIMIT 1");
+if ($archive_column) { $archive_column->execute(); if ($archive_column->get_result()->fetch_assoc()) $item_archive_filter = " AND (archived_at IS NULL OR archived_at = '')"; $archive_column->close(); }
+$count_stmt = $conn->prepare('SELECT COUNT(*) AS total FROM course_items WHERE course_id = ?' . $item_archive_filter);
 $count_stmt->bind_param('s', $course_id);
 $count_stmt->execute();
 $lesson_count = (int) (($count_stmt->get_result()->fetch_assoc()['total'] ?? 0));
@@ -502,7 +505,7 @@ $admin_base = rtrim((string) $baseUrl, '/') . '/admin/';
   }
   function bulkAction(action, ids, destination, $button) {
     if (!ids.length) { return; }
-    var data = { _method: 'BULK', course_id: courseId, action: action, item_ids: ids };
+    var data = { _method: 'BULK', course_id: courseId, action: action, item_ids: ids, _token: adminCsrfToken };
     if (action === 'move') { data.destination_section_id = destination || ''; }
     setButtonLoading($button, true, 'Working…');
     $.ajax({ type: 'POST', url: 'requests/item/bulk', data: data, dataType: 'json' }).done(function(response) {
@@ -628,7 +631,7 @@ $admin_base = rtrim((string) $baseUrl, '/') . '/admin/';
     if (action === 'toggle-item-status') { bulkAction(String($button.data('status')) === 'published' ? 'unpublish' : 'publish', [String($button.data('item-id'))], '', $button); return; }
     if (action === 'duplicate-item') { bulkAction('duplicate', [String($button.data('item-id'))], '', $button); return; }
     if (action === 'copy-item') { openCopyModal('item', String($button.data('item-id')), $button.closest('.lesson-manager-row').find('.course-manager-edit-link').first().text(), $button); return; }
-    if (action === 'delete-item') { Swal.fire({ icon: 'warning', title: 'Delete this lesson?', text: 'This cannot be undone.', showCancelButton: true, confirmButtonText: 'Delete', confirmButtonColor: 'var(--danger)' }).then(function(result) { if (result.isConfirmed) { bulkAction('delete', [String($button.data('item-id'))], '', $button); } }); return; }
+    if (action === 'delete-item') { var itemTitle = String($button.data('item-title') || 'this item'); var hasActivity = String($button.data('item-activity') || '0') === '1'; Swal.fire({ icon: 'warning', title: 'Delete this item?', html: '<strong>' + escapeHtml(itemTitle) + '</strong><br><span>' + (hasActivity ? 'This item has student activity. It will be removed from active Course Content while historical submissions, attempts, and progress are preserved.' : 'This item will be removed from the course. Any historical records will be preserved safely.') + '</span>', showCancelButton: true, confirmButtonText: 'Delete item', cancelButtonText: 'Cancel', confirmButtonColor: 'var(--danger)' }).then(function(result) { if (result.isConfirmed) { bulkAction('delete', [String($button.data('item-id'))], '', $button); } }); return; }
     if (action === 'edit-section') { openSection({ course_id: courseId, section_id: $button.data('section-id'), _method: 'GET' }, $button); return; }
     if (action === 'duplicate-section') { duplicateSection(String($button.data('section-id')), $button); return; }
     if (action === 'copy-section') { openCopyModal('section', String($button.data('section-id')), $button.closest('.course-manager-section').find('.course-manager-section-title').first().text(), $button); return; }

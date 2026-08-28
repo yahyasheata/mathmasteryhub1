@@ -52,6 +52,50 @@ if (!function_exists('mmh_admin_course_set_state')) {
     }
 }
 
+if (!function_exists('mmh_admin_course_item_has_activity')) {
+    /**
+     * Return whether an item has historical/dependent student data. This is
+     * used only to strengthen the confirmation copy; deletion itself remains
+     * the canonical archive operation so history is never cascaded away.
+     */
+    function mmh_admin_course_item_has_activity(mysqli $conn, string $courseId, string $itemId): bool
+    {
+        $courseId = trim($courseId); $itemId = trim($itemId);
+        if ($courseId === '' || $itemId === '') return false;
+        $tableExists = static function (string $table) use ($conn): bool {
+            $stmt = $conn->prepare('SELECT 1 FROM INFORMATION_SCHEMA.TABLES WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = ? LIMIT 1');
+            if (!$stmt) return false;
+            $stmt->bind_param('s', $table); $stmt->execute(); $found = (bool) $stmt->get_result()->fetch_assoc(); $stmt->close(); return $found;
+        };
+        $hasColumns = static function (string $table, array $columns) use ($conn): bool {
+            foreach ($columns as $column) {
+                $stmt = $conn->prepare('SELECT 1 FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = ? AND COLUMN_NAME = ? LIMIT 1');
+                if (!$stmt) return false;
+                $stmt->bind_param('ss', $table, $column); $stmt->execute(); $found = (bool) $stmt->get_result()->fetch_assoc(); $stmt->close();
+                if (!$found) return false;
+            }
+            return true;
+        };
+        $hasRows = static function (string $sql, string $types, array $params) use ($conn): bool {
+            $stmt = $conn->prepare($sql); if (!$stmt) return false;
+            $refs = [$types]; foreach ($params as &$value) $refs[] = &$value;
+            call_user_func_array([$stmt, 'bind_param'], $refs);
+            if (!$stmt->execute()) { $stmt->close(); return false; }
+            $result = $stmt->get_result();
+            $found = $result ? (int) (($result->fetch_assoc()['total'] ?? 0)) > 0 : false;
+            $stmt->close(); return $found;
+        };
+        if ($tableExists('course_item_progress') && $hasColumns('course_item_progress', ['course_id', 'item_id']) && $hasRows('SELECT COUNT(*) AS total FROM course_item_progress WHERE course_id = ? AND item_id = ?', 'ss', [$courseId, $itemId])) return true;
+        if ($tableExists('student_learning_evidence') && $hasColumns('student_learning_evidence', ['course_id', 'item_id']) && $hasRows('SELECT COUNT(*) AS total FROM student_learning_evidence WHERE course_id = ? AND item_id = ?', 'ss', [$courseId, $itemId])) return true;
+        if ($tableExists('timed_exams') && $hasRows('SELECT COUNT(*) AS total FROM timed_exams WHERE course_id = ? AND item_id = ?', 'ss', [$courseId, $itemId])) return true;
+        if ($tableExists('timed_exams') && $tableExists('timed_exam_attempts') && $hasRows('SELECT COUNT(*) AS total FROM timed_exam_attempts a INNER JOIN timed_exams e ON e.id = a.timed_exam_id WHERE e.course_id = ? AND e.item_id = ?', 'ss', [$courseId, $itemId])) return true;
+        if ($tableExists('assignments') && $hasRows('SELECT COUNT(*) AS total FROM assignments WHERE course_id = ? AND item_id = ?', 'ss', [$courseId, $itemId])) return true;
+        if ($tableExists('assignments') && $tableExists('assignment_submissions') && $hasRows('SELECT COUNT(*) AS total FROM assignment_submissions s INNER JOIN assignments a ON a.assignment_id = s.assignment_id WHERE a.course_id = ? AND a.item_id = ?', 'ss', [$courseId, $itemId])) return true;
+        if ($tableExists('revision_plan_template_requirements') && $tableExists('revision_plan_template_days') && $tableExists('revision_plan_template_batches') && $tableExists('revision_plan_template_versions') && $tableExists('revision_plan_templates') && $hasRows('SELECT COUNT(*) AS total FROM revision_plan_template_requirements r INNER JOIN revision_plan_template_versions v ON v.id = r.version_id INNER JOIN revision_plan_templates t ON t.id = v.template_id WHERE t.course_id = ? AND r.linked_course_item_id = ?', 'ss', [$courseId, $itemId])) return true;
+        return false;
+    }
+}
+
 if (!function_exists('mmh_admin_course_archive_item')) {
     function mmh_admin_course_archive_item(mysqli $conn, string $itemId, ?string $courseId = null): void
     {

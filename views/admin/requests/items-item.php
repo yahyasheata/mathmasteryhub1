@@ -6,6 +6,7 @@ require_once 'inc/learning_schema.php';
 require_once 'inc/CourseSectionAvailability.php';
 require_once 'inc/CourseResourceResolver.php';
 require_once 'inc/AdminAssessmentService.php';
+require_once 'inc/AdminCourseService.php';
 
 header('Content-Type: application/json; charset=utf-8');
 
@@ -319,7 +320,7 @@ function items_item_render_lesson($row)
 }
 
 
-function items_item_manager_render_lesson($row, $section_locked = false, array $assignment_stats = [])
+function items_item_manager_render_lesson($row, $section_locked = false, array $assignment_stats = [], bool $has_activity = false)
 {
     $db_id = (int) $row['id'];
     $item_id = items_item_html($row['item_id']);
@@ -374,7 +375,7 @@ function items_item_manager_render_lesson($row, $section_locked = false, array $
               <li><button type='button' class='dropdown-item' data-manager-action='duplicate-item' data-item-id='{$item_id}'><i class='fas fa-copy ds-icon ds-icon-sm' aria-hidden='true'></i> Duplicate</button></li>
               <li><button type='button' class='dropdown-item' data-manager-action='copy-item' data-item-id='{$item_id}'><i class='fas fa-share-square ds-icon ds-icon-sm' aria-hidden='true'></i> Copy to another course</button></li>
               <li><hr class='dropdown-divider'></li>
-              <li><button type='button' class='dropdown-item text-danger' data-manager-action='delete-item' data-item-id='{$item_id}'><i class='fas fa-archive ds-icon ds-icon-sm' aria-hidden='true'></i> Archive</button></li>
+              <li><button type='button' class='dropdown-item text-danger' data-manager-action='delete-item' data-item-id='{$item_id}' data-item-title='{$title}' data-item-activity='" . ($has_activity ? '1' : '0') . "'><i class='fas fa-trash ds-icon ds-icon-sm' aria-hidden='true'></i> Delete item</button></li>
             </ul>
           </div>
         </div>";
@@ -391,6 +392,8 @@ function items_item_manager_render_lesson($row, $section_locked = false, array $
           id='course-item-{$db_id}'
           data-item-db-id='{$db_id}'
           data-item-id='{$item_id}'
+          data-item-title='{$title}'
+          data-item-activity='" . ($has_activity ? '1' : '0') . "'
           data-course-id='{$course_id}'
           data-status='{$status_key}'
           data-template='{$template_class}'
@@ -589,7 +592,8 @@ if ($has_sections) {
     $section_stmt->close();
 }
 
-$stmt = $conn->prepare('SELECT * FROM course_items WHERE course_id = ? ORDER BY page_order ASC, id ASC');
+$item_archive_filter = items_item_column_exists($conn, 'archived_at') ? " AND (archived_at IS NULL OR archived_at = '')" : '';
+$stmt = $conn->prepare('SELECT * FROM course_items WHERE course_id = ?' . $item_archive_filter . ' ORDER BY page_order ASC, id ASC');
 $stmt->bind_param('s', $course_id);
 $stmt->execute();
 $items_result = $stmt->get_result();
@@ -623,6 +627,11 @@ while ($row = $items_result->fetch_assoc()) {
 }
 $stmt->close();
 $assignment_stats = mmh_admin_assignment_operational_stats($conn, $course_id, $assignment_ids);
+$item_activity_map = [];
+foreach ($manager_rows_by_section as $rows) foreach ($rows as $item_row) {
+    $itemKey = (string) ($item_row['item_id'] ?? '');
+    if ($itemKey !== '') $item_activity_map[$itemKey] = mmh_admin_course_item_has_activity($conn, $course_id, $itemKey);
+}
 
 $general_section = items_item_render_section(
     $course_id,
@@ -663,7 +672,7 @@ if (($items_request_data['layout'] ?? '') === 'manager') {
         $section_lessons_html = '';
         $section_locked = strtolower(trim((string) ($section['unlock_mode'] ?? 'always'))) !== 'always';
         foreach ($manager_rows_by_section[$section_id] ?? [] as $section_item) {
-            $section_lessons_html .= items_item_manager_render_lesson($section_item, $section_locked, $assignment_stats);
+            $section_lessons_html .= items_item_manager_render_lesson($section_item, $section_locked, $assignment_stats, !empty($item_activity_map[(string) ($section_item['item_id'] ?? '')]));
         }
         $manager_real_sections_html .= items_item_manager_render_section(
             $conn,
@@ -677,7 +686,7 @@ if (($items_request_data['layout'] ?? '') === 'manager') {
 
     $general_lessons_html = '';
     foreach ($manager_rows_by_section['__general__'] ?? [] as $general_item) {
-        $general_lessons_html .= items_item_manager_render_lesson($general_item, false, $assignment_stats);
+        $general_lessons_html .= items_item_manager_render_lesson($general_item, false, $assignment_stats, !empty($item_activity_map[(string) ($general_item['item_id'] ?? '')]));
     }
 
     $general_manager_section = items_item_manager_render_section(
