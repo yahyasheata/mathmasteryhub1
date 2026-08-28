@@ -289,6 +289,17 @@ if (!function_exists('mmh_revision_latest_version_id')) {
     }
 }
 
+if (!function_exists('mmh_revision_template_has_published_version')) {
+    function mmh_revision_template_has_published_version(mysqli $conn, int $templateId): bool
+    {
+        if ($templateId <= 0) return false;
+        $stmt = $conn->prepare("SELECT id FROM revision_plan_template_versions WHERE template_id = ? AND status = 'published' LIMIT 1");
+        if (!$stmt) return false;
+        $stmt->bind_param('i', $templateId); $stmt->execute(); $found = $stmt->get_result()->num_rows > 0; $stmt->close();
+        return $found;
+    }
+}
+
 if (!function_exists('mmh_revision_create_template')) {
     function mmh_revision_create_template(mysqli $conn, string $courseId, string $title, string $description, int $adminId): int
     {
@@ -356,6 +367,17 @@ if (!function_exists('mmh_revision_validate_structure')) {
         }
         $itemMap = [];
         foreach (mmh_revision_course_items($conn, $courseId) as $row) $itemMap[(string) $row['item_id']] = true;
+        // Lineage is server-owned. Only requirement IDs from this template's
+        // existing versions may be supplied by the editor; arbitrary IDs must
+        // never be able to copy another plan's student state.
+        $lineageIds = [];
+        $lineage = $conn->prepare('SELECT r.id FROM revision_plan_template_requirements r INNER JOIN revision_plan_template_versions v ON v.id = r.version_id WHERE v.template_id = (SELECT template_id FROM revision_plan_template_versions WHERE id = ? LIMIT 1)');
+        if ($lineage) {
+            $lineage->bind_param('i', $versionId);
+            $lineage->execute();
+            foreach ($lineage->get_result()->fetch_all(MYSQLI_ASSOC) as $row) $lineageIds[(int) $row['id']] = true;
+            $lineage->close();
+        }
         $clean = ['batches' => []];
         foreach ($batches as $batchIndex => $batch) {
             if (!is_array($batch)) continue;
@@ -392,7 +414,9 @@ if (!function_exists('mmh_revision_validate_structure')) {
                         if ($resourceId > 0 && isset($resourceIds[$resourceId]) && !in_array($resourceId, $selectedResources, true)) $selectedResources[] = $resourceId;
                     }
                     if ($type === 'resource' && !$selectedResources) throw new InvalidArgumentException('Resource requirements must reference at least one shared material.');
-                    return ['title' => $title, 'description' => mb_substr(trim((string) ($requirement['description'] ?? '')), 0, 2000), 'requirement_type' => $type, 'is_required' => !empty($requirement['is_required']) ? 1 : 0, 'sort_order' => $sort, 'activity_key' => $activityId, 'linked_course_item_id' => $itemId, 'allow_multiple_files' => !empty($requirement['allow_multiple_files']) ? 1 : 0, 'accepted_file_policy' => mb_substr(trim((string) ($requirement['accepted_file_policy'] ?? 'pdf')), 0, 80), 'resource_ids' => $selectedResources];
+                    $sourceId = max(0, (int) ($requirement['source_requirement_id'] ?? 0));
+                    if ($sourceId <= 0 || !isset($lineageIds[$sourceId])) $sourceId = 0;
+                    return ['title' => $title, 'description' => mb_substr(trim((string) ($requirement['description'] ?? '')), 0, 2000), 'requirement_type' => $type, 'is_required' => !empty($requirement['is_required']) ? 1 : 0, 'sort_order' => $sort, 'activity_key' => $activityId, 'source_requirement_id' => $sourceId, 'linked_course_item_id' => $itemId, 'allow_multiple_files' => !empty($requirement['allow_multiple_files']) ? 1 : 0, 'accepted_file_policy' => mb_substr(trim((string) ($requirement['accepted_file_policy'] ?? 'pdf')), 0, 80), 'resource_ids' => $selectedResources];
                 };
                 foreach ((array) ($day['requirements'] ?? []) as $reqIndex => $requirement) $cleanDay['requirements'][] = $normalizeRequirement($requirement, count($cleanDay['requirements']), null, $cleanDay);
                 foreach ((array) ($day['activity_groups'] ?? []) as $groupIndex => $group) {
@@ -494,14 +518,35 @@ if (!function_exists('mmh_revision_save_draft')) {
     }
 }
 
+if (!function_exists('mmh_revision_requirement_lineage_schema_available')) {
+    function mmh_revision_requirement_lineage_schema_available(mysqli $conn): bool
+    {
+        static $available = [];
+        $key = spl_object_id($conn);
+        if (array_key_exists($key, $available)) return $available[$key];
+        $stmt = $conn->prepare("SELECT COUNT(*) AS total FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'revision_plan_template_requirements' AND COLUMN_NAME = 'source_requirement_id'");
+        if (!$stmt) return $available[$key] = false;
+        $stmt->execute();
+        $available[$key] = (int) (($stmt->get_result()->fetch_assoc()['total'] ?? 0)) > 0;
+        $stmt->close();
+        return $available[$key];
+    }
+}
+
 if (!function_exists('mmh_revision_insert_requirement')) {
     function mmh_revision_insert_requirement(mysqli $conn, int $versionId, int $dayId, ?int $activityId, array $requirement): void
     {
         $itemId = (string) ($requirement['linked_course_item_id'] ?? '');
-        $stmt = $conn->prepare("INSERT INTO revision_plan_template_requirements (version_id, day_id, activity_id, title, description, requirement_type, is_required, sort_order, linked_course_item_id, allow_multiple_files, accepted_file_policy) VALUES (?, ?, NULLIF(?, 0), ?, ?, ?, ?, ?, NULLIF(?, ''), ?, ?)");
-        if (!$stmt) throw new RuntimeException('Unable to save a requirement.');
-        $activityValue = (int) ($activityId ?? 0); $type = (string) $requirement['requirement_type']; $required = (int) $requirement['is_required']; $sort = (int) $requirement['sort_order']; $multiple = (int) $requirement['allow_multiple_files']; $policy = (string) $requirement['accepted_file_policy'];
-        $stmt->bind_param('iiisssiisis', $versionId, $dayId, $activityValue, $requirement['title'], $requirement['description'], $type, $required, $sort, $itemId, $multiple, $policy);
+        $activityValue = (int) ($activityId ?? 0); $lineageId = max(0, (int) ($requirement['source_requirement_id'] ?? 0)); $type = (string) $requirement['requirement_type']; $required = (int) $requirement['is_required']; $sort = (int) $requirement['sort_order']; $multiple = (int) $requirement['allow_multiple_files']; $policy = (string) $requirement['accepted_file_policy'];
+        if (mmh_revision_requirement_lineage_schema_available($conn)) {
+            $stmt = $conn->prepare("INSERT INTO revision_plan_template_requirements (version_id, source_requirement_id, day_id, activity_id, title, description, requirement_type, is_required, sort_order, linked_course_item_id, allow_multiple_files, accepted_file_policy) VALUES (?, NULLIF(?, 0), ?, NULLIF(?, 0), ?, ?, ?, ?, ?, NULLIF(?, ''), ?, ?)");
+            if (!$stmt) throw new RuntimeException('Unable to save a requirement.');
+            $stmt->bind_param('iiiisssiisisi', $versionId, $lineageId, $dayId, $activityValue, $requirement['title'], $requirement['description'], $type, $required, $sort, $itemId, $multiple, $policy);
+        } else {
+            $stmt = $conn->prepare("INSERT INTO revision_plan_template_requirements (version_id, day_id, activity_id, title, description, requirement_type, is_required, sort_order, linked_course_item_id, allow_multiple_files, accepted_file_policy) VALUES (?, ?, NULLIF(?, 0), ?, ?, ?, ?, ?, NULLIF(?, ''), ?, ?)");
+            if (!$stmt) throw new RuntimeException('Unable to save a requirement.');
+            $stmt->bind_param('iiisssiisis', $versionId, $dayId, $activityValue, $requirement['title'], $requirement['description'], $type, $required, $sort, $itemId, $multiple, $policy);
+        }
         if (!$stmt->execute()) throw new RuntimeException('Unable to save a requirement.');
         $requirementId = (int) $stmt->insert_id; $stmt->close();
         foreach ((array) ($requirement['resource_ids'] ?? []) as $sortOrder => $resourceId) {
@@ -539,11 +584,11 @@ if (!function_exists('mmh_revision_publish_version')) {
             $stmt->close();
             if (mmh_revision_batch_release_schema_available($conn)) {
                 $existing = [];
-                $released = $conn->prepare("SELECT batch_position FROM revision_plan_batch_releases WHERE template_id = ? AND status = 'released' FOR UPDATE");
+                $released = $conn->prepare("SELECT id, batch_position FROM revision_plan_batch_releases WHERE template_id = ? AND status = 'released' FOR UPDATE");
                 if (!$released) throw new RuntimeException('Unable to inspect released Batches.');
                 $released->bind_param('i', $version['template_id']);
                 $released->execute();
-                foreach ($released->get_result()->fetch_all(MYSQLI_ASSOC) as $row) $existing[(int) $row['batch_position']] = true;
+                foreach ($released->get_result()->fetch_all(MYSQLI_ASSOC) as $row) $existing[(int) $row['batch_position']] = (int) $row['id'];
                 $released->close();
                 $insert = $conn->prepare("INSERT INTO revision_plan_batch_releases (template_id, source_version_id, source_batch_id, batch_position, status, visibility, day_access_mode, display_title, released_by) VALUES (?, ?, ?, ?, 'released', 'released', ?, NULLIF(?, ''), ?)");
                 if (!$insert) throw new RuntimeException('Unable to prepare Batch release.');
@@ -564,9 +609,21 @@ if (!function_exists('mmh_revision_publish_version')) {
                 }
                 $insert->close();
                 if (!$existing && $inserted === 0) throw new InvalidArgumentException('Prepare the first Batch before publishing.');
+                // A new immutable Version becomes the current student-facing
+                // snapshot for every previously released Batch position. The
+                // old Version remains intact for history and rollback.
+                foreach ($existing as $position => $releaseId) {
+                    $currentBatch = ($version['batches'] ?? [])[$position] ?? null;
+                    if (!is_array($currentBatch) || (int) ($currentBatch['id'] ?? 0) <= 0) continue;
+                    $refresh = $conn->prepare('UPDATE revision_plan_batch_releases SET source_version_id = ?, source_batch_id = ? WHERE id = ?');
+                    if (!$refresh) throw new RuntimeException('Unable to update the current Batch snapshot.');
+                    $currentBatchId = (int) $currentBatch['id']; $releaseId = (int) $releaseId; $refresh->bind_param('iii', $versionId, $currentBatchId, $releaseId);
+                    if (!$refresh->execute()) throw new RuntimeException('Unable to update the current Batch snapshot.'); $refresh->close();
+                }
             } elseif (!mmh_revision_batch_has_content((array) (($version['batches'] ?? [])[0] ?? []))) {
                 throw new InvalidArgumentException('Prepare the first Batch before publishing.');
             }
+            mmh_revision_upgrade_assignments_for_version($conn, (int) $version['template_id'], $versionId);
             $touch = $conn->prepare('UPDATE revision_plan_templates SET updated_at = CURRENT_TIMESTAMP WHERE id = ?');
             if ($touch) { $touch->bind_param('i', $version['template_id']); $touch->execute(); $touch->close(); }
             $conn->commit();
@@ -691,9 +748,105 @@ if (!function_exists('mmh_revision_clone_version')) {
 if (!function_exists('mmh_revision_clone_requirement')) {
     function mmh_revision_clone_requirement(mysqli $conn, int $versionId, int $dayId, ?int $activityId, array $requirement, array $resourceMap): void
     {
-        $itemId = (string) ($requirement['linked_course_item_id'] ?? ''); $activityValue = (int) ($activityId ?? 0); $type = (string) $requirement['requirement_type']; $required = (int) $requirement['is_required']; $sort = (int) $requirement['sort_order']; $multiple = (int) $requirement['allow_multiple_files']; $policy = (string) $requirement['accepted_file_policy'];
-        $stmt = $conn->prepare("INSERT INTO revision_plan_template_requirements (version_id, day_id, activity_id, title, description, requirement_type, is_required, sort_order, linked_course_item_id, allow_multiple_files, accepted_file_policy) VALUES (?, ?, NULLIF(?, 0), ?, ?, ?, ?, ?, NULLIF(?, ''), ?, ?)"); $stmt->bind_param('iiisssiisis', $versionId, $dayId, $activityValue, $requirement['title'], $requirement['description'], $type, $required, $sort, $itemId, $multiple, $policy); if (!$stmt->execute()) throw new RuntimeException('Unable to clone a requirement.'); $newId = (int) $stmt->insert_id; $stmt->close();
-        foreach ((array) ($requirement['resource_ids'] ?? []) as $sortOrder => $resourceId) { $mapped = $resourceMap[(int) $resourceId] ?? 0; if ($mapped <= 0) continue; $link = $conn->prepare('INSERT INTO revision_plan_requirement_resources (requirement_id, resource_id, sort_order) VALUES (?, ?, ?)'); $link->bind_param('iii', $newId, $mapped, $sortOrder); if (!$link->execute()) throw new RuntimeException('Unable to clone a resource link.'); $link->close(); }
+        $sourceId = (int) ($requirement['id'] ?? $requirement['source_requirement_id'] ?? 0);
+        $requirement['source_requirement_id'] = $sourceId;
+        $requirement['resource_ids'] = array_values(array_filter(array_map(static fn($id): int => (int) ($resourceMap[(int) $id] ?? 0), (array) ($requirement['resource_ids'] ?? [])), static fn(int $id): bool => $id > 0));
+        mmh_revision_insert_requirement($conn, $versionId, $dayId, $activityId, $requirement);
+    }
+}
+
+if (!function_exists('mmh_revision_version_requirements_flat')) {
+    function mmh_revision_version_requirements_flat(array $version): array
+    {
+        $result = [];
+        foreach ((array) ($version['batches'] ?? []) as $batch) {
+            foreach ((array) ($batch['days'] ?? []) as $day) {
+                foreach ((array) ($day['requirements'] ?? []) as $requirement) $result[(int) ($requirement['id'] ?? 0)] = $requirement;
+                foreach ((array) ($day['activity_groups'] ?? []) as $group) foreach ((array) ($group['requirements'] ?? []) as $requirement) $result[(int) ($requirement['id'] ?? 0)] = $requirement;
+            }
+        }
+        return $result;
+    }
+}
+
+if (!function_exists('mmh_revision_copy_submission_state')) {
+    function mmh_revision_copy_submission_state(mysqli $conn, int $fromAssignmentId, int $fromRequirementId, int $toAssignmentId, int $toRequirementId): void
+    {
+        if (!mmh_revision_submission_schema_available($conn)) return;
+        $source = $conn->prepare('SELECT id, submitted_at, updated_at FROM revision_plan_requirement_submissions WHERE assignment_id = ? AND requirement_id = ? LIMIT 1');
+        if (!$source) throw new RuntimeException('Unable to inspect Revision upload history.');
+        $source->bind_param('ii', $fromAssignmentId, $fromRequirementId); $source->execute(); $sourceRow = $source->get_result()->fetch_assoc() ?: null; $source->close();
+        if (!is_array($sourceRow)) return;
+        $existing = $conn->prepare('SELECT id FROM revision_plan_requirement_submissions WHERE assignment_id = ? AND requirement_id = ? LIMIT 1');
+        if (!$existing) throw new RuntimeException('Unable to inspect Revision upload history.');
+        $existing->bind_param('ii', $toAssignmentId, $toRequirementId); $existing->execute(); $existingId = (int) (($existing->get_result()->fetch_assoc()['id'] ?? 0)); $existing->close();
+        if ($existingId > 0) return;
+        $insert = $conn->prepare('INSERT INTO revision_plan_requirement_submissions (assignment_id, requirement_id, submitted_at, updated_at) VALUES (?, ?, ?, ?)');
+        if (!$insert) throw new RuntimeException('Unable to preserve Revision upload history.');
+        $submittedAt = (string) ($sourceRow['submitted_at'] ?? ''); $updatedAt = (string) ($sourceRow['updated_at'] ?? ''); $insert->bind_param('iiss', $toAssignmentId, $toRequirementId, $submittedAt, $updatedAt);
+        if (!$insert->execute()) throw new RuntimeException('Unable to preserve Revision upload history.');
+        $newSubmissionId = (int) $insert->insert_id; $insert->close();
+        $files = $conn->prepare('SELECT file_path, original_filename, mime_type, file_size_bytes, sort_order, uploaded_at FROM revision_plan_submission_files WHERE submission_id = ? ORDER BY sort_order ASC, id ASC');
+        if (!$files) throw new RuntimeException('Unable to preserve Revision upload files.');
+        $sourceSubmissionId = (int) $sourceRow['id']; $files->bind_param('i', $sourceSubmissionId); $files->execute(); $fileRows = $files->get_result()->fetch_all(MYSQLI_ASSOC); $files->close();
+        $fileInsert = $conn->prepare('INSERT INTO revision_plan_submission_files (submission_id, file_path, original_filename, mime_type, file_size_bytes, sort_order, uploaded_at) VALUES (?, ?, ?, ?, ?, ?, ?)');
+        if (!$fileInsert) throw new RuntimeException('Unable to preserve Revision upload files.');
+        foreach ($fileRows as $file) { $filePath = (string) ($file['file_path'] ?? ''); $name = (string) ($file['original_filename'] ?? ''); $mime = (string) ($file['mime_type'] ?? 'application/pdf'); $size = (int) ($file['file_size_bytes'] ?? 0); $sort = (int) ($file['sort_order'] ?? 0); $uploadedAt = (string) ($file['uploaded_at'] ?? ''); $fileInsert->bind_param('isssiis', $newSubmissionId, $filePath, $name, $mime, $size, $sort, $uploadedAt); if (!$fileInsert->execute()) throw new RuntimeException('Unable to preserve Revision upload files.'); }
+        $fileInsert->close();
+    }
+}
+
+if (!function_exists('mmh_revision_transfer_assignment_state')) {
+    function mmh_revision_transfer_assignment_state(mysqli $conn, int $fromAssignmentId, int $toAssignmentId, array $oldVersion, array $newVersion): void
+    {
+        $oldRequirements = mmh_revision_version_requirements_flat($oldVersion);
+        foreach (mmh_revision_version_requirements_flat($newVersion) as $newRequirementId => $newRequirement) {
+            $sourceId = (int) ($newRequirement['source_requirement_id'] ?? 0);
+            if ($sourceId <= 0 || !isset($oldRequirements[$sourceId])) continue;
+            $oldRequirement = $oldRequirements[$sourceId]; $oldType = strtolower(trim((string) ($oldRequirement['requirement_type'] ?? ''))); $newType = strtolower(trim((string) ($newRequirement['requirement_type'] ?? '')));
+            if ($oldType === '' || $oldType !== $newType) continue;
+            if (mmh_revision_progress_schema_available($conn)) {
+                $progress = $conn->prepare('INSERT IGNORE INTO revision_plan_requirement_progress (assignment_id, requirement_id, completed_at) SELECT ?, ?, completed_at FROM revision_plan_requirement_progress WHERE assignment_id = ? AND requirement_id = ?');
+                if (!$progress) throw new RuntimeException('Unable to preserve Revision Plan progress.'); $oldId = $sourceId; $newId = (int) $newRequirementId; $progress->bind_param('iiii', $toAssignmentId, $newId, $fromAssignmentId, $oldId); if (!$progress->execute()) { $error = $progress->error; $progress->close(); throw new RuntimeException('Unable to preserve Revision Plan progress: ' . $error); } $progress->close();
+            }
+            mmh_revision_copy_submission_state($conn, $fromAssignmentId, $sourceId, $toAssignmentId, (int) $newRequirementId);
+        }
+    }
+}
+
+if (!function_exists('mmh_revision_merge_same_version_assignment_state')) {
+    function mmh_revision_merge_same_version_assignment_state(mysqli $conn, int $fromAssignmentId, int $toAssignmentId, array $version): void
+    {
+        if (mmh_revision_progress_schema_available($conn)) {
+            $progress = $conn->prepare('INSERT IGNORE INTO revision_plan_requirement_progress (assignment_id, requirement_id, completed_at) SELECT ?, requirement_id, completed_at FROM revision_plan_requirement_progress WHERE assignment_id = ?');
+            if (!$progress) throw new RuntimeException('Unable to merge Revision Plan progress.'); $progress->bind_param('ii', $toAssignmentId, $fromAssignmentId); if (!$progress->execute()) { $error = $progress->error; $progress->close(); throw new RuntimeException('Unable to merge Revision Plan progress: ' . $error); } $progress->close();
+        }
+        if (mmh_revision_submission_schema_available($conn)) foreach (mmh_revision_version_requirements_flat($version) as $requirementId => $_requirement) mmh_revision_copy_submission_state($conn, $fromAssignmentId, (int) $requirementId, $toAssignmentId, (int) $requirementId);
+    }
+}
+
+if (!function_exists('mmh_revision_upgrade_assignments_for_version')) {
+    /** Upgrade active assignments in place and archive superseded duplicate rows. */
+    function mmh_revision_upgrade_assignments_for_version(mysqli $conn, int $templateId, int $newVersionId): int
+    {
+        if ($templateId <= 0 || $newVersionId <= 0 || !mmh_revision_assignment_schema_available($conn)) return 0;
+        $newVersion = mmh_revision_version($conn, $newVersionId); if (!is_array($newVersion)) throw new InvalidArgumentException('The new Revision Plan Version could not be loaded.');
+        $stmt = $conn->prepare("SELECT id, user_id, template_version_id, assigned_at FROM revision_plan_assignments WHERE template_id = ? AND status = 'active' AND archived_at IS NULL AND (ended_at IS NULL OR ended_at > UTC_TIMESTAMP()) ORDER BY user_id ASC, assigned_at ASC, id ASC FOR UPDATE");
+        if (!$stmt) throw new RuntimeException('Unable to inspect Revision Plan assignments.'); $stmt->bind_param('i', $templateId); $stmt->execute(); $rows = $stmt->get_result()->fetch_all(MYSQLI_ASSOC); $stmt->close();
+        $groups = []; foreach ($rows as $row) $groups[(int) $row['user_id']][] = $row; $upgraded = 0;
+        foreach ($groups as $userRows) {
+            $canonical = $userRows[0]; $canonicalId = (int) $canonical['id']; $canonicalVersionId = (int) $canonical['template_version_id']; $canonicalVersion = $canonicalVersionId > 0 ? mmh_revision_version($conn, $canonicalVersionId) : null; if (!is_array($canonicalVersion)) $canonicalVersion = $newVersion;
+            if ($canonicalVersionId !== $newVersionId) {
+                mmh_revision_transfer_assignment_state($conn, $canonicalId, $canonicalId, $canonicalVersion, $newVersion);
+                $update = $conn->prepare('UPDATE revision_plan_assignments SET template_version_id = ? WHERE id = ?'); if (!$update) throw new RuntimeException('Unable to upgrade the Revision Plan assignment.'); $update->bind_param('ii', $newVersionId, $canonicalId); if (!$update->execute()) throw new RuntimeException('Unable to upgrade the Revision Plan assignment.'); $update->close(); $upgraded++;
+            }
+            foreach (array_slice($userRows, 1) as $duplicate) {
+                $duplicateId = (int) $duplicate['id']; $duplicateVersionId = (int) $duplicate['template_version_id']; $duplicateVersion = $duplicateVersionId > 0 ? mmh_revision_version($conn, $duplicateVersionId) : null;
+                if (is_array($duplicateVersion) && $duplicateVersionId !== $newVersionId) mmh_revision_transfer_assignment_state($conn, $duplicateId, $canonicalId, $duplicateVersion, $newVersion); elseif ($duplicateVersionId === $newVersionId) mmh_revision_merge_same_version_assignment_state($conn, $duplicateId, $canonicalId, $newVersion);
+                $archive = $conn->prepare("UPDATE revision_plan_assignments SET status = 'archived', archived_at = COALESCE(archived_at, UTC_TIMESTAMP()), ended_at = COALESCE(ended_at, UTC_TIMESTAMP()) WHERE id = ? AND template_id = ? AND status = 'active'"); if (!$archive) throw new RuntimeException('Unable to archive a superseded Revision Plan assignment.'); $archive->bind_param('ii', $duplicateId, $templateId); if (!$archive->execute()) throw new RuntimeException('Unable to archive a superseded Revision Plan assignment.'); $archive->close();
+            }
+        }
+        return $upgraded;
     }
 }
 
@@ -1344,24 +1497,33 @@ if (!function_exists('mmh_revision_assign_students')) {
         if (!$ids) throw new InvalidArgumentException('Select at least one enrolled student.');
         $conn->begin_transaction();
         try {
-            $courseId = (string) $version['course_id'];
-            $templateId = (int) $version['template_id'];
-            $count = 0;
+            $courseId = (string) $version['course_id']; $templateId = (int) $version['template_id']; $count = 0;
             $check = $conn->prepare("SELECT u.user_id FROM users u INNER JOIN course_logs cl ON cl.user_id = u.user_id AND cl.course_id = ? WHERE u.user_id = ? AND u.role = 'user' AND u.status = '1' AND u.archived_at IS NULL LIMIT 1");
-            /*
-             * The unique key prevents duplicate student/version assignments.  A
-             * re-assignment must also make an older archived/ended row active
-             * again; leaving that row untouched makes the admin confirmation say
-             * "assigned" while the student list correctly hides it.
-             */
-            $insert = $conn->prepare("INSERT INTO revision_plan_assignments (template_id, template_version_id, course_id, user_id, start_date, assigned_by) VALUES (?, ?, ?, ?, ?, ?) ON DUPLICATE KEY UPDATE course_id = VALUES(course_id), start_date = VALUES(start_date), status = 'active', assigned_by = VALUES(assigned_by), assigned_at = CURRENT_TIMESTAMP, archived_at = NULL, ended_at = NULL");
-            if (!$check || !$insert) throw new RuntimeException('Unable to prepare Revision Plan assignment.');
+            $find = $conn->prepare("SELECT id, template_version_id, status FROM revision_plan_assignments WHERE template_id = ? AND user_id = ? ORDER BY CASE WHEN status = 'active' AND archived_at IS NULL THEN 0 ELSE 1 END, assigned_at ASC, id ASC LIMIT 1 FOR UPDATE");
+            $insert = $conn->prepare('INSERT INTO revision_plan_assignments (template_id, template_version_id, course_id, user_id, start_date, assigned_by) VALUES (?, ?, ?, ?, ?, ?)');
+            if (!$check || !$find || !$insert) throw new RuntimeException('Unable to prepare Revision Plan assignment.');
             foreach ($ids as $studentId) { $check->bind_param('si', $courseId, $studentId); $check->execute(); if (!$check->get_result()->fetch_assoc()) throw new InvalidArgumentException('Every selected student must be an active enrollee in this course.'); }
-            foreach ($ids as $studentId) { $insert->bind_param('iisisi', $templateId, $versionId, $courseId, $studentId, $startDate, $adminId); if (!$insert->execute()) throw new RuntimeException('Unable to assign the Revision Plan.'); $count++; }
-            $check->close();
-            $insert->close();
-            $conn->commit();
-            return $count;
+            foreach ($ids as $studentId) {
+                $find->bind_param('ii', $templateId, $studentId); $find->execute(); $existing = $find->get_result()->fetch_assoc() ?: null;
+                if (is_array($existing)) {
+                    $assignmentId = (int) $existing['id']; $oldVersionId = (int) $existing['template_version_id']; $isActive = (string) ($existing['status'] ?? '') === 'active';
+                    if ($oldVersionId > 0 && $oldVersionId !== $versionId) {
+                        $oldVersion = mmh_revision_version($conn, $oldVersionId); if (is_array($oldVersion)) mmh_revision_transfer_assignment_state($conn, $assignmentId, $assignmentId, $oldVersion, $version);
+                    }
+                    if ($isActive) {
+                        $update = $conn->prepare("UPDATE revision_plan_assignments SET template_version_id = ?, course_id = ?, assigned_by = ? WHERE id = ?");
+                        if (!$update) throw new RuntimeException('Unable to update the Revision Plan assignment.'); $update->bind_param('isii', $versionId, $courseId, $adminId, $assignmentId);
+                    } else {
+                        $update = $conn->prepare("UPDATE revision_plan_assignments SET template_version_id = ?, course_id = ?, start_date = ?, status = 'active', assigned_by = ?, assigned_at = CURRENT_TIMESTAMP, archived_at = NULL, ended_at = NULL WHERE id = ?");
+                        if (!$update) throw new RuntimeException('Unable to reactivate the Revision Plan assignment.'); $update->bind_param('issii', $versionId, $courseId, $startDate, $adminId, $assignmentId);
+                    }
+                    if (!$update->execute()) throw new RuntimeException('Unable to assign the Revision Plan.'); $update->close();
+                } else {
+                    $insert->bind_param('iisisi', $templateId, $versionId, $courseId, $studentId, $startDate, $adminId); if (!$insert->execute()) throw new RuntimeException('Unable to assign the Revision Plan.');
+                }
+                $count++;
+            }
+            $check->close(); $find->close(); $insert->close(); $conn->commit(); return $count;
         } catch (Throwable $e) { $conn->rollback(); throw $e; }
     }
 }

@@ -45,6 +45,12 @@ try {
         $redirect(true, 'Revision Plan template created.', $newTemplateId, $newVersionId);
     }
 
+    if ($action === 'edit_template') {
+        $sourceId = $versionId > 0 ? $versionId : mmh_revision_latest_version_id($conn, $templateId);
+        $draftId = mmh_revision_prepare_editable_version($conn, $templateId, $sourceId, $adminId);
+        $redirect(true, $draftId === $sourceId ? 'Revision Plan is ready to edit.' : 'Editing a new draft. Published student plans remain unchanged until you publish changes.', $templateId, $draftId);
+    }
+
     if ($action === 'prepare_batch_edit') {
         $version = mmh_revision_version($conn, $versionId);
         if (!$version || (int) ($version['template_id'] ?? 0) !== $templateId) throw new InvalidArgumentException('The selected Revision Plan version could not be found.');
@@ -60,6 +66,7 @@ try {
         $draftId = mmh_revision_prepare_editable_version($conn, $templateId, $versionId, $adminId);
         $draft = mmh_revision_version($conn, $draftId);
         if (!$draft) throw new RuntimeException('The editable Draft Version could not be loaded.');
+        $sourceWasDraft = (string) ($version['status'] ?? '') === 'draft';
         if ($sourceWasDraft) {
             $json = trim((string) ($_POST['structure_json'] ?? ''));
             $structure = $json === '' ? ['batches' => ($draft['batches'] ?? [])] : json_decode($json, true);
