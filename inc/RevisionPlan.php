@@ -42,6 +42,36 @@ if (!function_exists('mmh_revision_batch_controls_schema_available')) {
     }
 }
 
+if (!function_exists('mmh_revision_manual_dates_schema_available')) {
+    function mmh_revision_manual_dates_schema_available(mysqli $conn): bool
+    {
+        $stmt = $conn->prepare("SELECT COUNT(*) AS total FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'revision_plan_template_batches' AND COLUMN_NAME = 'schedule_mode'");
+        if (!$stmt) return false;
+        $stmt->execute(); $batchMode = (int) (($stmt->get_result()->fetch_assoc()['total'] ?? 0)); $stmt->close();
+        $stmt = $conn->prepare("SELECT COUNT(*) AS total FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'revision_plan_template_days' AND COLUMN_NAME = 'scheduled_date'");
+        if (!$stmt) return false;
+        $stmt->execute(); $dayDate = (int) (($stmt->get_result()->fetch_assoc()['total'] ?? 0)); $stmt->close();
+        return $batchMode > 0 && $dayDate > 0;
+    }
+}
+
+if (!function_exists('mmh_revision_normalize_study_date')) {
+    function mmh_revision_normalize_study_date($value, bool $required = false): ?string
+    {
+        $date = trim((string) $value);
+        if ($date === '') {
+            if ($required) throw new InvalidArgumentException('Enter a Study date for every Day when Manual dates is selected.');
+            return null;
+        }
+        $parsed = DateTimeImmutable::createFromFormat('!Y-m-d', $date);
+        $errors = DateTimeImmutable::getLastErrors();
+        if (!$parsed || ($errors !== false && ($errors['warning_count'] ?? 0) > 0) || ($errors !== false && ($errors['error_count'] ?? 0) > 0) || $parsed->format('Y-m-d') !== $date) {
+            throw new InvalidArgumentException('Study dates must use a valid calendar date.');
+        }
+        return $date;
+    }
+}
+
 if (!function_exists('mmh_revision_batch_has_content')) {
     /** A batch may remain an empty shell until it is ready for release. */
     function mmh_revision_batch_has_content(array $batch): bool
@@ -330,13 +360,17 @@ if (!function_exists('mmh_revision_validate_structure')) {
             if ($batchTitle === '') throw new InvalidArgumentException('Every batch needs a title.');
             $dayAccess = strtolower(trim((string) ($batch['day_access_mode'] ?? 'follow_schedule')));
             if (!in_array($dayAccess, ['follow_schedule', 'open_all'], true)) $dayAccess = 'follow_schedule';
-            $cleanBatch = ['title' => $batchTitle, 'description' => mb_substr(trim((string) ($batch['description'] ?? '')), 0, 1000), 'suggested_days' => max(0, min(365, (int) ($batch['suggested_days'] ?? 0))), 'day_access_mode' => $dayAccess, 'sort_order' => count($clean['batches']), 'days' => []];
+            $scheduleMode = strtolower(trim((string) ($batch['schedule_mode'] ?? 'automatic')));
+            if (!in_array($scheduleMode, ['automatic', 'manual'], true)) $scheduleMode = 'automatic';
+            if ($scheduleMode === 'manual' && !mmh_revision_manual_dates_schema_available($conn)) throw new RuntimeException('Manual dates are unavailable until the Revision Plan date migration is applied.');
+            $cleanBatch = ['title' => $batchTitle, 'description' => mb_substr(trim((string) ($batch['description'] ?? '')), 0, 1000), 'suggested_days' => max(0, min(365, (int) ($batch['suggested_days'] ?? 0))), 'day_access_mode' => $dayAccess, 'schedule_mode' => $scheduleMode, 'sort_order' => count($clean['batches']), 'days' => []];
             foreach ((array) ($batch['days'] ?? []) as $dayIndex => $day) {
                 if (!is_array($day)) continue;
                 $dayTitle = mb_substr(trim((string) ($day['title'] ?? '')), 0, 180);
                 if ($dayTitle === '') throw new InvalidArgumentException('Every day needs a title.');
                 // Day numbers are presentation sequence, never a client-controlled ID.
-                $cleanDay = ['day_number' => count($cleanBatch['days']) + 1, 'title' => $dayTitle, 'description' => mb_substr(trim((string) ($day['description'] ?? '')), 0, 1000), 'sort_order' => count($cleanBatch['days']), 'requirements' => [], 'activity_groups' => []];
+                $scheduledDate = mmh_revision_normalize_study_date($day['scheduled_date'] ?? '', $scheduleMode === 'manual');
+                $cleanDay = ['day_number' => count($cleanBatch['days']) + 1, 'title' => $dayTitle, 'description' => mb_substr(trim((string) ($day['description'] ?? '')), 0, 1000), 'scheduled_date' => $scheduledDate, 'sort_order' => count($cleanBatch['days']), 'requirements' => [], 'activity_groups' => []];
                 $normalizeRequirement = static function ($requirement, int $sort, ?int $activityId, array &$cleanDay) use ($itemMap, $resourceIds): array {
                     if (!is_array($requirement)) return [];
                     $title = mb_substr(trim((string) ($requirement['title'] ?? '')), 0, 180);
@@ -407,15 +441,20 @@ if (!function_exists('mmh_revision_save_draft')) {
             if (!$clear) throw new RuntimeException('Unable to replace the Draft Version structure.');
             $clear->bind_param('i', $versionId); if (!$clear->execute()) throw new RuntimeException('Unable to replace the Draft Version structure.'); $clear->close();
             $hasBatchAccess = mmh_revision_batch_controls_schema_available($conn);
+            $hasManualDates = mmh_revision_manual_dates_schema_available($conn);
             foreach ($clean['batches'] as $batchPosition => $batch) {
-                if ($hasBatchAccess) {
+                if ($hasManualDates) {
+                    $stmt = $conn->prepare('INSERT INTO revision_plan_template_batches (version_id, title, description, suggested_days, sort_order, day_access_mode, schedule_mode) VALUES (?, ?, ?, ?, ?, ?, ?)');
+                    if (!$stmt) throw new RuntimeException('Unable to save a batch.');
+                    $stmt->bind_param('issiiss', $versionId, $batch['title'], $batch['description'], $batch['suggested_days'], $batch['sort_order'], $batch['day_access_mode'], $batch['schedule_mode']);
+                } elseif ($hasBatchAccess) {
                     $stmt = $conn->prepare('INSERT INTO revision_plan_template_batches (version_id, title, description, suggested_days, sort_order, day_access_mode) VALUES (?, ?, ?, ?, ?, ?)');
                     $stmt->bind_param('issiis', $versionId, $batch['title'], $batch['description'], $batch['suggested_days'], $batch['sort_order'], $batch['day_access_mode']);
                 } else {
                     $stmt = $conn->prepare('INSERT INTO revision_plan_template_batches (version_id, title, description, suggested_days, sort_order) VALUES (?, ?, ?, ?, ?)');
                     $stmt->bind_param('issii', $versionId, $batch['title'], $batch['description'], $batch['suggested_days'], $batch['sort_order']);
                 }
-                if (!$stmt->execute()) throw new RuntimeException('Unable to save a batch.'); $batchId = (int) $stmt->insert_id; $stmt->close();
+                if (!$stmt || !$stmt->execute()) throw new RuntimeException('Unable to save a batch.'); $batchId = (int) $stmt->insert_id; $stmt->close();
                 foreach ($resourceBatchPositions as $resourceId => $resourcePosition) {
                     if ($resourcePosition !== (int) $batchPosition) continue;
                     $resourceUpdate = $conn->prepare('UPDATE revision_plan_template_resources SET batch_id = ? WHERE id = ? AND version_id = ?');
@@ -425,8 +464,16 @@ if (!function_exists('mmh_revision_save_draft')) {
                     $resourceUpdate->close();
                 }
                 foreach ($batch['days'] as $day) {
-                    $stmt = $conn->prepare('INSERT INTO revision_plan_template_days (batch_id, version_id, day_number, title, description, sort_order) VALUES (?, ?, ?, ?, ?, ?)');
-                    $stmt->bind_param('iiissi', $batchId, $versionId, $day['day_number'], $day['title'], $day['description'], $day['sort_order']); if (!$stmt->execute()) throw new RuntimeException('Unable to save a day.'); $dayId = (int) $stmt->insert_id; $stmt->close();
+                    if ($hasManualDates) {
+                        $stmt = $conn->prepare("INSERT INTO revision_plan_template_days (batch_id, version_id, day_number, title, description, scheduled_date, sort_order) VALUES (?, ?, ?, ?, ?, NULLIF(?, ''), ?)");
+                        if (!$stmt) throw new RuntimeException('Unable to save a day.');
+                        $scheduledDate = (string) ($day['scheduled_date'] ?? '');
+                        $stmt->bind_param('iiisssi', $batchId, $versionId, $day['day_number'], $day['title'], $day['description'], $scheduledDate, $day['sort_order']);
+                    } else {
+                        $stmt = $conn->prepare('INSERT INTO revision_plan_template_days (batch_id, version_id, day_number, title, description, sort_order) VALUES (?, ?, ?, ?, ?, ?)');
+                        $stmt->bind_param('iiissi', $batchId, $versionId, $day['day_number'], $day['title'], $day['description'], $day['sort_order']);
+                    }
+                    if (!$stmt || !$stmt->execute()) throw new RuntimeException('Unable to save a day.'); $dayId = (int) $stmt->insert_id; $stmt->close();
                     foreach ($day['requirements'] as $requirement) mmh_revision_insert_requirement($conn, $versionId, $dayId, null, $requirement);
                     foreach ($day['activity_groups'] as $group) {
                         $stmt = $conn->prepare('INSERT INTO revision_plan_template_activities (day_id, version_id, title, description, sort_order) VALUES (?, ?, ?, ?, ?)');
@@ -597,6 +644,7 @@ if (!function_exists('mmh_revision_clone_version')) {
             $resourceMap = [];
             $batchMap = [];
             $hasBatchAccess = mmh_revision_batch_controls_schema_available($conn);
+            $hasManualDates = mmh_revision_manual_dates_schema_available($conn);
             foreach ((array) ($source['resources'] ?? []) as $resource) {
                 $stmt = $conn->prepare('INSERT INTO revision_plan_template_resources (version_id, batch_id, resource_type, display_name, external_url, storage_key, original_filename, mime_type, file_size_bytes, linked_course_item_id, sort_order, created_by) VALUES (?, NULL, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)');
                 $stmt->bind_param('issssssisii', $newVersionId, $resource['resource_type'], $resource['display_name'], $resource['external_url'], $resource['storage_key'], $resource['original_filename'], $resource['mime_type'], $resource['file_size_bytes'], $resource['linked_course_item_id'], $resource['sort_order'], $adminId); if (!$stmt->execute()) throw new RuntimeException('Unable to clone a shared resource.'); $resourceMap[(int) $resource['id']] = (int) $stmt->insert_id; $stmt->close();
@@ -604,11 +652,15 @@ if (!function_exists('mmh_revision_clone_version')) {
             foreach ((array) ($source['batches'] ?? []) as $batch) {
                 $batchDayAccess = (string) ($batch['day_access_mode'] ?? 'follow_schedule');
                 $dayAccess = in_array($batchDayAccess, ['follow_schedule', 'open_all'], true) ? $batchDayAccess : 'follow_schedule';
-                if ($hasBatchAccess) { $stmt = $conn->prepare('INSERT INTO revision_plan_template_batches (version_id, title, description, suggested_days, sort_order, day_access_mode) VALUES (?, ?, ?, ?, ?, ?)'); $stmt->bind_param('issiis', $newVersionId, $batch['title'], $batch['description'], $batch['suggested_days'], $batch['sort_order'], $dayAccess); }
+                $scheduleMode = in_array((string) ($batch['schedule_mode'] ?? 'automatic'), ['automatic', 'manual'], true) ? (string) ($batch['schedule_mode'] ?? 'automatic') : 'automatic';
+                if ($hasManualDates) { $stmt = $conn->prepare('INSERT INTO revision_plan_template_batches (version_id, title, description, suggested_days, sort_order, day_access_mode, schedule_mode) VALUES (?, ?, ?, ?, ?, ?, ?)'); if (!$stmt) throw new RuntimeException('Unable to clone a batch.'); $stmt->bind_param('issiiss', $newVersionId, $batch['title'], $batch['description'], $batch['suggested_days'], $batch['sort_order'], $dayAccess, $scheduleMode); }
+                elseif ($hasBatchAccess) { $stmt = $conn->prepare('INSERT INTO revision_plan_template_batches (version_id, title, description, suggested_days, sort_order, day_access_mode) VALUES (?, ?, ?, ?, ?, ?)'); $stmt->bind_param('issiis', $newVersionId, $batch['title'], $batch['description'], $batch['suggested_days'], $batch['sort_order'], $dayAccess); }
                 else { $stmt = $conn->prepare('INSERT INTO revision_plan_template_batches (version_id, title, description, suggested_days, sort_order) VALUES (?, ?, ?, ?, ?)'); $stmt->bind_param('issii', $newVersionId, $batch['title'], $batch['description'], $batch['suggested_days'], $batch['sort_order']); }
-                if (!$stmt->execute()) throw new RuntimeException('Unable to clone a batch.'); $batchId = (int) $stmt->insert_id; $stmt->close(); $batchMap[(int) $batch['id']] = $batchId;
+                if (!$stmt || !$stmt->execute()) throw new RuntimeException('Unable to clone a batch.'); $batchId = (int) $stmt->insert_id; $stmt->close(); $batchMap[(int) $batch['id']] = $batchId;
                 foreach ((array) ($batch['days'] ?? []) as $day) {
-                    $stmt = $conn->prepare('INSERT INTO revision_plan_template_days (batch_id, version_id, day_number, title, description, sort_order) VALUES (?, ?, ?, ?, ?, ?)'); $stmt->bind_param('iiissi', $batchId, $newVersionId, $day['day_number'], $day['title'], $day['description'], $day['sort_order']); if (!$stmt->execute()) throw new RuntimeException('Unable to clone a day.'); $dayId = (int) $stmt->insert_id; $stmt->close();
+                    if ($hasManualDates) { $stmt = $conn->prepare("INSERT INTO revision_plan_template_days (batch_id, version_id, day_number, title, description, scheduled_date, sort_order) VALUES (?, ?, ?, ?, ?, NULLIF(?, ''), ?)"); if (!$stmt) throw new RuntimeException('Unable to clone a day.'); $scheduledDate = (string) ($day['scheduled_date'] ?? ''); $stmt->bind_param('iiisssi', $batchId, $newVersionId, $day['day_number'], $day['title'], $day['description'], $scheduledDate, $day['sort_order']); }
+                    else { $stmt = $conn->prepare('INSERT INTO revision_plan_template_days (batch_id, version_id, day_number, title, description, sort_order) VALUES (?, ?, ?, ?, ?, ?)'); $stmt->bind_param('iiissi', $batchId, $newVersionId, $day['day_number'], $day['title'], $day['description'], $day['sort_order']); }
+                    if (!$stmt || !$stmt->execute()) throw new RuntimeException('Unable to clone a day.'); $dayId = (int) $stmt->insert_id; $stmt->close();
                     foreach ((array) ($day['requirements'] ?? []) as $requirement) mmh_revision_clone_requirement($conn, $newVersionId, $dayId, null, $requirement, $resourceMap);
                     foreach ((array) ($day['activity_groups'] ?? []) as $group) {
                         $stmt = $conn->prepare('INSERT INTO revision_plan_template_activities (day_id, version_id, title, description, sort_order) VALUES (?, ?, ?, ?, ?)'); $stmt->bind_param('iissi', $dayId, $newVersionId, $group['title'], $group['description'], $group['sort_order']); if (!$stmt->execute()) throw new RuntimeException('Unable to clone an Activity Group.'); $activityId = (int) $stmt->insert_id; $stmt->close();
@@ -966,9 +1018,16 @@ if (!function_exists('mmh_revision_assignment_days')) {
         foreach ((array) ($version['batches'] ?? []) as $batch) {
             $batchMode = strtolower(trim((string) ($batch['day_access_mode'] ?? '')));
             $batchAllowAhead = $batchMode === 'open_all' ? true : ($batchMode === 'follow_schedule' ? false : $allowAhead);
+            $scheduleMode = strtolower(trim((string) ($batch['schedule_mode'] ?? 'automatic')));
+            if (!in_array($scheduleMode, ['automatic', 'manual'], true)) $scheduleMode = 'automatic';
             foreach ((array) ($batch['days'] ?? []) as $day) {
-                $scheduled = $start->modify('+' . $offset . ' days');
+                $authoredDate = mmh_revision_normalize_study_date($day['scheduled_date'] ?? '', false);
+                $scheduled = $scheduleMode === 'manual' && $authoredDate !== null
+                    ? DateTimeImmutable::createFromFormat('!Y-m-d', $authoredDate, $timezone)
+                    : $start->modify('+' . $offset . ' days');
+                if (!$scheduled) $scheduled = $start->modify('+' . $offset . ' days');
                 $day['batch_title'] = (string) ($batch['title'] ?? 'Batch');
+                $day['schedule_mode'] = $scheduleMode;
                 $day['absolute_day_number'] = $offset + 1;
                 $day['scheduled_date'] = $scheduled->format('Y-m-d');
                 $day['availability'] = $scheduled < $today ? 'previous' : ($scheduled == $today ? 'today' : ($batchAllowAhead ? 'upcoming' : 'locked'));

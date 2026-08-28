@@ -76,7 +76,7 @@ try {
         $dayCount = max(0, min(30, (int) ($_POST['batch_days'] ?? 0)));
         $days = [];
         for ($i = 0; $i < $dayCount; $i++) $days[] = ['day_number' => $i + 1, 'title' => 'Day ' . ($i + 1), 'description' => '', 'sort_order' => $i, 'requirements' => [], 'activity_groups' => []];
-        $batches[] = ['title' => $title, 'description' => $description, 'suggested_days' => $dayCount, 'day_access_mode' => 'follow_schedule', 'sort_order' => count($batches), 'days' => $days];
+        $batches[] = ['title' => $title, 'description' => $description, 'suggested_days' => $dayCount, 'day_access_mode' => 'follow_schedule', 'schedule_mode' => 'automatic', 'sort_order' => count($batches), 'days' => $days];
         $structure['batches'] = $batches;
         $draftTemplate = mmh_revision_template($conn, $templateId);
         if (!$draftTemplate) throw new RuntimeException('The Revision Plan template could not be loaded.');
@@ -159,6 +159,8 @@ try {
         if ($title === '') throw new InvalidArgumentException('Enter a Batch name.');
         $dayAccess = strtolower(trim((string) ($_POST['day_access_mode'] ?? 'follow_schedule')));
         if (!in_array($dayAccess, ['follow_schedule', 'open_all'], true)) $dayAccess = 'follow_schedule';
+        $scheduleMode = strtolower(trim((string) ($_POST['schedule_mode'] ?? 'automatic')));
+        if (!in_array($scheduleMode, ['automatic', 'manual'], true)) $scheduleMode = 'automatic';
         $version = mmh_revision_version($conn, $versionId);
         if (!$version || (int) ($version['template_id'] ?? 0) !== $templateId) throw new InvalidArgumentException('The selected Revision Plan version could not be found.');
         $batches = (array) ($version['batches'] ?? []);
@@ -185,6 +187,7 @@ try {
         if (!array_key_exists($batchPosition, $draftBatches)) throw new InvalidArgumentException('Batch not found.');
         $draftBatches[$batchPosition]['title'] = $title;
         $draftBatches[$batchPosition]['day_access_mode'] = $dayAccess;
+        $draftBatches[$batchPosition]['schedule_mode'] = $scheduleMode;
         $structure['batches'] = $draftBatches;
         $template = mmh_revision_template($conn, $templateId);
         if (!$template) throw new RuntimeException('The Revision Plan template could not be loaded.');
