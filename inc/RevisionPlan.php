@@ -563,21 +563,6 @@ if (!function_exists('mmh_revision_update_batch_controls')) {
                 $versionTemplate = (int) (($versionCheck->get_result()->fetch_assoc()['template_id'] ?? 0)); $versionCheck->close();
                 if ($versionTemplate !== $templateId) throw new InvalidArgumentException('Batch does not belong to the selected Version.');
             }
-            if ($visibility === 'coming_soon') {
-                $releaseId = (int) $row['id'];
-                if (mmh_revision_progress_schema_available($conn)) {
-                    $progress = $conn->prepare('SELECT COUNT(*) AS total FROM revision_plan_requirement_progress p INNER JOIN revision_plan_template_requirements r ON r.id = p.requirement_id INNER JOIN revision_plan_template_days d ON d.id = r.day_id INNER JOIN revision_plan_template_batches b ON b.id = d.batch_id WHERE b.id = (SELECT source_batch_id FROM revision_plan_batch_releases WHERE id = ?) AND p.completed_at IS NOT NULL');
-                    if (!$progress) throw new RuntimeException('Unable to inspect Batch progress.');
-                    $progress->bind_param('i', $releaseId); $progress->execute(); $count = (int) (($progress->get_result()->fetch_assoc()['total'] ?? 0)); $progress->close();
-                    if ($count > 0) throw new InvalidArgumentException('This Batch has student progress and cannot be hidden.');
-                }
-                if (mmh_revision_submission_schema_available($conn)) {
-                    $submissions = $conn->prepare('SELECT COUNT(*) AS total FROM revision_plan_requirement_submissions s INNER JOIN revision_plan_template_requirements r ON r.id = s.requirement_id INNER JOIN revision_plan_template_days d ON d.id = r.day_id INNER JOIN revision_plan_template_batches b ON b.id = d.batch_id WHERE b.id = (SELECT source_batch_id FROM revision_plan_batch_releases WHERE id = ?)');
-                    if (!$submissions) throw new RuntimeException('Unable to inspect Batch submissions.');
-                    $submissions->bind_param('i', $releaseId); $submissions->execute(); $count = (int) (($submissions->get_result()->fetch_assoc()['total'] ?? 0)); $submissions->close();
-                    if ($count > 0) throw new InvalidArgumentException('This Batch has student activity and cannot be hidden.');
-                }
-            }
             $update = $conn->prepare('UPDATE revision_plan_batch_releases SET visibility = ?, day_access_mode = ?, display_title = ?, released_at = released_at WHERE id = ?');
             if (!$update) throw new RuntimeException('Unable to save Batch controls.');
             $id = (int) $row['id']; $update->bind_param('sssi', $visibility, $dayAccess, $title, $id);
