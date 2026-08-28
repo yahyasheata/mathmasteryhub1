@@ -114,7 +114,7 @@ try {
             mmh_revision_save_draft($conn, $versionId, $structure, mb_substr(trim((string) ($_POST['title'] ?? $template['title'] ?? '')), 0, 180), mb_substr(trim((string) ($_POST['description'] ?? $template['description'] ?? '')), 0, 1000), !empty($_POST['allow_work_ahead']));
         }
         mmh_revision_publish_version($conn, $versionId, $adminId);
-        $redirect(true, 'Version ' . (int) $version['version_number'] . ' is now finalized and immutable.', (int) $version['template_id'], $versionId);
+        $redirect(true, 'Revision Plan published.', (int) $version['template_id'], $versionId);
     }
 
     if ($action === 'publish_and_assign') {
