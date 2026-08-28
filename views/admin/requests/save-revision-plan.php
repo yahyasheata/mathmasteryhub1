@@ -109,6 +109,22 @@ try {
         $redirect(true, $assigned > 0 ? $assigned . ' student' . ($assigned === 1 ? '' : 's') . ' assigned.' : 'Those students already have this Version assigned.', (int) ($_POST['template_id'] ?? 0), $versionId);
     }
 
+    if ($action === 'update_batch_controls') {
+        if ($templateId <= 0) throw new InvalidArgumentException('Revision Plan not found.');
+        $batchPosition = (int) ($_POST['batch_position'] ?? -1);
+        if ($batchPosition < 0) throw new InvalidArgumentException('Batch not found.');
+        mmh_revision_update_batch_controls(
+            $conn,
+            $templateId,
+            $batchPosition,
+            (string) ($_POST['batch_title'] ?? ''),
+            (string) ($_POST['batch_visibility'] ?? 'released'),
+            (string) ($_POST['day_access_mode'] ?? 'follow_schedule'),
+            $versionId
+        );
+        $redirect(true, 'Batch settings saved.', $templateId, $versionId);
+    }
+
     if ($action === 'new_version') {
         $sourceId = $versionId > 0 ? $versionId : mmh_revision_latest_version_id($conn, $templateId);
         $newVersionId = mmh_revision_clone_version($conn, $sourceId, $adminId);

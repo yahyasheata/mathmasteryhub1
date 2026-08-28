@@ -33,6 +33,15 @@ if (!function_exists('mmh_revision_batch_release_schema_available')) {
     }
 }
 
+if (!function_exists('mmh_revision_batch_controls_schema_available')) {
+    function mmh_revision_batch_controls_schema_available(mysqli $conn): bool
+    {
+        $stmt = $conn->prepare("SELECT COUNT(*) AS total FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'revision_plan_template_batches' AND COLUMN_NAME = 'day_access_mode'");
+        if (!$stmt) return false;
+        $stmt->execute(); $ok = (int) (($stmt->get_result()->fetch_assoc()['total'] ?? 0)) > 0; $stmt->close(); return $ok;
+    }
+}
+
 if (!function_exists('mmh_revision_batch_has_content')) {
     /** A batch may remain an empty shell until it is ready for release. */
     function mmh_revision_batch_has_content(array $batch): bool
@@ -319,7 +328,9 @@ if (!function_exists('mmh_revision_validate_structure')) {
             if (!is_array($batch)) continue;
             $batchTitle = mb_substr(trim((string) ($batch['title'] ?? '')), 0, 180);
             if ($batchTitle === '') throw new InvalidArgumentException('Every batch needs a title.');
-            $cleanBatch = ['title' => $batchTitle, 'description' => mb_substr(trim((string) ($batch['description'] ?? '')), 0, 1000), 'suggested_days' => max(0, min(365, (int) ($batch['suggested_days'] ?? 0))), 'sort_order' => count($clean['batches']), 'days' => []];
+            $dayAccess = strtolower(trim((string) ($batch['day_access_mode'] ?? 'follow_schedule')));
+            if (!in_array($dayAccess, ['follow_schedule', 'open_all'], true)) $dayAccess = 'follow_schedule';
+            $cleanBatch = ['title' => $batchTitle, 'description' => mb_substr(trim((string) ($batch['description'] ?? '')), 0, 1000), 'suggested_days' => max(0, min(365, (int) ($batch['suggested_days'] ?? 0))), 'day_access_mode' => $dayAccess, 'sort_order' => count($clean['batches']), 'days' => []];
             foreach ((array) ($batch['days'] ?? []) as $dayIndex => $day) {
                 if (!is_array($day)) continue;
                 $dayTitle = mb_substr(trim((string) ($day['title'] ?? '')), 0, 180);
@@ -395,9 +406,16 @@ if (!function_exists('mmh_revision_save_draft')) {
             $clear = $conn->prepare('DELETE FROM revision_plan_template_batches WHERE version_id = ?');
             if (!$clear) throw new RuntimeException('Unable to replace the Draft Version structure.');
             $clear->bind_param('i', $versionId); if (!$clear->execute()) throw new RuntimeException('Unable to replace the Draft Version structure.'); $clear->close();
+            $hasBatchAccess = mmh_revision_batch_controls_schema_available($conn);
             foreach ($clean['batches'] as $batchPosition => $batch) {
-                $stmt = $conn->prepare('INSERT INTO revision_plan_template_batches (version_id, title, description, suggested_days, sort_order) VALUES (?, ?, ?, ?, ?)');
-                $stmt->bind_param('issii', $versionId, $batch['title'], $batch['description'], $batch['suggested_days'], $batch['sort_order']); if (!$stmt->execute()) throw new RuntimeException('Unable to save a batch.'); $batchId = (int) $stmt->insert_id; $stmt->close();
+                if ($hasBatchAccess) {
+                    $stmt = $conn->prepare('INSERT INTO revision_plan_template_batches (version_id, title, description, suggested_days, sort_order, day_access_mode) VALUES (?, ?, ?, ?, ?, ?)');
+                    $stmt->bind_param('issiis', $versionId, $batch['title'], $batch['description'], $batch['suggested_days'], $batch['sort_order'], $batch['day_access_mode']);
+                } else {
+                    $stmt = $conn->prepare('INSERT INTO revision_plan_template_batches (version_id, title, description, suggested_days, sort_order) VALUES (?, ?, ?, ?, ?)');
+                    $stmt->bind_param('issii', $versionId, $batch['title'], $batch['description'], $batch['suggested_days'], $batch['sort_order']);
+                }
+                if (!$stmt->execute()) throw new RuntimeException('Unable to save a batch.'); $batchId = (int) $stmt->insert_id; $stmt->close();
                 foreach ($resourceBatchPositions as $resourceId => $resourcePosition) {
                     if ($resourcePosition !== (int) $batchPosition) continue;
                     $resourceUpdate = $conn->prepare('UPDATE revision_plan_template_resources SET batch_id = ? WHERE id = ? AND version_id = ?');
@@ -473,7 +491,7 @@ if (!function_exists('mmh_revision_publish_version')) {
                 $released->execute();
                 foreach ($released->get_result()->fetch_all(MYSQLI_ASSOC) as $row) $existing[(int) $row['batch_position']] = true;
                 $released->close();
-                $insert = $conn->prepare("INSERT INTO revision_plan_batch_releases (template_id, source_version_id, source_batch_id, batch_position, released_by) VALUES (?, ?, ?, ?, ?)");
+                $insert = $conn->prepare("INSERT INTO revision_plan_batch_releases (template_id, source_version_id, source_batch_id, batch_position, status, visibility, day_access_mode, display_title, released_by) VALUES (?, ?, ?, ?, 'released', 'released', ?, NULLIF(?, ''), ?)");
                 if (!$insert) throw new RuntimeException('Unable to prepare Batch release.');
                 $inserted = 0;
                 foreach ((array) ($version['batches'] ?? []) as $position => $batch) {
@@ -482,7 +500,9 @@ if (!function_exists('mmh_revision_publish_version')) {
                     $batchId = (int) ($batch['id'] ?? 0);
                     if ($batchId <= 0) throw new RuntimeException('A Batch could not be released safely.');
                     $position = (int) $position;
-                    $insert->bind_param('iiiii', $version['template_id'], $versionId, $batchId, $position, $adminId);
+                    $dayAccess = in_array((string) ($batch['day_access_mode'] ?? 'follow_schedule'), ['follow_schedule', 'open_all'], true) ? (string) $batch['day_access_mode'] : 'follow_schedule';
+                    $displayTitle = trim((string) ($batch['title'] ?? ''));
+                    $insert->bind_param('iiiissi', $version['template_id'], $versionId, $batchId, $position, $dayAccess, $displayTitle, $adminId);
                     if (!$insert->execute()) throw new RuntimeException('Unable to release a Batch.');
                     $existing[$position] = true;
                     $inserted++;
@@ -507,13 +527,62 @@ if (!function_exists('mmh_revision_batch_release_statuses')) {
     function mmh_revision_batch_release_statuses(mysqli $conn, int $templateId): array
     {
         if ($templateId <= 0 || !mmh_revision_batch_release_schema_available($conn)) return [];
-        $stmt = $conn->prepare("SELECT batch_position, source_version_id, source_batch_id, released_at FROM revision_plan_batch_releases WHERE template_id = ? AND status = 'released' ORDER BY batch_position ASC");
+        $stmt = $conn->prepare("SELECT batch_position, source_version_id, source_batch_id, released_at, visibility, day_access_mode, display_title FROM revision_plan_batch_releases WHERE template_id = ? AND status = 'released' ORDER BY batch_position ASC");
         if (!$stmt) return [];
         $stmt->bind_param('i', $templateId); $stmt->execute();
         $rows = $stmt->get_result()->fetch_all(MYSQLI_ASSOC); $stmt->close();
         $result = [];
         foreach ($rows as $row) $result[(int) $row['batch_position']] = $row;
         return $result;
+    }
+}
+
+if (!function_exists('mmh_revision_update_batch_controls')) {
+    /** Update release metadata without mutating the immutable Batch content. */
+    function mmh_revision_update_batch_controls(mysqli $conn, int $templateId, int $batchPosition, string $title, string $visibility, string $dayAccess, int $versionId = 0): void
+    {
+        if ($templateId <= 0 || $batchPosition < 0 || !mmh_revision_batch_release_schema_available($conn)) throw new InvalidArgumentException('Batch release not found.');
+        $visibility = strtolower(trim($visibility));
+        $dayAccess = strtolower(trim($dayAccess));
+        if (!in_array($visibility, ['released', 'coming_soon'], true)) throw new InvalidArgumentException('Choose a valid Batch visibility.');
+        if (!in_array($dayAccess, ['follow_schedule', 'open_all'], true)) throw new InvalidArgumentException('Choose a valid Day access mode.');
+        $title = mb_substr(trim($title), 0, 180);
+        if ($title === '') throw new InvalidArgumentException('Enter a Batch name.');
+        $conn->begin_transaction();
+        try {
+            $lock = $conn->prepare('SELECT id, source_version_id FROM revision_plan_batch_releases WHERE template_id = ? AND batch_position = ? AND status = \'released\' FOR UPDATE');
+            if (!$lock) throw new RuntimeException('Unable to inspect the Batch release.');
+            $lock->bind_param('ii', $templateId, $batchPosition); $lock->execute();
+            $row = $lock->get_result()->fetch_assoc(); $lock->close();
+            if (!$row) throw new InvalidArgumentException('Batch release not found.');
+            if ($versionId > 0) {
+                $versionCheck = $conn->prepare('SELECT template_id FROM revision_plan_template_versions WHERE id = ? LIMIT 1');
+                if (!$versionCheck) throw new RuntimeException('Unable to verify the selected Version.');
+                $versionCheck->bind_param('i', $versionId); $versionCheck->execute();
+                $versionTemplate = (int) (($versionCheck->get_result()->fetch_assoc()['template_id'] ?? 0)); $versionCheck->close();
+                if ($versionTemplate !== $templateId) throw new InvalidArgumentException('Batch does not belong to the selected Version.');
+            }
+            if ($visibility === 'coming_soon') {
+                $releaseId = (int) $row['id'];
+                if (mmh_revision_progress_schema_available($conn)) {
+                    $progress = $conn->prepare('SELECT COUNT(*) AS total FROM revision_plan_requirement_progress p INNER JOIN revision_plan_template_requirements r ON r.id = p.requirement_id INNER JOIN revision_plan_template_days d ON d.id = r.day_id INNER JOIN revision_plan_template_batches b ON b.id = d.batch_id WHERE b.id = (SELECT source_batch_id FROM revision_plan_batch_releases WHERE id = ?) AND p.completed_at IS NOT NULL');
+                    if (!$progress) throw new RuntimeException('Unable to inspect Batch progress.');
+                    $progress->bind_param('i', $releaseId); $progress->execute(); $count = (int) (($progress->get_result()->fetch_assoc()['total'] ?? 0)); $progress->close();
+                    if ($count > 0) throw new InvalidArgumentException('This Batch has student progress and cannot be hidden.');
+                }
+                if (mmh_revision_submission_schema_available($conn)) {
+                    $submissions = $conn->prepare('SELECT COUNT(*) AS total FROM revision_plan_requirement_submissions s INNER JOIN revision_plan_template_requirements r ON r.id = s.requirement_id INNER JOIN revision_plan_template_days d ON d.id = r.day_id INNER JOIN revision_plan_template_batches b ON b.id = d.batch_id WHERE b.id = (SELECT source_batch_id FROM revision_plan_batch_releases WHERE id = ?)');
+                    if (!$submissions) throw new RuntimeException('Unable to inspect Batch submissions.');
+                    $submissions->bind_param('i', $releaseId); $submissions->execute(); $count = (int) (($submissions->get_result()->fetch_assoc()['total'] ?? 0)); $submissions->close();
+                    if ($count > 0) throw new InvalidArgumentException('This Batch has student activity and cannot be hidden.');
+                }
+            }
+            $update = $conn->prepare('UPDATE revision_plan_batch_releases SET visibility = ?, day_access_mode = ?, display_title = ?, released_at = released_at WHERE id = ?');
+            if (!$update) throw new RuntimeException('Unable to save Batch controls.');
+            $id = (int) $row['id']; $update->bind_param('sssi', $visibility, $dayAccess, $title, $id);
+            if (!$update->execute()) throw new RuntimeException('Unable to save Batch controls.');
+            $update->close(); $conn->commit();
+        } catch (Throwable $e) { $conn->rollback(); throw $e; }
     }
 }
 
@@ -529,12 +598,16 @@ if (!function_exists('mmh_revision_clone_version')) {
             $status = 'draft'; $version = $conn->prepare('INSERT INTO revision_plan_template_versions (template_id, version_number, status, created_by) VALUES (?, ?, ?, ?)'); $version->bind_param('iisi', $source['template_id'], $number, $status, $adminId); if (!$version->execute()) throw new RuntimeException('Unable to create the new Draft Version.'); $newVersionId = (int) $version->insert_id; $version->close();
             $resourceMap = [];
             $batchMap = [];
+            $hasBatchAccess = mmh_revision_batch_controls_schema_available($conn);
             foreach ((array) ($source['resources'] ?? []) as $resource) {
                 $stmt = $conn->prepare('INSERT INTO revision_plan_template_resources (version_id, batch_id, resource_type, display_name, external_url, storage_key, original_filename, mime_type, file_size_bytes, linked_course_item_id, sort_order, created_by) VALUES (?, NULL, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)');
                 $stmt->bind_param('issssssisii', $newVersionId, $resource['resource_type'], $resource['display_name'], $resource['external_url'], $resource['storage_key'], $resource['original_filename'], $resource['mime_type'], $resource['file_size_bytes'], $resource['linked_course_item_id'], $resource['sort_order'], $adminId); if (!$stmt->execute()) throw new RuntimeException('Unable to clone a shared resource.'); $resourceMap[(int) $resource['id']] = (int) $stmt->insert_id; $stmt->close();
             }
             foreach ((array) ($source['batches'] ?? []) as $batch) {
-                $stmt = $conn->prepare('INSERT INTO revision_plan_template_batches (version_id, title, description, suggested_days, sort_order) VALUES (?, ?, ?, ?, ?)'); $stmt->bind_param('issii', $newVersionId, $batch['title'], $batch['description'], $batch['suggested_days'], $batch['sort_order']); if (!$stmt->execute()) throw new RuntimeException('Unable to clone a batch.'); $batchId = (int) $stmt->insert_id; $stmt->close(); $batchMap[(int) $batch['id']] = $batchId;
+                $dayAccess = in_array((string) ($batch['day_access_mode'] ?? 'follow_schedule'), ['follow_schedule', 'open_all'], true) ? (string) $batch['day_access_mode'] : 'follow_schedule';
+                if ($hasBatchAccess) { $stmt = $conn->prepare('INSERT INTO revision_plan_template_batches (version_id, title, description, suggested_days, sort_order, day_access_mode) VALUES (?, ?, ?, ?, ?, ?)'); $stmt->bind_param('issiis', $newVersionId, $batch['title'], $batch['description'], $batch['suggested_days'], $batch['sort_order'], $dayAccess); }
+                else { $stmt = $conn->prepare('INSERT INTO revision_plan_template_batches (version_id, title, description, suggested_days, sort_order) VALUES (?, ?, ?, ?, ?)'); $stmt->bind_param('issii', $newVersionId, $batch['title'], $batch['description'], $batch['suggested_days'], $batch['sort_order']); }
+                if (!$stmt->execute()) throw new RuntimeException('Unable to clone a batch.'); $batchId = (int) $stmt->insert_id; $stmt->close(); $batchMap[(int) $batch['id']] = $batchId;
                 foreach ((array) ($batch['days'] ?? []) as $day) {
                     $stmt = $conn->prepare('INSERT INTO revision_plan_template_days (batch_id, version_id, day_number, title, description, sort_order) VALUES (?, ?, ?, ?, ?, ?)'); $stmt->bind_param('iiissi', $batchId, $newVersionId, $day['day_number'], $day['title'], $day['description'], $day['sort_order']); if (!$stmt->execute()) throw new RuntimeException('Unable to clone a day.'); $dayId = (int) $stmt->insert_id; $stmt->close();
                     foreach ((array) ($day['requirements'] ?? []) as $requirement) mmh_revision_clone_requirement($conn, $newVersionId, $dayId, null, $requirement, $resourceMap);
@@ -769,7 +842,7 @@ if (!function_exists('mmh_revision_assignment')) {
         if (!mmh_revision_batch_release_schema_available($conn)) return $version;
         $templateId = (int) ($assignment['template_id'] ?? $version['template_id'] ?? 0);
         if ($templateId <= 0) return $version;
-        $stmt = $conn->prepare("SELECT batch_position, source_version_id, source_batch_id, released_at FROM revision_plan_batch_releases WHERE template_id = ? AND status = 'released' AND released_at <= UTC_TIMESTAMP() ORDER BY batch_position ASC");
+        $stmt = $conn->prepare("SELECT batch_position, source_version_id, source_batch_id, released_at, visibility, day_access_mode, display_title FROM revision_plan_batch_releases WHERE template_id = ? AND status = 'released' AND released_at <= UTC_TIMESTAMP() ORDER BY batch_position ASC");
         if (!$stmt) return $version;
         $stmt->bind_param('i', $templateId); $stmt->execute();
         $releaseRows = $stmt->get_result()->fetch_all(MYSQLI_ASSOC); $stmt->close();
@@ -780,6 +853,7 @@ if (!function_exists('mmh_revision_assignment')) {
         $releasedPositions = [];
         $resources = [];
         $baseBatches = [];
+        $batchReleaseMeta = [];
         foreach ((array) ($version['batches'] ?? []) as $position => $batch) $baseBatches[(int) $position] = $batch;
         $firstReleaseAt = (string) (($releaseRows[0]['released_at'] ?? ''));
         $publishedAt = (string) ($version['published_at'] ?? '');
@@ -787,6 +861,8 @@ if (!function_exists('mmh_revision_assignment')) {
         if ($legacyMode) foreach ((array) ($version['resources'] ?? []) as $resource) $resources[(int) ($resource['id'] ?? 0)] = $resource;
         foreach ($releaseRows as $release) {
             $position = (int) $release['batch_position'];
+            $batchReleaseMeta[$position] = $release;
+            if ((string) ($release['visibility'] ?? 'released') !== 'released') continue;
             if ($legacyMode && isset($baseBatches[$position]) && mmh_revision_batch_has_content((array) $baseBatches[$position])) {
                 $baseBatch = $baseBatches[$position];
                 $baseBatch['_release_position'] = $position;
@@ -799,6 +875,8 @@ if (!function_exists('mmh_revision_assignment')) {
             foreach ((array) ($source['resources'] ?? []) as $resource) $resources[(int) ($resource['id'] ?? 0)] = $resource;
             foreach ((array) ($source['batches'] ?? []) as $batch) {
                 if ((int) ($batch['id'] ?? 0) !== (int) $release['source_batch_id']) continue;
+                if (trim((string) ($release['display_title'] ?? '')) !== '') $batch['title'] = trim((string) $release['display_title']);
+                $batch['day_access_mode'] = in_array((string) ($release['day_access_mode'] ?? 'follow_schedule'), ['follow_schedule', 'open_all'], true) ? (string) $release['day_access_mode'] : 'follow_schedule';
                 $batch['_release_position'] = $position;
                 $releasedBatches[] = $batch;
                 $releasedPositions[$position] = true;
@@ -822,6 +900,8 @@ if (!function_exists('mmh_revision_assignment')) {
         $unreleased = [];
         foreach ((array) ($shellSource['batches'] ?? []) as $position => $batch) {
             if (!isset($releasedPositions[(int) $position])) {
+                $meta = $batchReleaseMeta[(int) $position] ?? null;
+                if (is_array($meta) && trim((string) ($meta['display_title'] ?? '')) !== '') $batch['title'] = trim((string) $meta['display_title']);
                 $batch['_release_position'] = (int) $position;
                 $unreleased[] = $batch;
             }
@@ -885,13 +965,15 @@ if (!function_exists('mmh_revision_assignment_days')) {
         $days = [];
         $offset = 0;
         foreach ((array) ($version['batches'] ?? []) as $batch) {
+            $batchMode = strtolower(trim((string) ($batch['day_access_mode'] ?? '')));
+            $batchAllowAhead = $batchMode === 'open_all' ? true : ($batchMode === 'follow_schedule' ? false : $allowAhead);
             foreach ((array) ($batch['days'] ?? []) as $day) {
                 $scheduled = $start->modify('+' . $offset . ' days');
                 $day['batch_title'] = (string) ($batch['title'] ?? 'Batch');
                 $day['absolute_day_number'] = $offset + 1;
                 $day['scheduled_date'] = $scheduled->format('Y-m-d');
-                $day['availability'] = $scheduled < $today ? 'previous' : ($scheduled == $today ? 'today' : ($allowAhead ? 'upcoming' : 'locked'));
-                $day['accessible'] = $allowAhead || $scheduled <= $today;
+                $day['availability'] = $scheduled < $today ? 'previous' : ($scheduled == $today ? 'today' : ($batchAllowAhead ? 'upcoming' : 'locked'));
+                $day['accessible'] = $batchAllowAhead || $scheduled <= $today;
                 $days[] = $day;
                 $offset++;
             }
