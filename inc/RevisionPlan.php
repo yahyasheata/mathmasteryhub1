@@ -700,7 +700,7 @@ if (!function_exists('mmh_revision_clone_requirement')) {
 if (!function_exists('mmh_revision_archive_template')) {
     function mmh_revision_archive_template(mysqli $conn, int $templateId): void
     {
-        $stmt = $conn->prepare("UPDATE revision_plan_templates SET status = 'archived', archived_at = CURRENT_TIMESTAMP, updated_at = CURRENT_TIMESTAMP WHERE id = ? AND status <> 'archived'"); if (!$stmt) throw new RuntimeException('Unable to archive the template.'); $stmt->bind_param('i', $templateId); if (!$stmt->execute()) throw new RuntimeException('Unable to archive the template.'); $stmt->close();
+        $conn->begin_transaction(); try { if (mmh_revision_assignment_schema_available($conn)) { $revoke = $conn->prepare("UPDATE revision_plan_assignments SET status = 'archived', archived_at = COALESCE(archived_at, UTC_TIMESTAMP()), ended_at = COALESCE(ended_at, UTC_TIMESTAMP()) WHERE template_id = ? AND status = 'active' AND archived_at IS NULL"); if (!$revoke) throw new RuntimeException('Unable to revoke Revision Plan assignments.'); $revoke->bind_param('i', $templateId); if (!$revoke->execute()) { $revoke->close(); throw new RuntimeException('Unable to revoke Revision Plan assignments.'); } $revoke->close(); } $stmt = $conn->prepare("UPDATE revision_plan_templates SET status = 'archived', archived_at = CURRENT_TIMESTAMP, updated_at = CURRENT_TIMESTAMP WHERE id = ? AND status <> 'archived'"); if (!$stmt) throw new RuntimeException('Unable to archive the template.'); $stmt->bind_param('i', $templateId); if (!$stmt->execute()) { $stmt->close(); throw new RuntimeException('Unable to archive the template.'); } $stmt->close(); $conn->commit(); } catch (Throwable $e) { $conn->rollback(); throw $e; }
     }
 }
 
@@ -973,12 +973,12 @@ if (!function_exists('mmh_revision_assignment')) {
     function mmh_revision_assignment(mysqli $conn, int $assignmentId, int $studentId = 0): ?array
     {
         if ($assignmentId <= 0 || !mmh_revision_assignment_schema_available($conn)) return null;
-        $sql = "SELECT a.*, t.title, t.description, t.status AS template_status,
+        $sql = "SELECT a.*, t.title, t.description, t.status AS template_status, t.archived_at AS template_archived_at,
                        v.status AS version_status, v.version_number, v.allow_work_ahead,
                        c.course_title, c.course_state, u.full_name, u.username
                 FROM revision_plan_assignments a
-                INNER JOIN revision_plan_templates t ON t.id = a.template_id
-                INNER JOIN revision_plan_template_versions v ON v.id = a.template_version_id AND v.template_id = a.template_id
+                INNER JOIN revision_plan_templates t ON t.id = a.template_id AND LOWER(TRIM(COALESCE(t.status, ''))) NOT IN ('archived', 'deleted') AND t.archived_at IS NULL
+                INNER JOIN revision_plan_template_versions v ON v.id = a.template_version_id AND v.template_id = a.template_id AND LOWER(TRIM(COALESCE(v.status, ''))) = 'published'
                 INNER JOIN courses c ON c.course_id = a.course_id
                 INNER JOIN users u ON u.user_id = a.user_id
                 WHERE a.id = ? AND a.archived_at IS NULL AND (a.ended_at IS NULL OR a.ended_at > UTC_TIMESTAMP()) AND c.archived_at IS NULL";
@@ -1057,7 +1057,7 @@ if (!function_exists('mmh_revision_assignment_context')) {
     function mmh_revision_assignment_context(mysqli $conn, int $assignmentId, int $studentId, ?int $requirementId = null, ?int $resourceId = null): ?array
     {
         $assignment = mmh_revision_assignment($conn, $assignmentId, $studentId);
-        if (!$assignment || (string) $assignment['status'] !== 'active' || (string) $assignment['template_status'] === 'archived' || (string) $assignment['version_status'] !== 'published' || !in_array((string) ($assignment['course_state'] ?? ''), ['public', 'private'], true)) return null;
+        if (!$assignment || (string) $assignment['status'] !== 'active' || in_array(strtolower(trim((string) ($assignment['template_status'] ?? ''))), ['archived', 'deleted'], true) || !empty($assignment['template_archived_at']) || (string) $assignment['version_status'] !== 'published' || !in_array((string) ($assignment['course_state'] ?? ''), ['public', 'private'], true)) return null;
         if (!mmh_revision_assignment_enrolled($conn, $studentId, (string) $assignment['course_id'])) return null;
         $days = mmh_revision_assignment_days($assignment);
         $resources = [];
@@ -1386,8 +1386,8 @@ if (!function_exists('mmh_revision_student_assignments')) {
                 FROM revision_plan_assignments a
                 INNER JOIN users u ON u.user_id = a.user_id AND u.role = 'user' AND u.status = '1' AND u.archived_at IS NULL
                 INNER JOIN course_logs cl ON cl.user_id = a.user_id AND cl.course_id = a.course_id
-                INNER JOIN revision_plan_templates t ON t.id = a.template_id AND t.course_id = a.course_id
-                INNER JOIN revision_plan_template_versions v ON v.id = a.template_version_id AND v.template_id = t.id
+                INNER JOIN revision_plan_templates t ON t.id = a.template_id AND t.course_id = a.course_id AND LOWER(TRIM(COALESCE(t.status, ''))) NOT IN ('archived', 'deleted') AND t.archived_at IS NULL
+                INNER JOIN revision_plan_template_versions v ON v.id = a.template_version_id AND v.template_id = t.id AND LOWER(TRIM(COALESCE(v.status, ''))) = 'published'
                 INNER JOIN courses c ON c.course_id = a.course_id AND c.archived_at IS NULL
                 WHERE a.user_id = ?
                   AND LOWER(TRIM(COALESCE(a.status, ''))) = 'active'
