@@ -500,7 +500,8 @@ if (!function_exists('mmh_revision_publish_version')) {
                     $batchId = (int) ($batch['id'] ?? 0);
                     if ($batchId <= 0) throw new RuntimeException('A Batch could not be released safely.');
                     $position = (int) $position;
-                    $dayAccess = in_array((string) ($batch['day_access_mode'] ?? 'follow_schedule'), ['follow_schedule', 'open_all'], true) ? (string) $batch['day_access_mode'] : 'follow_schedule';
+                    $batchDayAccess = (string) ($batch['day_access_mode'] ?? 'follow_schedule');
+                    $dayAccess = in_array($batchDayAccess, ['follow_schedule', 'open_all'], true) ? $batchDayAccess : 'follow_schedule';
                     $displayTitle = trim((string) ($batch['title'] ?? ''));
                     $insert->bind_param('iiiissi', $version['template_id'], $versionId, $batchId, $position, $dayAccess, $displayTitle, $adminId);
                     if (!$insert->execute()) throw new RuntimeException('Unable to release a Batch.');
@@ -586,6 +587,18 @@ if (!function_exists('mmh_revision_update_batch_controls')) {
     }
 }
 
+if (!function_exists('mmh_revision_prepare_editable_version')) {
+    /** Return an editable Version, cloning a published Version when necessary. */
+    function mmh_revision_prepare_editable_version(mysqli $conn, int $templateId, int $versionId, int $adminId): int
+    {
+        if ($templateId <= 0 || $versionId <= 0 || $adminId <= 0) throw new InvalidArgumentException('Revision Plan version not found.');
+        $version = mmh_revision_version($conn, $versionId);
+        if (!$version || (int) ($version['template_id'] ?? 0) !== $templateId) throw new InvalidArgumentException('Revision Plan version not found.');
+        if ((string) ($version['status'] ?? '') === 'draft') return $versionId;
+        return mmh_revision_clone_version($conn, $versionId, $adminId);
+    }
+}
+
 if (!function_exists('mmh_revision_clone_version')) {
     function mmh_revision_clone_version(mysqli $conn, int $sourceVersionId, int $adminId): int
     {
@@ -604,7 +617,8 @@ if (!function_exists('mmh_revision_clone_version')) {
                 $stmt->bind_param('issssssisii', $newVersionId, $resource['resource_type'], $resource['display_name'], $resource['external_url'], $resource['storage_key'], $resource['original_filename'], $resource['mime_type'], $resource['file_size_bytes'], $resource['linked_course_item_id'], $resource['sort_order'], $adminId); if (!$stmt->execute()) throw new RuntimeException('Unable to clone a shared resource.'); $resourceMap[(int) $resource['id']] = (int) $stmt->insert_id; $stmt->close();
             }
             foreach ((array) ($source['batches'] ?? []) as $batch) {
-                $dayAccess = in_array((string) ($batch['day_access_mode'] ?? 'follow_schedule'), ['follow_schedule', 'open_all'], true) ? (string) $batch['day_access_mode'] : 'follow_schedule';
+                $batchDayAccess = (string) ($batch['day_access_mode'] ?? 'follow_schedule');
+                $dayAccess = in_array($batchDayAccess, ['follow_schedule', 'open_all'], true) ? $batchDayAccess : 'follow_schedule';
                 if ($hasBatchAccess) { $stmt = $conn->prepare('INSERT INTO revision_plan_template_batches (version_id, title, description, suggested_days, sort_order, day_access_mode) VALUES (?, ?, ?, ?, ?, ?)'); $stmt->bind_param('issiis', $newVersionId, $batch['title'], $batch['description'], $batch['suggested_days'], $batch['sort_order'], $dayAccess); }
                 else { $stmt = $conn->prepare('INSERT INTO revision_plan_template_batches (version_id, title, description, suggested_days, sort_order) VALUES (?, ?, ?, ?, ?)'); $stmt->bind_param('issii', $newVersionId, $batch['title'], $batch['description'], $batch['suggested_days'], $batch['sort_order']); }
                 if (!$stmt->execute()) throw new RuntimeException('Unable to clone a batch.'); $batchId = (int) $stmt->insert_id; $stmt->close(); $batchMap[(int) $batch['id']] = $batchId;

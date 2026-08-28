@@ -44,6 +44,46 @@ try {
         $redirect(true, 'Revision Plan template created.', $newTemplateId, $newVersionId);
     }
 
+    if ($action === 'prepare_batch_edit') {
+        $version = mmh_revision_version($conn, $versionId);
+        if (!$version || (int) ($version['template_id'] ?? 0) !== $templateId) throw new InvalidArgumentException('The selected Revision Plan version could not be found.');
+        $batchPosition = (int) ($_POST['batch_position'] ?? -1);
+        if ($batchPosition < 0 || !array_key_exists($batchPosition, (array) ($version['batches'] ?? []))) throw new InvalidArgumentException('Batch not found.');
+        $draftId = mmh_revision_prepare_editable_version($conn, $templateId, $versionId, $adminId);
+        $redirect(true, $draftId === $versionId ? 'Batch is ready to edit.' : 'A new Draft Version is ready to edit this Batch. The released Version remains unchanged.', $templateId, $draftId);
+    }
+
+    if ($action === 'add_batch') {
+        $version = mmh_revision_version($conn, $versionId);
+        if (!$version || (int) ($version['template_id'] ?? 0) !== $templateId) throw new InvalidArgumentException('The selected Revision Plan version could not be found.');
+        $sourceWasDraft = (string) ($version['status'] ?? '') === 'draft';
+        $draftId = mmh_revision_prepare_editable_version($conn, $templateId, $versionId, $adminId);
+        $draft = mmh_revision_version($conn, $draftId);
+        if (!$draft) throw new RuntimeException('The editable Draft Version could not be loaded.');
+        if ($sourceWasDraft) {
+            $json = trim((string) ($_POST['structure_json'] ?? ''));
+            $structure = $json === '' ? ['batches' => ($draft['batches'] ?? [])] : json_decode($json, true);
+            if (!is_array($structure)) throw new InvalidArgumentException('The Batch structure is invalid.');
+        } else {
+            // Published content is cloned from its immutable source. Ignore
+            // client structure data so old resource IDs cannot cross Versions.
+            $structure = ['batches' => ($draft['batches'] ?? [])];
+        }
+        $batches = is_array($structure['batches'] ?? null) ? $structure['batches'] : [];
+        $title = mb_substr(trim((string) ($_POST['batch_title'] ?? 'New Batch')), 0, 180);
+        if ($title === '') $title = 'New Batch';
+        $description = mb_substr(trim((string) ($_POST['batch_description'] ?? '')), 0, 1000);
+        $dayCount = max(0, min(30, (int) ($_POST['batch_days'] ?? 0)));
+        $days = [];
+        for ($i = 0; $i < $dayCount; $i++) $days[] = ['day_number' => $i + 1, 'title' => 'Day ' . ($i + 1), 'description' => '', 'sort_order' => $i, 'requirements' => [], 'activity_groups' => []];
+        $batches[] = ['title' => $title, 'description' => $description, 'suggested_days' => $dayCount, 'day_access_mode' => 'follow_schedule', 'sort_order' => count($batches), 'days' => $days];
+        $structure['batches'] = $batches;
+        $draftTemplate = mmh_revision_template($conn, $templateId);
+        if (!$draftTemplate) throw new RuntimeException('The Revision Plan template could not be loaded.');
+        mmh_revision_save_draft($conn, $draftId, $structure, (string) ($draftTemplate['title'] ?? $draft['template_title'] ?? ''), (string) ($draftTemplate['description'] ?? ''), !empty($draft['allow_work_ahead']));
+        $redirect(true, 'Coming Soon Batch added. Add its content when ready.', $templateId, $draftId);
+    }
+
     if ($action === 'save_version') {
         $template = mmh_revision_template($conn, $templateId);
         $version = mmh_revision_version($conn, $versionId);
