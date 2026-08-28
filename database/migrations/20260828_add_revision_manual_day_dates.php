@@ -21,5 +21,8 @@ if (!$columnExists('revision_plan_template_batches', 'schedule_mode')) {
 if (!$columnExists('revision_plan_template_days', 'scheduled_date')) {
     if (!$conn->query("ALTER TABLE revision_plan_template_days ADD COLUMN scheduled_date DATE NULL AFTER description")) throw new RuntimeException($conn->error);
 }
+if (!$columnExists('revision_plan_template_batches', 'schedule_start_date')) {
+    if (!$conn->query("ALTER TABLE revision_plan_template_batches ADD COLUMN schedule_start_date DATE NULL AFTER schedule_mode")) throw new RuntimeException($conn->error);
+}
 
 echo "Revision Plan manual day dates are ready.\n";

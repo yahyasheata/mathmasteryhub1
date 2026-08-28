@@ -7,14 +7,23 @@ $root = dirname(__DIR__);
 $migration = file_get_contents($root . '/database/migrations/20260828_add_revision_manual_day_dates.php');
 $adminView = file_get_contents($root . '/views/admin/revision-plans.php');
 $assert = static function (bool $ok, string $message): void { if (!$ok) throw new RuntimeException($message); };
-foreach (['schedule_mode', 'scheduled_date', 'ALTER TABLE', "DEFAULT 'automatic'"] as $needle) $assert(str_contains($migration, $needle), 'Manual date migration contract missing: ' . $needle);
-foreach (['Automatic consecutive days', 'Manual dates', 'Study date', 'scheduled_date', 'schedule_mode'] as $needle) $assert(str_contains($adminView, $needle), 'Admin date UX contract missing: ' . $needle);
+foreach (['schedule_mode', 'schedule_start_date', 'scheduled_date', 'ALTER TABLE', "DEFAULT 'automatic'"] as $needle) $assert(str_contains($migration, $needle), 'Manual date migration contract missing: ' . $needle);
+foreach (['Consecutive dates', 'Custom dates', 'First Day date', 'Study date', 'schedule_start_date', 'scheduled_date', 'schedule_mode', 'data-batch-title-field', 'syncBatchTitleFields'] as $needle) $assert(str_contains($adminView, $needle), 'Admin date UX contract missing: ' . $needle);
 $automatic = [
     'start_date' => '2026-08-30',
     'version' => ['allow_work_ahead' => 0, 'batches' => [['title' => 'Batch 1', 'day_access_mode' => 'follow_schedule', 'schedule_mode' => 'automatic', 'days' => [['title' => 'Day 1'], ['title' => 'Day 2']]]]],
 ];
 $days = mmh_revision_assignment_days($automatic);
 $assert(array_column($days, 'scheduled_date') === ['2026-08-30', '2026-08-31'], 'Automatic schedule changed.');
+$consecutive = [
+    'start_date' => '2026-12-01',
+    'version' => ['allow_work_ahead' => 0, 'batches' => [
+        ['title' => 'Batch 1', 'day_access_mode' => 'follow_schedule', 'schedule_mode' => 'automatic', 'schedule_start_date' => '2026-08-30', 'days' => [['title' => 'Day 1'], ['title' => 'Day 2'], ['title' => 'Day 3']]],
+        ['title' => 'Batch 2', 'day_access_mode' => 'follow_schedule', 'schedule_mode' => 'automatic', 'schedule_start_date' => '2026-09-05', 'days' => [['title' => 'Day 1'], ['title' => 'Day 2']]],
+    ]],
+];
+$days = mmh_revision_assignment_days($consecutive);
+$assert(array_column($days, 'scheduled_date') === ['2026-08-30', '2026-08-31', '2026-09-01', '2026-09-05', '2026-09-06'], 'Consecutive Batch dates did not use independent Batch start dates.');
 $manual = [
     'start_date' => '2026-08-30',
     'version' => ['allow_work_ahead' => 0, 'batches' => [
@@ -33,4 +42,4 @@ $assert(mmh_revision_normalize_study_date('2026-09-01', true) === '2026-09-01', 
 $invalid = false;
 try { mmh_revision_normalize_study_date('2026-02-30', true); } catch (InvalidArgumentException $e) { $invalid = true; }
 $assert($invalid, 'Invalid Study date was accepted.');
-echo "revision_plan_manual_dates=automatic_compatibility=PASS manual_dates=PASS batch_boundary=PASS open_all=PASS locking=PASS validation=PASS\n";
+echo "revision_plan_manual_dates=automatic_compatibility=PASS consecutive_batch_starts=PASS manual_dates=PASS batch_boundary=PASS open_all=PASS locking=PASS validation=PASS\n";

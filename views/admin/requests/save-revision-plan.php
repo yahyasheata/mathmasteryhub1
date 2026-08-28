@@ -161,6 +161,7 @@ try {
         if (!in_array($dayAccess, ['follow_schedule', 'open_all'], true)) $dayAccess = 'follow_schedule';
         $scheduleMode = strtolower(trim((string) ($_POST['schedule_mode'] ?? 'automatic')));
         if (!in_array($scheduleMode, ['automatic', 'manual'], true)) $scheduleMode = 'automatic';
+        $scheduleStartDate = mmh_revision_normalize_study_date($_POST['schedule_start_date'] ?? '', false);
         $version = mmh_revision_version($conn, $versionId);
         if (!$version || (int) ($version['template_id'] ?? 0) !== $templateId) throw new InvalidArgumentException('The selected Revision Plan version could not be found.');
         $batches = (array) ($version['batches'] ?? []);
@@ -188,6 +189,7 @@ try {
         $draftBatches[$batchPosition]['title'] = $title;
         $draftBatches[$batchPosition]['day_access_mode'] = $dayAccess;
         $draftBatches[$batchPosition]['schedule_mode'] = $scheduleMode;
+        $draftBatches[$batchPosition]['schedule_start_date'] = $scheduleStartDate;
         $structure['batches'] = $draftBatches;
         $template = mmh_revision_template($conn, $templateId);
         if (!$template) throw new RuntimeException('The Revision Plan template could not be loaded.');
