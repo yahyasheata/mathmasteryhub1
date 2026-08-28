@@ -43,6 +43,11 @@ $selectedDayNumber = ($requestedDay && isset($dayNumbers[(int) $requestedDay])) 
 $selectedDay = null;
 foreach ($days as $day) if ((int) ($day['absolute_day_number'] ?? 0) === $selectedDayNumber) { $selectedDay = $day; break; }
 if (!is_array($selectedDay) && $days) $selectedDay = $days[0];
+$selectedDayTopics = '';
+if (is_array($selectedDay)) {
+    $candidateTopics = trim((string) ($selectedDay['title'] ?? ''));
+    if ($candidateTopics !== '' && !preg_match('/^Day \d+$/i', $candidateTopics)) $selectedDayTopics = $candidateTopics;
+}
 
 $base = rtrim((string) $baseUrl, '/');
 $esc = static fn($value): string => htmlspecialchars((string) $value, ENT_QUOTES, 'UTF-8');
@@ -154,7 +159,7 @@ foreach ($selectedRequirements as $uploadRequirement) {
         </nav>
         <?php if (is_array($selectedDay)): ?>
             <section class="revision-selected-day <?= $selectedAvailable ? '' : 'is-locked' ?>" aria-labelledby="selected-day-title">
-                <header class="revision-selected-day-header"><div><span class="revision-student-card-kicker"><?= $esc($selectedDay['availability'] === 'today' ? 'Today' : ($selectedDay['availability'] === 'previous' ? 'Previous' : ($selectedDay['availability'] === 'upcoming' ? 'Upcoming' : 'Locked'))) ?></span><h2 id="selected-day-title">Day <?= $selectedDayNumber ?></h2><p><?= $esc(date('l, j M Y', strtotime((string) $selectedDay['scheduled_date']))) ?></p></div><?php if ($selectedAvailable && $selectedProgress['total'] > 0): ?><span class="revision-selected-day-progress"><?= (int) $selectedProgress['completed'] ?>/<?= (int) $selectedProgress['total'] ?> complete</span><?php endif; ?></header>
+                <header class="revision-selected-day-header"><div><span class="revision-student-card-kicker"><?= $esc($selectedDay['availability'] === 'today' ? 'Today' : ($selectedDay['availability'] === 'previous' ? 'Previous' : ($selectedDay['availability'] === 'upcoming' ? 'Upcoming' : 'Locked'))) ?></span><h2 id="selected-day-title">Day <?= $selectedDayNumber ?></h2><p><?= $esc(date('l, j M Y', strtotime((string) $selectedDay['scheduled_date']))) ?></p><?php if ($selectedDayTopics !== ''): ?><p class="revision-selected-day-topics"><?= $esc($selectedDayTopics) ?></p><?php endif; ?></div><?php if ($selectedAvailable && $selectedProgress['total'] > 0): ?><span class="revision-selected-day-progress"><?= (int) $selectedProgress['completed'] ?>/<?= (int) $selectedProgress['total'] ?> complete</span><?php endif; ?></header>
                 <?php if (!$selectedAvailable): ?><div class="revision-locked-note"><span class="revision-day-state is-locked" aria-hidden="true"></span><div><strong>Available <?= $esc(date('j M', strtotime((string) $selectedDay['scheduled_date']))) ?></strong><p>This day's tasks will unlock on <?= $esc(date('j M Y', strtotime((string) $selectedDay['scheduled_date']))) ?>.</p></div></div>
                 <?php elseif (!$selectedRequirements): ?><div class="revision-student-empty small"><p>No tasks have been added to this day yet.</p></div>
                 <?php else: ?><div class="revision-requirement-list">

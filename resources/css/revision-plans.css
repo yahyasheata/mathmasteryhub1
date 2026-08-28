@@ -190,3 +190,7 @@
   .revision-plan-list-page .revision-student-card-link{align-items:flex-start;flex-direction:column;gap:12px;padding:15px}
   .revision-plan-list-page .revision-student-card-link .student-dashboard-btn{width:100%;justify-content:center}
 }
+
+/* Day topics use the existing day title storage while remaining distinct from the generated Day number. */
+.revision-day-topics-field input{min-width:0}
+.revision-plan-workspace .revision-selected-day-topics{margin:8px 0 0!important;color:var(--text-primary)!important;font-size:.95rem!important;font-weight:700;line-height:1.45;max-width:760px;overflow-wrap:anywhere}
