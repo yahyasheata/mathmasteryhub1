@@ -17,6 +17,11 @@ if (!is_string($view) || !is_string($page) || !is_string($routes)) {
 if (!str_contains($routes, '$router->get(\'/requests/course-copy/options\'')) {
     throw new RuntimeException('Destination-course endpoint is not registered as an explicit GET route.');
 }
+$optionsRoutePosition = strpos($routes, '$router->get(\'/requests/course-copy/options\'');
+$catchAllRoutePosition = strpos($routes, '$router->get(\'/{pageName}\'');
+if ($optionsRoutePosition === false || $catchAllRoutePosition === false || $optionsRoutePosition > $catchAllRoutePosition) {
+    throw new RuntimeException('Destination-course endpoint must be registered before the catch-all admin page route.');
+}
 if (!str_contains($routes, "mmh_admin_require_admin();")) {
     throw new RuntimeException('Copy Section endpoint is missing admin authorization.');
 }

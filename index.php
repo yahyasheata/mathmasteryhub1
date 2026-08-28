@@ -227,6 +227,14 @@ $router->mount('/admin', function() use ($router) {
         require __DIR__ . '/views/admin/requests/form-item.php';
     });
 
+    // Course Content copy is intentionally explicit: destination validation,
+    // transactional duplication, and child-record rules live in one service.
+    $router->get('/requests/course-copy/options', function() {
+        require_once '__init.php';
+        mmh_admin_require_admin();
+        require __DIR__ . '/views/admin/requests/course-copy-options.php';
+    });
+
     // Compatibility for already-open Course Content pages that still issue
     // the former POST + _method=GET editor request. The handler accepts only
     // that explicit read marker and performs no mutation.
@@ -304,14 +312,6 @@ $router->mount('/admin', function() use ($router) {
         require_once '__init.php';
         mmh_admin_require_mutation();
         require __DIR__ . '/views/admin/requests/bulk-items.php';
-    });
-
-    // Course Content copy is intentionally explicit: destination validation,
-    // transactional duplication, and child-record rules live in one service.
-    $router->get('/requests/course-copy/options', function() {
-        require_once '__init.php';
-        mmh_admin_require_admin();
-        require __DIR__ . '/views/admin/requests/course-copy-options.php';
     });
 
     $router->post('/requests/course-copy/item', function() {
