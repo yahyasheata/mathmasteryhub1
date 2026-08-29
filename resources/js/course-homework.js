@@ -28,9 +28,6 @@
       selectedFiles.forEach(function (file) { transfer.items.add(file); });
       input.files = transfer.files;
     }
-    // The visible file list is the source of truth while files are added or removed.
-    // Keep native validation aligned with that state after the input is cleared.
-    input.required = selectedFiles.length === 0;
   }
   function renderFiles() {
     if (!fileList) return;
@@ -83,6 +80,14 @@
     if (!action) throw new Error('The submission address is unavailable. Please refresh and try again.');
     return new URL(action, window.location.href).toString();
   }
+  function submissionFormData() {
+    var payload = new FormData(form);
+    // selectedFiles is canonical while the native picker is reused for incremental selection.
+    // Replace any browser-provided file entries so each selected file is sent exactly once.
+    payload.delete('submission_files[]');
+    selectedFiles.forEach(function (file) { payload.append('submission_files[]', file, file.name); });
+    return payload;
+  }
   function submissionResponse(response) {
     return response.text().then(function (body) {
       var result;
@@ -109,7 +114,7 @@
     form.dataset.homeworkSubmitting = '1';
     if (submit) submit.disabled = true;
     setMessage('Submitting homework…');
-    fetch(endpoint, { method: 'POST', body: new FormData(form), credentials: 'same-origin', headers: { 'Accept': 'application/json' } })
+    fetch(endpoint, { method: 'POST', body: submissionFormData(), credentials: 'same-origin', headers: { 'Accept': 'application/json' } })
       .then(submissionResponse)
       .then(function (result) { setMessage(result.message || 'Homework submitted.'); window.setTimeout(function () { window.location.reload(); }, 500); })
       .catch(function (error) { setMessage(error.message || 'Unable to submit homework.'); delete form.dataset.homeworkSubmitting; if (submit) submit.disabled = false; });

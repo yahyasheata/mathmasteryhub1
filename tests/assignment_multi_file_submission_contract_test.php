@@ -17,7 +17,12 @@ foreach (['name=\'assignment_drive_url\'', 'submission_files[]', 'multiple', 'as
     if (!str_contains($form . $renderer . $handler . $js . file_get_contents($root . '/inc/AssignmentProgress.php'), $needle)) throw new RuntimeException('Missing multi-file contract: ' . $needle);
 }
 if (!str_contains($renderer, 'data-homework-file-list') || !str_contains($js, 'Remove')) throw new RuntimeException('Selected-file UX is missing.');
-if (!str_contains($js, 'input.required = selectedFiles.length === 0')) throw new RuntimeException('Native file validation is not synchronized with the selected-file state.');
+if (str_contains($js, 'input.required =')) throw new RuntimeException('Custom Homework uploader still mutates native required validation.');
+if (str_contains($renderer, 'name="submission_files[]" type="file" accept=".pdf,.doc,.docx" multiple required')) throw new RuntimeException('Custom Homework input still relies on native required validation.');
+if (!str_contains($renderer, 'course-homework.js?v=')) throw new RuntimeException('Homework JavaScript asset is not cache-busted.');
+foreach (["payload.delete('submission_files[]')", "payload.append('submission_files[]', file, file.name)", 'submissionFormData()'] as $needle) {
+    if (!str_contains($js, $needle)) throw new RuntimeException('Canonical selected-file FormData contract is missing: ' . $needle);
+}
 if (!str_contains($handler, 'fileEntries') || !str_contains($handler, 'INSERT INTO assignment_submission_files')) throw new RuntimeException('Upload handler does not persist normalized child files.');
 if (!str_contains(file_get_contents($root . '/inc/AssignmentSubmissionFiles.php'), 'student_course_access_authorized_course')) throw new RuntimeException('Protected submission-file route is missing enrollment authorization.');
 echo "Multi-file Homework contract passed.\n";
