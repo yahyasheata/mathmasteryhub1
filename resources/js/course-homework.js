@@ -22,10 +22,15 @@
     return (bytes / (1024 * 1024)).toFixed(1) + ' MB';
   }
   function syncInput() {
-    if (!input || typeof DataTransfer === 'undefined') return;
-    var transfer = new DataTransfer();
-    selectedFiles.forEach(function (file) { transfer.items.add(file); });
-    input.files = transfer.files;
+    if (!input) return;
+    if (typeof DataTransfer !== 'undefined') {
+      var transfer = new DataTransfer();
+      selectedFiles.forEach(function (file) { transfer.items.add(file); });
+      input.files = transfer.files;
+    }
+    // The visible file list is the source of truth while files are added or removed.
+    // Keep native validation aligned with that state after the input is cleared.
+    input.required = selectedFiles.length === 0;
   }
   function renderFiles() {
     if (!fileList) return;
