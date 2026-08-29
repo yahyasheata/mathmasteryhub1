@@ -1134,7 +1134,7 @@ if (!function_exists('mmh_revision_assignment')) {
                 INNER JOIN revision_plan_template_versions v ON v.id = a.template_version_id AND v.template_id = a.template_id AND LOWER(TRIM(COALESCE(v.status, ''))) = 'published'
                 INNER JOIN courses c ON c.course_id = a.course_id
                 INNER JOIN users u ON u.user_id = a.user_id
-                WHERE a.id = ? AND a.archived_at IS NULL AND (a.ended_at IS NULL OR a.ended_at > UTC_TIMESTAMP()) AND c.archived_at IS NULL";
+                WHERE a.id = ? AND LOWER(TRIM(COALESCE(a.status, ''))) = 'active' AND a.archived_at IS NULL AND (a.ended_at IS NULL OR a.ended_at > UTC_TIMESTAMP()) AND c.archived_at IS NULL";
         if ($studentId > 0) $sql .= ' AND a.user_id = ?';
         $sql .= ' LIMIT 1';
         $stmt = $conn->prepare($sql);
@@ -1557,6 +1557,17 @@ if (!function_exists('mmh_revision_student_assignments')) {
                   AND (a.ended_at IS NULL OR a.ended_at > UTC_TIMESTAMP())
                   AND LOWER(TRIM(COALESCE(t.status, ''))) <> 'archived'
                   AND LOWER(TRIM(COALESCE(v.status, ''))) = 'published'
+                  AND NOT EXISTS (
+                      SELECT 1
+                      FROM revision_plan_assignments newer
+                      INNER JOIN revision_plan_template_versions newer_v ON newer_v.id = newer.template_version_id AND newer_v.template_id = t.id AND LOWER(TRIM(COALESCE(newer_v.status, ''))) = 'published'
+                      WHERE newer.template_id = a.template_id
+                        AND newer.user_id = a.user_id
+                        AND LOWER(TRIM(COALESCE(newer.status, ''))) = 'active'
+                        AND newer.archived_at IS NULL
+                        AND (newer.ended_at IS NULL OR newer.ended_at > UTC_TIMESTAMP())
+                        AND (newer_v.version_number > v.version_number OR (newer_v.version_number = v.version_number AND newer.id > a.id))
+                  )
                   AND (LOWER(TRIM(COALESCE(c.course_state, ''))) IN ('public', 'private')
                        OR (COALESCE(c.course_state, '') = '' AND c.course_status = '1' AND LOWER(TRIM(COALESCE(c.course_visibility, 'public'))) IN ('public', 'private')))
                 ORDER BY a.start_date ASC, a.id ASC");

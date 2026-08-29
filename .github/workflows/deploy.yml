@@ -68,6 +68,7 @@ jobs:
             php database/migrations/20260805_add_timed_exam_external_paper.php
             php database/migrations/20260828_reconcile_deleted_revision_plan_assignments.php
             php database/migrations/20260829_add_revision_requirement_lineage.php
+            php database/migrations/20260829_reconcile_revision_plan_logical_assignments.php
             php database/migrations/20260810_timed_exam_drive_only.php
             php database/migrations/20260811_finalize_timed_exam_lifecycle.php
             php database/migrations/20260808_add_course_visibility.php

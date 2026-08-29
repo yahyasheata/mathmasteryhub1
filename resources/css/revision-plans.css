@@ -194,3 +194,17 @@
 /* Day topics use the existing day title storage while remaining distinct from the generated Day number. */
 .revision-day-topics-field input{min-width:0}
 .revision-plan-workspace .revision-selected-day-topics{margin:8px 0 0!important;color:var(--text-primary)!important;font-size:.95rem!important;font-weight:700;line-height:1.45;max-width:760px;overflow-wrap:anywhere}
+
+/* Your Plans polish: prioritize the current study path without adding dashboard chrome. */
+.revision-plan-list-page .revision-student-header{background:transparent;border-bottom:0;margin-bottom:14px;padding-top:20px}
+.revision-plan-list-page .revision-student-header h1{font-size:clamp(1.6rem,2.5vw,2.15rem);letter-spacing:-.02em}
+.revision-plan-list-page .revision-plan-group{display:grid;gap:8px;margin-top:18px}
+.revision-plan-list-page .revision-plan-group-title{margin:0;color:var(--text-secondary);font-size:.72rem;font-weight:850;letter-spacing:.1em;text-transform:uppercase}
+.revision-plan-list-page .revision-plan-group-active .revision-plan-group-title{color:var(--primary)}
+.revision-plan-list-page .revision-plan-group-past .revision-student-card-link{background:color-mix(in srgb,var(--surface) 82%,var(--surface-hover));color:var(--text-secondary)}
+.revision-plan-list-page .revision-plan-group-past .revision-student-card-link h3{color:var(--text-secondary)}
+.revision-plan-list-page .revision-plan-group-past .revision-student-card-link:hover{color:var(--text-primary)}
+.revision-plan-list-page .revision-plan-group-active .revision-student-card-link{border-left:3px solid var(--primary);padding-left:16px}
+.revision-plan-list-page .revision-student-card-link h3{margin:4px 0 3px;font-size:1.12rem;line-height:1.3}
+.revision-plan-list-page .revision-student-card-link .student-dashboard-btn.secondary{border-color:var(--border);color:var(--text-secondary)}
+@media(max-width:780px){.revision-plan-list-page .revision-student-header{padding-top:12px}.revision-plan-list-page .revision-plan-group{margin-top:15px}.revision-plan-list-page .revision-plan-group-active .revision-student-card-link{padding-left:13px}}
