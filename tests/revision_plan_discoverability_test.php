@@ -18,7 +18,7 @@ if (!str_contains($studentNav, '/user/revision-plans') || !str_contains($student
 foreach (['mmh_revision_student_assignments', 'student-revision-plans-strip', 'View all plans', 'schedule_state'] as $marker) {
     if (!str_contains($myCourses, $marker)) throw new RuntimeException('My Courses Revision Plan discovery is missing: ' . $marker);
 }
-if (!str_contains($list, 'No plans assigned yet') || !str_contains($list, 'View Plan')) {
+if (!str_contains($list, 'Your revision plans will appear here') || !str_contains($list, 'View Plan')) {
     throw new RuntimeException('Revision Plan list lacks explicit empty/upcoming states.');
 }
 echo "revision_plan_discoverability=public_account=student_nav=my_courses_strip=present\n";

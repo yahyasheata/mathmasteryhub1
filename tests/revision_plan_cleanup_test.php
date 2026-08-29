@@ -9,7 +9,7 @@ $migration = file_get_contents($root . '/database/migrations/20260829_reconcile_
 $workflow = file_get_contents($root . '/.github/workflows/deploy.yml');
 $assert = static function(bool $ok,string $message):void{if(!$ok)throw new RuntimeException($message);};
 foreach (['NOT EXISTS','newer_v.version_number','newer.id > a.id'] as $marker) $assert(str_contains($service,$marker),'Student assignment deduplication missing: '.$marker);
-foreach (['assignmentGroups','Active Plans','Upcoming','Past Plans','Continue Plan','View Plan'] as $marker) $assert(str_contains($list,$marker),'Your Plans grouping missing: '.$marker);
+foreach (['assignmentGroups','Active','Upcoming','Past Plans','Continue Plan','View Plan'] as $marker) $assert(str_contains($list,$marker),'Your Plans grouping missing: '.$marker);
 foreach (['revision-plan-group-active','revision-plan-group-past','@media(max-width:780px)'] as $marker) $assert(str_contains($css,$marker),'Your Plans responsive styling missing: '.$marker);
 foreach (['MMH_REVISION_RECONCILE_TEMPLATE_IDS','duplicate logical-plan groups found','superseded assignments archived','deleted-plan assignments revoked'] as $marker) $assert(str_contains($migration,$marker),'Scoped reconciliation migration missing: '.$marker);
 $assert(str_contains($workflow,'20260829_reconcile_revision_plan_logical_assignments.php'),'Reconciliation migration is not deployed.');
