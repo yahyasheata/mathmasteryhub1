@@ -52,6 +52,28 @@ if (!function_exists('student_course_access_course_url')) {
     }
 }
 
+if (!function_exists('student_course_access_active_item_sql')) {
+    /**
+     * Canonical SQL predicate for active student-visible course items.
+     * Admin deletion is non-destructive: archived rows remain for historical
+     * submissions/progress, but are excluded from normal student surfaces.
+     */
+    function student_course_access_active_item_sql(string $alias = ''): string
+    {
+        $prefix = $alias !== '' ? rtrim($alias, '.') . '.' : '';
+        return "({$prefix}archived_at IS NULL OR {$prefix}archived_at = '') AND ({$prefix}status IS NULL OR {$prefix}status = '' OR {$prefix}status = 'published')";
+    }
+}
+
+if (!function_exists('student_course_access_item_is_active')) {
+    function student_course_access_item_is_active(array $item): bool
+    {
+        $archivedAt = trim((string) ($item['archived_at'] ?? ''));
+        $status = strtolower(trim((string) ($item['status'] ?? '')));
+        return $archivedAt === '' && ($status === '' || $status === 'published');
+    }
+}
+
 if (!function_exists('student_course_access_visible_status')) {
     function student_course_access_visible_status($status)
     {
@@ -161,10 +183,9 @@ if (!function_exists('student_course_access_item')) {
             return null;
         }
 
-        $stmt = $conn->prepare("SELECT id, item_id, item_title, item_description, course_id, section_id, item_type, template_type, template_data, assignment_id, duration_minutes, status
+        $stmt = $conn->prepare("SELECT id, item_id, item_title, item_description, course_id, section_id, item_type, template_type, template_data, assignment_id, duration_minutes, status, archived_at
             FROM course_items
-            WHERE course_id = ? AND item_id = ? AND archived_at IS NULL
-              AND (status IS NULL OR status = '' OR status = 'published')
+            WHERE course_id = ? AND item_id = ? AND " . student_course_access_active_item_sql() . "
             LIMIT 1");
         if (!$stmt) {
             return null;
@@ -456,8 +477,8 @@ if (!function_exists('student_course_access_visible_sections')) {
               AND (s.status IS NULL OR s.status = '' OR s.status = 'published')
               AND EXISTS (
                 SELECT 1 FROM course_items AS i
-                WHERE i.course_id = s.course_id AND i.section_id = s.section_id AND i.archived_at IS NULL
-                  AND (i.status IS NULL OR i.status = '' OR i.status = 'published')
+                WHERE i.course_id = s.course_id AND i.section_id = s.section_id
+                  AND " . student_course_access_active_item_sql('i') . "
               )
             ORDER BY s.sort_order ASC, s.id ASC");
         if (!$stmt) {
@@ -485,8 +506,8 @@ if (!function_exists('student_course_access_has_visible_general_item')) {
         }
 
         $stmt = $conn->prepare("SELECT id FROM course_items
-            WHERE course_id = ? AND archived_at IS NULL AND (section_id IS NULL OR section_id = '')
-              AND (status IS NULL OR status = '' OR status = 'published')
+            WHERE course_id = ? AND (section_id IS NULL OR section_id = '')
+              AND " . student_course_access_active_item_sql() . "
             LIMIT 1");
         if (!$stmt) {
             return false;
@@ -582,7 +603,7 @@ if (!function_exists('student_course_access_ordered_items')) {
             FROM course_items AS i
             LEFT JOIN course_sections AS s ON s.course_id = i.course_id AND s.section_id = i.section_id
               AND (s.status IS NULL OR s.status = '' OR s.status = 'published')
-            WHERE i.course_id = ? AND i.archived_at IS NULL AND (i.status IS NULL OR i.status = '' OR i.status = 'published')
+            WHERE i.course_id = ? AND " . student_course_access_active_item_sql('i') . "
               AND (i.section_id IS NULL OR i.section_id = '' OR s.section_id IS NOT NULL)
             ORDER BY CASE WHEN i.section_id IS NULL OR i.section_id = '' THEN 0 ELSE 1 END ASC,
                 s.sort_order ASC, s.id ASC, i.sort_order ASC, i.page_order ASC, i.item_id ASC, i.id ASC");

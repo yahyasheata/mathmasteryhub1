@@ -40,7 +40,7 @@ if (!$course || !$userId || !student_course_access_enrolled($conn, $userId, $cou
 
 $stmt = $conn->prepare("SELECT id, item_id, item_title, item_description, item_type, section_id
     FROM course_items
-    WHERE course_id = ? AND (status IS NULL OR status = '' OR status = 'published')
+    WHERE course_id = ? AND " . student_course_access_active_item_sql() . "
     ORDER BY page_order ASC, id ASC");
 if (!$stmt) {
     user_items_response(false, 'Course content could not be loaded.');

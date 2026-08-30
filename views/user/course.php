@@ -293,7 +293,7 @@ if ($course_access_allowed) {
       FROM courses
       INNER JOIN course_logs ON courses.course_id = course_logs.course_id
       LEFT JOIN course_items ON courses.course_id = course_items.course_id
-        AND (course_items.status IS NULL OR course_items.status = '' OR course_items.status = 'published')
+        AND " . student_course_access_active_item_sql('course_items') . "
         AND (
           course_items.section_id IS NULL OR course_items.section_id = '' OR EXISTS (
             SELECT 1 FROM course_sections AS visible_sections

@@ -71,6 +71,7 @@ function student_courses_local_date(array $session)
     }
 }
 
+$activeCourseItemFilter = student_course_access_active_item_sql();
 $coursesQuery = "
     SELECT courses.id AS courseId, courses.*, categories.category_title,
            COALESCE(course_item_counts.item_count, 0) AS item_count,
@@ -82,13 +83,13 @@ $coursesQuery = "
     LEFT JOIN (
         SELECT course_id, COUNT(item_id) AS item_count
         FROM course_items
-        WHERE status IS NULL OR status = '' OR status = 'published'
+        WHERE " . $activeCourseItemFilter . "
         GROUP BY course_id
     ) AS course_item_counts ON courses.course_id = course_item_counts.course_id
     LEFT JOIN (
         SELECT course_id, COUNT(item_id) AS homework_count
         FROM course_items
-        WHERE (status IS NULL OR status = '' OR status = 'published')
+        WHERE (" . $activeCourseItemFilter . ")
           AND (template_type = 'classified_assignment' OR item_type IN ('assignment', 'homework', 'quiz'))
         GROUP BY course_id
     ) AS homework_counts ON courses.course_id = homework_counts.course_id
