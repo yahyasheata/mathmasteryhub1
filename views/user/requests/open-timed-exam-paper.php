@@ -1,7 +1,9 @@
 <?php
+require_once '__init.php';
 require_once 'connection/config.php';
 require_once 'inc/StudentCourseAccess.php';
 require_once 'inc/TimedExam.php';
+require_once 'inc/RecoveryPlan.php';
 
 $conn = db();
 $timedExamPreview = !empty($timedExamPreview);
@@ -31,7 +33,12 @@ $recovery = !$timedExamPreview ? mmh_timed_exam_resolve_recovery($conn, $exam, (
 if (($recoveryPlanId > 0 || $recoveryTaskId > 0) && !$recovery) { http_response_code(403); exit('Recovery Plan exam window unavailable.'); }
 if ($recovery) $exam = $recovery['exam'];
 $context = mmh_timed_exam_student_context($conn, $exam, (int) $studentId, $timedExamPreview);
-$stateKey = (string) ($context['state']['key'] ?? '');
+$state = is_array($context['state'] ?? null) ? $context['state'] : [];
+$base = rtrim(mmh_current_request_base_url(), '/');
+$previewExitUrl = $timedExamPreview
+    ? (trim((string) ($timedExamPreviewExitUrl ?? '')) ?: $base . '/admin/courses/' . rawurlencode((string) $course['course_id']) . '/content#course-item-' . rawurlencode((string) ($exam['item_id'] ?? '')))
+    : '';
+$stateKey = (string) ($state['key'] ?? '');
 $activeState = in_array($stateKey, ['open', 'grace'], true);
 if (!$timedExamPreview && !in_array($stateKey, ['open', 'grace'], true)) { http_response_code(403); exit('The exam paper is available only during the exam window.'); }
 $paper = mmh_timed_exam_normalize_external_paper_url((string) ($exam['paper_external_url'] ?? ''));
@@ -58,10 +65,10 @@ if ($action === '' || $action === 'preview') {
     $paperQuery = static function (string $paperAction) use ($recoveryParams): string {
         return '?' . http_build_query($recoveryParams + ['paper_action' => $paperAction], '', '&', PHP_QUERY_RFC3986);
     };
-    $openUrl = rtrim(mmh_current_request_base_url(), '/') . ($timedExamPreview
+    $openUrl = $base . ($timedExamPreview
         ? '/admin/courses/' . rawurlencode((string) $course['course_id']) . '/timed-exam/item/' . rawurlencode((string) ($exam['item_id'] ?? '')) . '/paper'
         : '/user/course/' . rawurlencode((string) $course['course_id']) . '/exam/' . (int) $exam['id'] . '/paper') . $paperQuery('open');
-    $downloadUrl = rtrim(mmh_current_request_base_url(), '/') . ($timedExamPreview
+    $downloadUrl = $base . ($timedExamPreview
         ? '/admin/courses/' . rawurlencode((string) $course['course_id']) . '/timed-exam/item/' . rawurlencode((string) ($exam['item_id'] ?? '')) . '/paper'
         : '/user/course/' . rawurlencode((string) $course['course_id']) . '/exam/' . (int) $exam['id'] . '/paper') . $paperQuery('download');
     $returnQuery = $recoveryParams ? '?' . http_build_query($recoveryParams, '', '&', PHP_QUERY_RFC3986) : '';

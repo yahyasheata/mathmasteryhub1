@@ -31,6 +31,26 @@ if (!str_contains($paperView, '$timedExamPreview = !empty($timedExamPreview);')
     || !str_contains($paperView, 'mmh_timed_exam_student_context($conn, $exam, (int) $studentId, $timedExamPreview)')) {
     throw new RuntimeException('Paper route does not carry the trusted preview context.');
 }
+$stateInitialization = <<<'PHP'
+$state = is_array($context['state'] ?? null) ? $context['state'] : [];
+PHP;
+$baseInitialization = <<<'PHP'
+$base = rtrim(mmh_current_request_base_url(), '/');
+PHP;
+if (!str_contains($paperView, "require_once '__init.php';")
+    || !str_contains($paperView, $stateInitialization)
+    || !str_contains($paperView, $baseInitialization)) {
+    throw new RuntimeException('Paper route does not initialize its viewer base/state dependencies locally.');
+}
+$viewExamPosition = strpos($studentView, 'View Exam');
+if ($viewExamPosition === false) {
+    throw new RuntimeException('Student Exam workspace is missing the primary View Exam action.');
+}
+$viewExamAnchorStart = strrpos(substr($studentView, 0, $viewExamPosition), '<a');
+$viewExamAnchor = $viewExamAnchorStart === false ? '' : substr($studentView, $viewExamAnchorStart, $viewExamPosition - $viewExamAnchorStart);
+if (str_contains($viewExamAnchor, 'target=')) {
+    throw new RuntimeException('Primary View Exam action must stay in the current tab.');
+}
 $recoveryInitialization = strpos($paperView, '$recoveryParams =');
 $paperQueryCapture = strpos($paperView, 'use ($recoveryParams)');
 if ($recoveryInitialization === false || $paperQueryCapture === false || $recoveryInitialization > $paperQueryCapture) {
