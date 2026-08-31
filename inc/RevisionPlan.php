@@ -541,7 +541,7 @@ if (!function_exists('mmh_revision_insert_requirement')) {
         if (mmh_revision_requirement_lineage_schema_available($conn)) {
             $stmt = $conn->prepare("INSERT INTO revision_plan_template_requirements (version_id, source_requirement_id, day_id, activity_id, title, description, requirement_type, is_required, sort_order, linked_course_item_id, allow_multiple_files, accepted_file_policy) VALUES (?, NULLIF(?, 0), ?, NULLIF(?, 0), ?, ?, ?, ?, ?, NULLIF(?, ''), ?, ?)");
             if (!$stmt) throw new RuntimeException('Unable to save a requirement.');
-            $stmt->bind_param('iiiisssiisisi', $versionId, $lineageId, $dayId, $activityValue, $requirement['title'], $requirement['description'], $type, $required, $sort, $itemId, $multiple, $policy);
+            $stmt->bind_param('iiiisssiisis', $versionId, $lineageId, $dayId, $activityValue, $requirement['title'], $requirement['description'], $type, $required, $sort, $itemId, $multiple, $policy);
         } else {
             $stmt = $conn->prepare("INSERT INTO revision_plan_template_requirements (version_id, day_id, activity_id, title, description, requirement_type, is_required, sort_order, linked_course_item_id, allow_multiple_files, accepted_file_policy) VALUES (?, ?, NULLIF(?, 0), ?, ?, ?, ?, ?, NULLIF(?, ''), ?, ?)");
             if (!$stmt) throw new RuntimeException('Unable to save a requirement.');
