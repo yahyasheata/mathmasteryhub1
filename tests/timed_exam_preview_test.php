@@ -31,6 +31,20 @@ if (!str_contains($paperView, '$timedExamPreview = !empty($timedExamPreview);')
     || !str_contains($paperView, 'mmh_timed_exam_student_context($conn, $exam, (int) $studentId, $timedExamPreview)')) {
     throw new RuntimeException('Paper route does not carry the trusted preview context.');
 }
+$recoveryInitialization = strpos($paperView, '$recoveryParams =');
+$paperQueryCapture = strpos($paperView, 'use ($recoveryParams)');
+if ($recoveryInitialization === false || $paperQueryCapture === false || $recoveryInitialization > $paperQueryCapture) {
+    throw new RuntimeException('Paper route must initialize recovery URL parameters before the query closure captures them.');
+}
+$paperQuery = static function (array $recoveryParams, string $paperAction): string {
+    return '?' . http_build_query($recoveryParams + ['paper_action' => $paperAction], '', '&', PHP_QUERY_RFC3986);
+};
+if ($paperQuery([], 'preview') !== '?paper_action=preview') {
+    throw new RuntimeException('Exam paper URL must work without Recovery Plan context.');
+}
+if ($paperQuery(['recovery_plan' => 41, 'recovery_task' => 102], 'open') !== '?recovery_plan=41&recovery_task=102&paper_action=open') {
+    throw new RuntimeException('Exam paper URL must preserve validated Recovery Plan context.');
+}
 foreach (['course-resource-viewer-page', 'course-resource-viewer-toolbar', 'course-resource-viewer-stage', 'course-resource-viewer.js', 'data-resource-viewer-src', 'Return to Exam'] as $marker) {
     if (!str_contains($paperView, $marker)) throw new RuntimeException('Exam paper does not reuse the standard Resource Viewer shell: ' . $marker);
 }

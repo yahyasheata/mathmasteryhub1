@@ -22,8 +22,13 @@ if ($courseId !== null && $timedExamPreview) {
 }
 $exam = $course && ($timedExamPreview || $studentId) ? mmh_timed_exam_load($conn, (string) $course['course_id'], $examId, $timedExamPreview) : null;
 if (!$course || !$exam || (!$timedExamPreview && (!$studentId || !student_course_access_enrolled($conn, $studentId, (string) $course['course_id'])))) { http_response_code(403); exit('Exam unavailable.'); }
-$recovery = !$timedExamPreview ? mmh_timed_exam_resolve_recovery($conn, $exam, (int) $studentId, (int) ($_GET['recovery_plan'] ?? 0), (int) ($_GET['recovery_task'] ?? 0)) : null;
-if (((int) ($_GET['recovery_plan'] ?? 0) > 0 || (int) ($_GET['recovery_task'] ?? 0) > 0) && !$recovery) { http_response_code(403); exit('Recovery Plan exam window unavailable.'); }
+$recoveryPlanId = (int) ($_GET['recovery_plan'] ?? 0);
+$recoveryTaskId = (int) ($_GET['recovery_task'] ?? 0);
+$recoveryParams = ($recoveryPlanId > 0 && $recoveryTaskId > 0)
+    ? ['recovery_plan' => $recoveryPlanId, 'recovery_task' => $recoveryTaskId]
+    : [];
+$recovery = !$timedExamPreview ? mmh_timed_exam_resolve_recovery($conn, $exam, (int) $studentId, $recoveryPlanId, $recoveryTaskId) : null;
+if (($recoveryPlanId > 0 || $recoveryTaskId > 0) && !$recovery) { http_response_code(403); exit('Recovery Plan exam window unavailable.'); }
 if ($recovery) $exam = $recovery['exam'];
 $context = mmh_timed_exam_student_context($conn, $exam, (int) $studentId, $timedExamPreview);
 $stateKey = (string) ($context['state']['key'] ?? '');
