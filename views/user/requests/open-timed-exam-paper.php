@@ -27,6 +27,7 @@ if (((int) ($_GET['recovery_plan'] ?? 0) > 0 || (int) ($_GET['recovery_task'] ??
 if ($recovery) $exam = $recovery['exam'];
 $context = mmh_timed_exam_student_context($conn, $exam, (int) $studentId, $timedExamPreview);
 $stateKey = (string) ($context['state']['key'] ?? '');
+$activeState = in_array($stateKey, ['open', 'grace'], true);
 if (!$timedExamPreview && !in_array($stateKey, ['open', 'grace'], true)) { http_response_code(403); exit('The exam paper is available only during the exam window.'); }
 $paper = mmh_timed_exam_normalize_external_paper_url((string) ($exam['paper_external_url'] ?? ''));
 if (!$paper) { http_response_code(409); exit('This exam paper needs a valid Google Drive file link.'); }
