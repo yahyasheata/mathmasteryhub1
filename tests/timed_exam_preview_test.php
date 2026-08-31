@@ -31,6 +31,12 @@ if (!str_contains($paperView, '$timedExamPreview = !empty($timedExamPreview);')
     || !str_contains($paperView, 'mmh_timed_exam_student_context($conn, $exam, (int) $studentId, $timedExamPreview)')) {
     throw new RuntimeException('Paper route does not carry the trusted preview context.');
 }
+foreach (['course-resource-viewer-page', 'course-resource-viewer-toolbar', 'course-resource-viewer-stage', 'course-resource-viewer.js', 'data-resource-viewer-src', 'Return to Exam'] as $marker) {
+    if (!str_contains($paperView, $marker)) throw new RuntimeException('Exam paper does not reuse the standard Resource Viewer shell: ' . $marker);
+}
+if (str_contains($paperView, 'background:#111;color:#fff') || str_contains($paperView, 'class="paper-frame"')) {
+    throw new RuntimeException('Legacy standalone Exam paper viewer markup remains.');
+}
 if (!str_contains($router, "'/courses/{courseId}/timed-exam/item/{itemId}/preview'")
     || !str_contains($router, "'/courses/{courseId}/timed-exam/item/{itemId}/paper'")) {
     throw new RuntimeException('Admin preview routes are not registered.');

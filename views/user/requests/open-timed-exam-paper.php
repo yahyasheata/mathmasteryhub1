@@ -49,19 +49,124 @@ if ($action === '' || $action === 'preview') {
     header('Cache-Control: private, no-store, max-age=0');
     header('Pragma: no-cache');
     header('Referrer-Policy: no-referrer');
-    $fallbackQuery = ['paper_action' => 'open'];
-    if (!empty($_GET['recovery_plan']) && !empty($_GET['recovery_task'])) {
-        $fallbackQuery['recovery_plan'] = (int) $_GET['recovery_plan'];
-        $fallbackQuery['recovery_task'] = (int) $_GET['recovery_task'];
-    }
-    $fallbackPath = $timedExamPreview
+    $paperQuery = static function (string $paperAction) use ($recoveryParams): string {
+        return '?' . http_build_query($recoveryParams + ['paper_action' => $paperAction], '', '&', PHP_QUERY_RFC3986);
+    };
+    $openUrl = rtrim(mmh_current_request_base_url(), '/') . ($timedExamPreview
         ? '/admin/courses/' . rawurlencode((string) $course['course_id']) . '/timed-exam/item/' . rawurlencode((string) ($exam['item_id'] ?? '')) . '/paper'
-        : '/user/course/' . rawurlencode((string) $course['course_id']) . '/exam/' . (int) $exam['id'] . '/paper';
-    $fallback = rtrim(mmh_current_request_base_url(), '/') . $fallbackPath . '?' . http_build_query($fallbackQuery, '', '&', PHP_QUERY_RFC3986);
+        : '/user/course/' . rawurlencode((string) $course['course_id']) . '/exam/' . (int) $exam['id'] . '/paper') . $paperQuery('open');
+    $downloadUrl = rtrim(mmh_current_request_base_url(), '/') . ($timedExamPreview
+        ? '/admin/courses/' . rawurlencode((string) $course['course_id']) . '/timed-exam/item/' . rawurlencode((string) ($exam['item_id'] ?? '')) . '/paper'
+        : '/user/course/' . rawurlencode((string) $course['course_id']) . '/exam/' . (int) $exam['id'] . '/paper') . $paperQuery('download');
+    $returnQuery = $recoveryParams ? '?' . http_build_query($recoveryParams, '', '&', PHP_QUERY_RFC3986) : '';
+    $courseUrl = $timedExamPreview
+        ? $base . '/admin/courses/' . rawurlencode((string) $course['course_id']) . '/content'
+        : $base . '/user/course/' . rawurlencode((string) $course['course_id']);
+    $returnUrl = $timedExamPreview
+        ? $previewExitUrl
+        : $base . '/user/course/' . rawurlencode((string) $course['course_id']) . '/exam/' . (int) $exam['id'] . $returnQuery;
+    $closeTimestamp = $state['window']['closes_at'] instanceof DateTimeImmutable ? $state['window']['closes_at']->getTimestamp() : 0;
+    if (($state['key'] ?? '') === 'grace' && $state['window']['grace_closes_at'] instanceof DateTimeImmutable) {
+        $closeTimestamp = $state['window']['grace_closes_at']->getTimestamp();
+    }
+    $timerSeconds = max(0, (int) ($state['remaining_seconds'] ?? 0));
+    $timerLabel = $timedExamPreview ? 'Preview' : ($activeState
+        ? sprintf('%02d:%02d', intdiv($timerSeconds, 60), $timerSeconds % 60)
+        : (string) ($state['label'] ?? 'Timed Exam'));
+    $sectionTitle = trim((string) ($exam['section_title'] ?? '')) ?: 'Exam Simulation';
+    $metaLabel = $timedExamPreview ? 'Timed Exam · Preview' : 'Timed Exam · Fixed Window';
+    $viewerKey = 'math-mastery-exam-paper:' . ($timedExamPreview ? 'preview' : (int) $studentId) . ':' . (string) $course['course_id'] . ':' . (int) $exam['id'];
     $esc = static fn($value): string => htmlspecialchars((string) $value, ENT_QUOTES, 'UTF-8');
     ?><!doctype html>
-    <html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title><?= $esc((string) $exam['title']); ?> · Exam Preview</title>
-    <style>body{margin:0;background:#111;color:#fff;font:16px system-ui,sans-serif}main{max-width:1100px;margin:0 auto;padding:16px}header{display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap;margin-bottom:12px}h1{font-size:1.1rem;margin:0}a{color:#fff;background:#e87518;border-radius:8px;padding:10px 14px;text-decoration:none;font-weight:700}.paper-frame{width:100%;height:min(82vh,900px);border:0;border-radius:8px;background:#fff}.fallback{margin:12px 0 0;color:#ddd}</style></head><body><main><header><h1><?= $esc((string) $exam['title']); ?></h1><a href="<?= $esc($fallback); ?>" target="_blank" rel="noopener noreferrer">Open Exam in New Tab</a></header><iframe class="paper-frame" src="<?= $esc($paper['preview_url']); ?>" title="<?= $esc((string) $exam['title']); ?> exam paper" allow="fullscreen"></iframe><p class="fallback">Preview unavailable? <a href="<?= $esc($fallback); ?>" target="_blank" rel="noopener noreferrer">Open Exam in New Tab</a></p></main></body></html><?php
+<html lang="en" dir="ltr">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title><?= $esc((string) $exam['title']); ?> | <?= $esc($course['course_title'] ?? 'Course'); ?></title>
+    <script>
+    (function () {
+        var theme = 'dark';
+        try { theme = localStorage.getItem('math-mastery-student-theme') || theme; } catch (error) {}
+        document.documentElement.dataset.studentTheme = theme === 'light' ? 'light' : 'dark';
+        document.documentElement.style.colorScheme = document.documentElement.dataset.studentTheme;
+    }());
+    </script>
+    <link rel="stylesheet" href="<?= $esc(rtrim((string) $base, '/') . '/resources/css/fontawsome5.min.css'); ?>">
+    <link rel="stylesheet" href="<?= $esc(rtrim((string) $base, '/') . '/resources/css/design-system.css'); ?>">
+    <link rel="stylesheet" href="<?= $esc(rtrim((string) $base, '/') . '/resources/css/course-learning.css'); ?>">
+</head>
+<body class="course-learning-page course-resource-viewer-page">
+<main class="course-resource-viewer" data-resource-viewer data-resource-viewer-key="<?= $esc($viewerKey); ?>" data-resource-viewer-kind="pdf">
+    <header class="course-resource-viewer-header">
+        <nav class="course-resource-viewer-breadcrumb" aria-label="Breadcrumb">
+            <a href="<?= $esc($courseUrl); ?>"><?= $esc($timedExamPreview ? 'Course Content' : 'Course'); ?></a>
+            <span aria-hidden="true">/</span>
+            <span><?= $esc($sectionTitle); ?></span>
+            <span aria-hidden="true">/</span>
+            <span aria-current="page"><?= $esc((string) $exam['title']); ?></span>
+        </nav>
+        <div class="course-resource-viewer-heading">
+            <span class="course-resource-viewer-icon fas fa-file-pdf" aria-hidden="true"></span>
+            <div class="course-resource-viewer-title-block">
+                <p class="course-resource-viewer-meta">
+                    <?= $esc($metaLabel); ?>
+                    <?php if ($activeState || $timedExamPreview): ?><span aria-hidden="true">•</span><span data-countdown<?= $activeState ? ' data-close="' . (int) $closeTimestamp . '"' : ''; ?>><?= $esc($timerLabel); ?></span><?php endif; ?>
+                    <?php if (!$activeState && !$timedExamPreview): ?><span aria-hidden="true">•</span><?= $esc((string) ($state['label'] ?? 'Unavailable')); ?><?php endif; ?>
+                </p>
+                <h1><?= $esc((string) $exam['title']); ?></h1>
+                <p class="course-resource-viewer-completion"><span class="fas fa-stopwatch" aria-hidden="true"></span> <?= $esc($activeState ? 'Exam window active' : ($timedExamPreview ? 'Preview only' : (string) ($state['label'] ?? 'Exam unavailable'))); ?></p>
+            </div>
+            <a href="<?= $esc($returnUrl); ?>" class="course-resource-viewer-return"><span class="fas fa-arrow-left" aria-hidden="true"></span> <?= $esc($timedExamPreview ? 'Exit Preview' : 'Return to Exam'); ?></a>
+        </div>
+    </header>
+
+    <section class="course-resource-viewer-toolbar" aria-label="Exam paper viewer controls">
+        <div class="course-resource-viewer-tool-group course-resource-viewer-tool-group-view">
+            <span class="course-resource-viewer-tool-label">Viewing</span>
+            <button type="button" data-resource-open><span class="fas fa-expand-arrows-alt" aria-hidden="true"></span><span>Focus viewer</span></button>
+            <?php if (!empty($exam['paper_view_allowed'])): ?><a href="<?= $esc($openUrl); ?>" target="_blank" rel="noopener noreferrer"><span class="fas fa-external-link-alt" aria-hidden="true"></span><span>Open externally</span></a><?php endif; ?>
+        </div>
+        <div class="course-resource-viewer-tool-divider" aria-hidden="true"></div>
+        <div class="course-resource-viewer-tool-group course-resource-viewer-tool-group-actions">
+            <span class="course-resource-viewer-tool-label">Actions</span>
+            <?php if (!empty($exam['paper_download_allowed'])): ?><a href="<?= $esc($downloadUrl); ?>" target="_blank" rel="noopener noreferrer"><span class="fas fa-download" aria-hidden="true"></span><span>Download</span></a><?php endif; ?>
+            <button type="button" data-resource-copy><span class="fas fa-link" aria-hidden="true"></span><span>Copy link</span></button>
+            <button type="button" data-resource-reload><span class="fas fa-sync-alt" aria-hidden="true"></span><span>Reload</span></button>
+            <button type="button" data-resource-fullscreen aria-pressed="false"><span class="fas fa-expand" aria-hidden="true"></span><span>Fullscreen</span></button>
+        </div>
+        <span class="visually-hidden" data-resource-status role="status" aria-live="polite"></span>
+    </section>
+
+    <section id="resource-viewer-stage" class="course-resource-viewer-stage" data-resource-viewer-stage data-resource-kind="pdf" aria-label="<?= $esc((string) $exam['title']); ?> exam paper" tabindex="-1" aria-busy="true">
+        <div class="course-resource-viewer-loading" data-resource-viewer-loading><span class="fas fa-circle-notch fa-spin" aria-hidden="true"></span><span>Preparing exam paper…</span></div>
+        <iframe data-resource-viewer-frame data-resource-viewer-src="<?= $esc((string) $paper['preview_url']); ?>" title="<?= $esc((string) $exam['title']); ?> exam paper" loading="eager" referrerpolicy="no-referrer" allow="fullscreen; picture-in-picture" allowfullscreen></iframe>
+    </section>
+    <p class="course-resource-viewer-provider-notice" data-resource-viewer-notice role="status" aria-live="polite" hidden></p>
+
+    <nav class="course-resource-viewer-navigation" aria-label="Exam navigation">
+        <div></div>
+        <div><a class="course-resource-viewer-nav-link" href="<?= $esc($returnUrl); ?>"><span class="fas fa-arrow-left" aria-hidden="true"></span> <?= $esc($timedExamPreview ? 'Exit Preview' : 'Return to Exam'); ?></a></div>
+    </nav>
+</main>
+<script src="<?= $esc(rtrim((string) $base, '/') . '/resources/js/course-resource-viewer.js'); ?>" defer></script>
+<?php if ($activeState): ?><script>
+(function () {
+    var countdown = document.querySelector('[data-countdown]');
+    if (!countdown) return;
+    var title = <?= json_encode((string) $exam['title'], JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES); ?>;
+    function format(seconds) { seconds = Math.max(0, seconds); return String(Math.floor(seconds / 60)).padStart(2, '0') + ':' + String(seconds % 60).padStart(2, '0'); }
+    function tick() {
+        var seconds = Math.max(0, parseInt(countdown.dataset.close || '0', 10) - Math.floor(Date.now() / 1000));
+        countdown.textContent = format(seconds);
+        document.title = (seconds > 0 ? format(seconds) : 'Time Ended') + ' — ' + title;
+        if (seconds <= 0) window.location.reload();
+    }
+    tick();
+    window.setInterval(tick, 1000);
+}());
+</script><?php endif; ?>
+</body>
+</html><?php
     exit;
 }
 if ($action === 'open') {
