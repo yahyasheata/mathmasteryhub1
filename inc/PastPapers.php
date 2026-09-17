@@ -552,6 +552,199 @@ if (!function_exists('mmh_past_save_paper')) {
     }
 }
 
+/*
+ * Parse the compact paper names teachers commonly use when adding a paper.
+ * This is deliberately deterministic and never calls an external service.
+ */
+if (!function_exists('mmh_past_parse_paper_name')) {
+    function mmh_past_parse_paper_name($name): array
+    {
+        $raw = mmh_past_clean($name, 190);
+        $text = preg_replace('/[\x{2013}\x{2014}]/u', '-', $raw);
+        $text = preg_replace('/\s+/', ' ', trim((string) $text));
+        $result = [
+            'input' => $raw,
+            'session' => '',
+            'year' => null,
+            'paper_number' => '',
+            'variant' => '',
+            'component' => '',
+            'confidence' => [],
+            'missing' => [],
+        ];
+
+        if (preg_match('/\b(?:may\s*[\/-]?\s*june|may\s+june|m\s*[\/]\s*j|\bjune\b)/i', $text)) {
+            $result['session'] = 'May/June';
+        } elseif (preg_match('/\b(?:oct(?:ober)?\s*[\/-]?\s*nov(?:ember)?|o\s*[\/]\s*n|\bnov(?:ember)?\b)/i', $text)) {
+            $result['session'] = 'October/November';
+        } elseif (preg_match('/\b(?:feb(?:ruary)?\s*[\/-]?\s*mar(?:ch)?|f\s*[\/]\s*m)/i', $text)) {
+            $result['session'] = 'February/March';
+        }
+        if ($result['session'] !== '') $result['confidence'][] = 'session';
+
+        if (preg_match('/\b(?:19|20)\d{2}\b/', $text, $match)) {
+            $result['year'] = (int) $match[0];
+            $result['confidence'][] = 'year';
+        }
+
+        $paper = '';
+        $variant = '';
+        if (preg_match('/\b(?:paper|p)\s*([1-9]\d?)\b/i', $text, $match)) {
+            $paper = (int) $match[1];
+        }
+        if (preg_match('/\b(?:v(?:ariant)?\s*)?([1-3])\b/i', $text, $match)) {
+            // Only treat an explicit V/Variant token as a variant. Bare
+            // numbers are handled below as Cambridge component codes.
+            if (preg_match('/\bv(?:ariant)?\s*([1-3])\b/i', $text, $variantMatch)) {
+                $variant = (int) $variantMatch[1];
+            }
+        }
+
+        if (preg_match('/\b(?:p(?:aper)?\s*)?([24])([1-3])\b/i', $text, $match)) {
+            $paper = (int) $match[1];
+            $variant = (int) $match[2];
+            $result['component'] = $match[0];
+            $result['component'] = preg_replace('/^paper\s*/i', '', $result['component']);
+            $result['component'] = preg_replace('/^p\s*/i', '', $result['component']);
+        }
+        if ($paper !== '') {
+            $result['paper_number'] = 'Paper ' . $paper;
+            $result['confidence'][] = 'paper';
+        }
+        if ($variant !== '') {
+            $result['variant'] = (string) $variant;
+            $result['confidence'][] = 'variant';
+        }
+        if ($result['component'] === '' && $paper !== '' && $variant !== '') {
+            $result['component'] = (string) $paper . (string) $variant;
+        }
+        if ($result['component'] !== '') $result['confidence'][] = 'component';
+        if ($result['session'] === '') $result['missing'][] = 'session';
+        if ($result['year'] === null) $result['missing'][] = 'year';
+        if ($result['paper_number'] === '') $result['missing'][] = 'paper';
+        if ($result['variant'] === '') $result['missing'][] = 'variant';
+        return $result;
+    }
+}
+
+if (!function_exists('mmh_past_quick_form_value')) {
+    function mmh_past_quick_form_value(array $data, $key, $default = '')
+    {
+        return array_key_exists($key, $data) ? $data[$key] : $default;
+    }
+}
+
+if (!function_exists('mmh_past_quick_add')) {
+    /** Save a paper and its routine resources as one logical operation. */
+    function mmh_past_quick_add(mysqli $conn, array $data, array $files, $admin = ''): array
+    {
+        $name = mmh_past_clean($data['paper_name'] ?? '', 190);
+        $parsed = mmh_past_parse_paper_name($name);
+        $year = isset($data['year']) && (string) $data['year'] !== '' ? (int) $data['year'] : (int) ($parsed['year'] ?? 0);
+        $syllabusId = mmh_past_identifier($data['syllabus_id'] ?? '', 40);
+        if ($name === '') return [false, 'Paper name is required.', ['parsed' => $parsed]];
+        if (!$syllabusId) return [false, 'Choose a Syllabus / Subject.', ['parsed' => $parsed]];
+        $customSession = mmh_past_clean($data['custom_session'] ?? '', 80);
+        if ((!$parsed['session'] && $customSession === '') || !$parsed['paper_number'] || !$parsed['variant'] || $year < 1900 || $year > 2100) {
+            $missing = $parsed['missing'];
+            if ($customSession !== '') $missing = array_values(array_diff($missing, ['session']));
+            if (!$year && !in_array('year', $missing, true)) $missing[] = 'year';
+            return [false, 'Add the missing paper details: ' . implode(', ', $missing ?: ['year, session, paper, variant']) . '.', ['parsed' => $parsed]];
+        }
+        $syllabus = mmh_past_syllabus($conn, $syllabusId);
+        if (!$syllabus) return [false, 'Choose a valid Syllabus / Subject.', ['parsed' => $parsed]];
+        $boardId = mmh_past_identifier($syllabus['exam_board_id'] ?? '', 40);
+        if (!$boardId) return [false, 'The selected Syllabus is not linked to an Exam Board.', ['parsed' => $parsed]];
+
+        $status = (($data['save_mode'] ?? '') === 'published') ? 'published' : 'draft';
+        $session = $parsed['session'] ?: 'Custom';
+        $courseId = mmh_past_identifier($data['course_id'] ?? '', 40) ?: ($syllabus['course_id'] ?? null);
+        $duplicate = $conn->prepare('SELECT paper_id FROM past_papers WHERE exam_board_id = ? AND syllabus_id = ? AND year = ? AND exam_session = ? AND paper_number = ? AND variant = ? LIMIT 1');
+        if (!$duplicate) return [false, 'Unable to validate the paper identity.', ['parsed' => $parsed]];
+        $paperNumber = $parsed['paper_number']; $variant = $parsed['variant'];
+        $duplicate->bind_param('ssisss', $boardId, $syllabusId, $year, $session, $paperNumber, $variant);
+        $duplicate->execute();
+        $existing = $duplicate->get_result()->fetch_assoc();
+        $duplicate->close();
+        if ($existing) return [false, 'A Past Paper with these exam details already exists. Open it to add or edit resources.', ['paper_id' => $existing['paper_id'], 'parsed' => $parsed]];
+
+        $conn->begin_transaction();
+        $movedFiles = [];
+        try {
+            $paperPayload = [
+                'exam_board_id' => $boardId,
+                'syllabus_id' => $syllabusId,
+                'course_id' => $courseId,
+                'year' => $year,
+                'exam_session' => $session,
+                'custom_session' => $customSession,
+                'paper_number' => $paperNumber,
+                'variant' => $variant,
+                'short_title' => mmh_past_clean($data['short_title'] ?? '', 190) ?: $name,
+                'qualification_level' => $data['qualification_level'] ?? '',
+                'tier' => $data['tier'] ?? '',
+                'calculator_mode' => $data['calculator_mode'] ?? '',
+                'maximum_marks' => $data['maximum_marks'] ?? '',
+                'duration_minutes' => $data['duration_minutes'] ?? '',
+                'paper_date' => $data['paper_date'] ?? '',
+                'description' => $data['description'] ?? '',
+                'primary_topic_id' => $data['primary_topic_id'] ?? '',
+                'additional_topic_ids' => $data['additional_topic_ids'] ?? [],
+                'keywords' => $data['keywords'] ?? '',
+                'sort_order' => $data['sort_order'] ?? 0,
+                'status' => $status,
+            ];
+            [$paperOk, $paperMessage, $paperData] = array_pad(mmh_past_save_paper($conn, $paperPayload), 3, []);
+            if (!$paperOk || empty($paperData['paper_id'])) throw new RuntimeException($paperMessage ?: 'Unable to save Past Paper.');
+            $paperId = (string) $paperData['paper_id'];
+            $resourceLabels = ['question_paper' => 'Question Paper', 'mark_scheme' => 'Mark Scheme', 'model_answer' => 'Model Answer', 'solution_video' => 'Video Solution', 'custom' => 'Additional Resource'];
+            $quickResources = is_array($data['quick_resources'] ?? null) ? $data['quick_resources'] : [];
+            foreach ($resourceLabels as $type => $label) {
+                $resource = is_array($quickResources[$type] ?? null) ? $quickResources[$type] : [];
+                $url = trim((string) ($resource['url'] ?? ''));
+                $hasFile = isset($files['quick_resources']['error'][$type]['file']) && (int) $files['quick_resources']['error'][$type]['file'] !== UPLOAD_ERR_NO_FILE;
+                if ($url === '' && !$hasFile) continue;
+                $resourceFile = [];
+                if ($hasFile) {
+                    $resourceFile = [
+                        'name' => $files['quick_resources']['name'][$type]['file'] ?? '',
+                        'type' => $files['quick_resources']['type'][$type]['file'] ?? '',
+                        'tmp_name' => $files['quick_resources']['tmp_name'][$type]['file'] ?? '',
+                        'error' => $files['quick_resources']['error'][$type]['file'] ?? UPLOAD_ERR_NO_FILE,
+                        'size' => $files['quick_resources']['size'][$type]['file'] ?? 0,
+                    ];
+                }
+                $storage = $hasFile ? 'file' : 'url';
+                [$resourceOk, $resourceMessage, $resourceData] = array_pad(mmh_past_save_resource($conn, [
+                    'paper_id' => $paperId,
+                    'resource_type' => $type,
+                    'display_title' => $type === 'custom' ? (mmh_past_clean($resource['title'] ?? '', 190) ?: $label) : $label,
+                    'custom_type' => $type === 'custom' ? mmh_past_clean($resource['custom_type'] ?? '', 80) : '',
+                    'storage_type' => $storage,
+                    'external_url' => $url,
+                    'access_level' => mmh_past_default_access($type),
+                    'unlock_rule' => 'immediate',
+                    'status' => $status,
+                    'download_allowed' => 1,
+                    'preview_allowed' => 1,
+                ], ['resource_file' => $resourceFile]), 3, []);
+                if (!$resourceOk) throw new RuntimeException($label . ': ' . $resourceMessage);
+                if (!empty($resourceData['resource_id'])) {
+                    $savedResource = mmh_past_resource($conn, $resourceData['resource_id']);
+                    if (!empty($savedResource['file_path'])) $movedFiles[] = (string) $savedResource['file_path'];
+                }
+            }
+            $conn->commit();
+            return [true, $status === 'published' ? 'Past Paper published successfully.' : 'Past Paper draft saved successfully.', ['paper_id' => $paperId, 'parsed' => $parsed]];
+        } catch (Throwable $e) {
+            $conn->rollback();
+            foreach ($movedFiles as $path) if ($path !== '' && is_file($path)) @unlink($path);
+            error_log('Past Paper quick add failed: ' . $e->getMessage());
+            return [false, 'Unable to save Past Paper and resources. Check the highlighted fields and try again.', ['parsed' => $parsed]];
+        }
+    }
+}
+
 if (!function_exists('mmh_past_paper')) {
     function mmh_past_paper(mysqli $conn, $paperId)
     {
@@ -800,6 +993,7 @@ if (!function_exists('mmh_past_save_resource')) {
         $external = null;
         $filePath = $original = $mime = null;
         $fileSize = null;
+        $newFilePath = null;
         $existing = $resourceId ? mmh_past_resource($conn, $resourceId) : null;
         if ($existing) {
             $filePath = $existing['file_path'];
@@ -827,6 +1021,7 @@ if (!function_exists('mmh_past_save_resource')) {
             }
             if (is_array($fileData)) {
                 $filePath = $fileData['file_path'];
+                $newFilePath = $filePath;
                 $original = $fileData['original_filename'];
                 $mime = $fileData['mime_type'];
                 $fileSize = $fileData['file_size'];
@@ -845,6 +1040,7 @@ if (!function_exists('mmh_past_save_resource')) {
             $stmt->bind_param('sssssssssisssssisiis', $resourceId, $paperId, $type, $customType, $title, $storageType, $filePath, $original, $mime, $fileSize, $external, $description, $access, $unlockRule, $unlockAt, $manualUnlocked, $status, $sort, $download, $preview);
         }
         if (!$stmt || !$stmt->execute()) {
+            if ($newFilePath && is_file($newFilePath)) @unlink($newFilePath);
             if ($stmt) {
                 $stmt->close();
             }
