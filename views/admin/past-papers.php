@@ -219,7 +219,7 @@ $unlockRules = [
                     </form>
                 </section>
 
-                <section class="past-papers-card past-papers-drive-import" id="import-tools">
+                <section class="past-papers-drive-import" id="import-tools">
                     <details class="past-papers-secondary-workflow" id="drive-import" <?= $driveJob ? 'open' : ''; ?>><summary><span class="fab fa-google-drive" aria-hidden="true"></span> Import &amp; migration tools</summary>
                     <div class="d-flex flex-wrap justify-content-between gap-3 align-items-start mb-3">
                         <div>

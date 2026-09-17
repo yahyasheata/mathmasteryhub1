@@ -11,6 +11,7 @@ foreach (['quick-add', 'quick-syllabus', 'quick-paper-name', 'name="quick_resour
 }
 if (!str_contains($handler, "!empty(\$_POST['quick_add'])") || !str_contains($handler, 'mmh_past_quick_add')) throw new RuntimeException('Quick-add handler wiring is missing.');
 if (!str_contains($page, '$rawDriveFilter = isset($_GET[\'drive_filter\'])')) throw new RuntimeException('Drive filter default handling is missing.');
+if (substr_count($page, 'class="past-papers-secondary-workflow') < 7) throw new RuntimeException('Secondary Past Papers workflows are missing the shared styling class.');
 foreach (['mmh_past_parse_paper_name', 'mmh_past_quick_add', 'begin_transaction', 'mmh_past_save_resource'] as $marker) {
     if (!str_contains($service, $marker)) throw new RuntimeException("Quick-add service marker missing: {$marker}");
 }

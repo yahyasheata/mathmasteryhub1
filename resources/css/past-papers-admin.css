@@ -4,7 +4,8 @@
 }
 
 .past-papers-hero,
-.past-papers-card {
+.past-papers-card,
+.past-papers-secondary-workflow {
   background: linear-gradient(180deg, color-mix(in srgb, var(--surface-elevated) 96%, transparent), var(--surface));
   border: 1px solid var(--border);
   border-radius: var(--radius-xl);
@@ -37,9 +38,7 @@
 }
 
 .past-papers-secondary-workflow {
-  border: 1px solid var(--border);
-  border-radius: var(--radius-lg);
-  padding: var(--space-3) var(--space-4);
+  padding: var(--space-4) var(--space-5);
 }
 
 .past-papers-secondary-workflow > summary,
@@ -187,8 +186,10 @@
 
 html.dark .past-papers-hero,
 html.dark .past-papers-card,
+html.dark .past-papers-secondary-workflow,
 html[data-bs-theme="dark"] .past-papers-hero,
-html[data-bs-theme="dark"] .past-papers-card {
+html[data-bs-theme="dark"] .past-papers-card,
+html[data-bs-theme="dark"] .past-papers-secondary-workflow {
   background: linear-gradient(180deg, color-mix(in srgb, var(--surface-elevated) 92%, transparent), var(--surface));
 }
 
@@ -219,7 +220,7 @@ html[data-bs-theme="dark"] .past-papers-card {
 
 
 /* Google Drive import stays within the existing Past Papers card system. */
-.past-papers-drive-import { overflow: hidden; }
+.past-papers-drive-import { overflow: visible; }
 .past-papers-drive-connection,
 .past-papers-drive-action {
   align-items: center;
