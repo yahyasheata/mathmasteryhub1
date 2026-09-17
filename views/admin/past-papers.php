@@ -108,6 +108,8 @@ $unlockRules = [
     'after_homework_submission' => 'Future: after Homework submission',
     'after_teacher_approval' => 'Future: after teacher approval',
 ];
+$pastPapersCssPath = dirname(__DIR__, 2) . '/resources/css/past-papers-admin.css';
+$pastPapersCssVersion = is_file($pastPapersCssPath) ? (string) (filemtime($pastPapersCssPath) ?: 1) : '1';
 ?>
 <!DOCTYPE html>
 <html lang="en">
@@ -116,7 +118,7 @@ $unlockRules = [
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>Past Papers | <?=$site_name;?></title>
     <?php include 'layouts/admin/header.php'; ?>
-    <link rel="stylesheet" href="<?=rtrim((string)$baseUrl, '/')?>/resources/css/past-papers-admin.css">
+    <link rel="stylesheet" href="<?=rtrim((string)$baseUrl, '/')?>/resources/css/past-papers-admin.css?v=<?=rawurlencode($pastPapersCssVersion)?>">
 </head>
 <body class="dash ds-bg-primary">
 <form method="POST" action="<?=$baseUrl?>/admin/logout" id="logout-form" class="d-none"><input type="hidden" name="mmh_csrf_token" value="<?=htmlspecialchars(mmh_admin_csrf_token(), ENT_QUOTES, 'UTF-8')?>"></form>
