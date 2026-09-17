@@ -367,27 +367,34 @@ if (!function_exists('mmh_classroom_scan')) {
         $syllabus = mmh_past_syllabus($conn, $syllabusId);
         if (!$syllabus || !mmh_classroom_is_target_syllabus($syllabus)) return [false, 'Select the configured Cambridge Mathematics 0580 syllabus.', null];
         $service = mmh_classroom_service($baseUrl); if (!$service) return [false, 'Connect a Google account with Classroom read-only access first.', null];
+        $stage = 'scan.start';
         try {
+            $stage = 'topics.list';
             $topics = mmh_classroom_api_list_all(static fn($page) => $service->courses_topics->listCoursesTopics($courseId, array_filter(['pageSize' => 100, 'pageToken' => $page, 'fields' => 'topic(id,name),nextPageToken'], static fn($v) => $v !== '')), 'topic');
             $topicRows = array_map(static fn($topic) => ['id' => (string) ($topic->getId() ?? ''), 'title' => (string) ($topic->getName() ?? '')], $topics);
             $metadata = [];
+            $stage = 'courseWorkMaterials.list';
             $listedMaterials = mmh_classroom_api_list_all(static fn($page) => $service->courses_courseWorkMaterials->listCoursesCourseWorkMaterials($courseId, array_filter(['courseWorkMaterialStates' => 'PUBLISHED', 'pageSize' => 100, 'pageToken' => $page, 'fields' => 'courseWorkMaterial(id,title,topicId),nextPageToken'], static fn($v) => $v !== '')), 'courseWorkMaterial');
             foreach ($listedMaterials as $item) $metadata[] = ['item_type' => 'coursework_material', 'id' => (string) ($item->getId() ?? ''), 'title' => (string) ($item->getTitle() ?? ''), 'topic_id' => (string) ($item->getTopicId() ?? '')];
+            $stage = 'courseWork.list';
             $listedWork = mmh_classroom_api_list_all(static fn($page) => $service->courses_courseWork->listCoursesCourseWork($courseId, array_filter(['courseWorkStates' => 'PUBLISHED', 'pageSize' => 100, 'pageToken' => $page, 'fields' => 'courseWork(id,title,topicId),nextPageToken'], static fn($v) => $v !== '')), 'courseWork');
             foreach ($listedWork as $item) $metadata[] = ['item_type' => 'coursework', 'id' => (string) ($item->getId() ?? ''), 'title' => (string) ($item->getTitle() ?? ''), 'topic_id' => (string) ($item->getTopicId() ?? '')];
             $approvedIds = []; foreach ($topicRows as $topic) if (mmh_classroom_parse_topic($topic['title'])) $approvedIds[(string) $topic['id']] = true;
             $items = [];
             foreach ($metadata as $item) {
                 if ($item['topic_id'] === '' || !isset($approvedIds[$item['topic_id']])) continue;
+                $stage = $item['item_type'] === 'coursework_material' ? 'courseWorkMaterials.get' : 'courseWork.get';
                 $full = $item['item_type'] === 'coursework_material' ? $service->courses_courseWorkMaterials->get($courseId, $item['id'], ['fields' => 'id,title,topicId,materials']) : $service->courses_courseWork->get($courseId, $item['id'], ['fields' => 'id,title,topicId,materials']);
                 $materials = method_exists($full, 'getMaterials') ? (array) ($full->getMaterials() ?? []) : [];
                 $items[] = array_merge($item, ['attachments' => array_map('mmh_classroom_normalize_attachment', $materials)]);
             }
+            $stage = 'preview.build';
             $preview = mmh_classroom_build_preview($topicRows, $items, $syllabus, static fn(array $candidate) => mmh_classroom_lookup_existing_paper($conn, (string) $syllabus['syllabus_id'], (int) $candidate['topic']['year'], (string) $candidate['topic']['session'], (string) $candidate['paper_number'], (string) $candidate['variant']));
             $preview['course'] = ['id' => $courseId]; $preview['scanned_at'] = date('c');
             return [true, 'Read-only Classroom scan complete. No Past Paper records were changed.', $preview];
         } catch (Throwable $exception) {
-            error_log('[PastPaperClassroom] scan failed: ' . $exception->getMessage());
+            $detail = preg_replace('/https?:\/\/\S+/i', '[url]', trim($exception->getMessage())) ?: 'unknown error';
+            error_log('[PastPaperClassroom] scan failed stage=' . $stage . ' course=' . $courseId . ' class=' . get_class($exception) . ' code=' . (int) $exception->getCode() . ' message=' . substr($detail, 0, 300));
             return [false, 'Google Classroom could not be scanned. Check the connected account and API configuration.', null];
         }
     }
