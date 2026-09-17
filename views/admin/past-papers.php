@@ -228,7 +228,7 @@ $pastPapersCssVersion = is_file($pastPapersCssPath) ? (string) (filemtime($pastP
                             <div class="past-papers-step"><span>Drive</span><strong>Google Drive Import</strong></div>
                             <p class="mb-0">Scan a shared folder first, review detected metadata, then confirm only the files you want to import. Scanning never creates Past Paper records.</p>
                         </div>
-                        <span class="past-papers-drive-connection <?= $driveConnection['available'] ? 'is-ready' : 'is-missing'; ?>">Authentication: <?=past_admin_html($driveConnection['label'] ?? 'Not configured');?></span>
+                        <div class="d-flex gap-2 align-items-center flex-wrap"><span class="past-papers-drive-connection <?= $driveConnection['available'] ? 'is-ready' : 'is-missing'; ?>">Authentication: <?=past_admin_html($driveConnection['label'] ?? 'Not configured');?></span><a class="btn btn-outline-secondary btn-sm" href="<?=past_admin_html(rtrim((string) $baseUrl, '/') . '/admin/past-papers/classroom');?>">Google Classroom scanner <small>(read-only)</small></a></div>
                     </div>
                     <?php if (!$driveConnection['available']): ?>
                         <div class="past-papers-drive-notice" role="status"><?=past_admin_html($driveConnection['message']);?></div>

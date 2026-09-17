@@ -286,6 +286,44 @@ $router->mount('/admin', function() use ($router) {
         require __DIR__ . '/views/admin/diagnostics/sharepoint-stream-test.php';
     });
 
+    // Google Classroom Past Paper scanning is a read-only, session-scoped
+    // preview flow. It deliberately has no import/write endpoint in Phase 2.
+    $router->get('/past-papers/classroom', function() {
+        require_once '__init.php';
+        mmh_admin_require_admin();
+        require __DIR__ . '/views/admin/past-papers-classroom.php';
+    });
+
+    $router->get('/past-papers/classroom/connect', function() {
+        require_once '__init.php';
+        mmh_admin_require_admin();
+        require_once __DIR__ . '/inc/PastPaperClassroomScanner.php';
+        $url = mmh_classroom_oauth_start_url(mmh_current_request_base_url());
+        if ($url === null) {
+            $_SESSION['mmh_classroom_flash'] = ['type' => 'error', 'message' => 'Google Classroom is not configured for this environment.'];
+            header('Location: ' . rtrim(mmh_current_request_base_url(), '/') . '/admin/past-papers/classroom');
+            exit;
+        }
+        header('Location: ' . $url);
+        exit;
+    });
+
+    $router->get('/past-papers/classroom/callback', function() {
+        require_once '__init.php';
+        mmh_admin_require_admin();
+        require_once __DIR__ . '/inc/PastPaperClassroomScanner.php';
+        [$ok, $message] = mmh_classroom_oauth_callback(mmh_current_request_base_url());
+        $_SESSION['mmh_classroom_flash'] = ['type' => $ok ? 'success' : 'error', 'message' => $message];
+        header('Location: ' . rtrim(mmh_current_request_base_url(), '/') . '/admin/past-papers/classroom');
+        exit;
+    });
+
+    $router->post('/past-papers/classroom/scan', function() {
+        require_once '__init.php';
+        mmh_admin_require_mutation();
+        require __DIR__ . '/views/admin/requests/scan-classroom-past-papers.php';
+    });
+
     // Parent Reports renders and processes the same page so Preview, comments,
     // and PDF output retain the existing Admin form workflow.
     $router->post('/parent-reports', function() {
