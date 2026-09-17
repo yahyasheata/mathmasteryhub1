@@ -394,7 +394,9 @@ if (!function_exists('mmh_classroom_scan')) {
             return [true, 'Read-only Classroom scan complete. No Past Paper records were changed.', $preview];
         } catch (Throwable $exception) {
             $detail = preg_replace('/https?:\/\/\S+/i', '[url]', trim($exception->getMessage())) ?: 'unknown error';
-            error_log('[PastPaperClassroom] scan failed stage=' . $stage . ' course=' . $courseId . ' class=' . get_class($exception) . ' code=' . (int) $exception->getCode() . ' message=' . substr($detail, 0, 300));
+            $diagnostic = '[PastPaperClassroom] scan failed stage=' . $stage . ' course=' . $courseId . ' class=' . get_class($exception) . ' code=' . (int) $exception->getCode() . ' message=' . substr($detail, 0, 300);
+            error_log($diagnostic);
+            @file_put_contents(dirname(__DIR__) . '/storage/private/classroom-scan-debug.log', $diagnostic . PHP_EOL, FILE_APPEND | LOCK_EX);
             return [false, 'Google Classroom could not be scanned. Check the connected account and API configuration.', null];
         }
     }
