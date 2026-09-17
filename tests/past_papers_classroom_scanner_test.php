@@ -47,6 +47,7 @@ $conflict = mmh_classroom_build_preview([$topic], [['item_type' => 'coursework',
 classroom_test(count($conflict['warnings']) === 1 && $conflict['warnings'][0]['status'] === 'NEEDS REVIEW', 'Ambiguous combined attachments were not flagged.');
 
 $scannerSource = file_get_contents(__DIR__ . '/../inc/PastPaperClassroomScanner.php');
+classroom_test(str_contains((string) $scannerSource, "fields' => 'topic(topicId,name),nextPageToken'") && str_contains((string) $scannerSource, 'getTopicId()'), 'Topics list used an invalid field mask or identifier accessor.');
 classroom_test(!str_contains((string) $scannerSource, 'INSERT INTO past_papers') && !str_contains((string) $scannerSource, 'INSERT INTO past_paper_resources'), 'Scanner contains Past Paper write SQL.');
 
 echo "Past Paper Classroom scanner checks passed.\n";
