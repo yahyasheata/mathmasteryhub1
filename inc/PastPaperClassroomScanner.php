@@ -252,6 +252,13 @@ if (!function_exists('mmh_classroom_attachment_papers')) {
         if (preg_match('/\bp4\b/i', $normalized)) $explicit[] = 4;
         if ($explicit) return array_values(array_intersect(array_values(array_unique($explicit)), $classification['papers'] ?? []));
         $found = [];
+        // Combined attachment names such as "Paper 2 and 4" are a common
+        // Classroom convention.  Treat the omitted second "Paper" label as
+        // an intentional P2/P4 resource, while still requiring an explicit
+        // paper marker (never a bare date number).
+        if (preg_match('/\b(?:paper\s*2|p2)\s*(?:and|&)\s*(?:paper\s*)?4\b/i', $normalized)) {
+            $found = [2, 4];
+        }
         if (preg_match('/paper\\s*2\\b/i', $normalized)) $found[] = 2;
         if (preg_match('/paper\\s*4\\b/i', $normalized)) $found[] = 4;
         $found = array_values(array_unique(array_intersect($found, $classification['papers'] ?? [])));
@@ -363,7 +370,8 @@ if (!function_exists('mmh_classroom_build_preview')) {
                 $types = array_values(array_unique(array_map(static fn($row) => (string) $row['resource_type'], $resources)));
                 $missing = array_values(array_diff(['question_paper', 'model_answer', 'video_solution'], $types));
                 $status = $missing ? 'NEEDS REVIEW' : 'READY';
-                $candidate = ['status' => $status, 'topic' => ['id' => (string) ($topic['id'] ?? ''), 'title' => (string) ($topic['original_title'] ?? ''), 'session' => $topic['session'], 'year' => $topic['year'], 'variant' => $topic['variant']], 'syllabus' => ['id' => (string) ($syllabus['syllabus_id'] ?? ''), 'title' => (string) ($syllabus['public_title'] ?? ''), 'code' => (string) ($syllabus['syllabus_code'] ?? ''), 'board' => (string) ($syllabus['board_name'] ?? '')], 'paper_number' => 'Paper ' . $paperNumber, 'paper' => $paperNumber, 'variant' => $topic['variant'], 'component' => mmh_classroom_component($paperNumber, (int) $topic['variant_number']), 'resources' => $resources, 'missing_resources' => $missing, 'existing_paper' => null];
+                $candidateStatus = !$resources ? 'NEEDS REVIEW' : ($missing ? 'WARNING' : 'READY');
+                $candidate = ['status' => $candidateStatus, 'candidate_key' => hash('sha256', (string) ($topic['id'] ?? '') . '|' . $paperNumber), 'topic' => ['id' => (string) ($topic['id'] ?? ''), 'title' => (string) ($topic['original_title'] ?? ''), 'session' => $topic['session'], 'year' => $topic['year'], 'variant' => $topic['variant']], 'syllabus' => ['id' => (string) ($syllabus['syllabus_id'] ?? ''), 'title' => (string) ($syllabus['public_title'] ?? ''), 'code' => (string) ($syllabus['syllabus_code'] ?? ''), 'board' => (string) ($syllabus['board_name'] ?? ''), 'board_id' => (string) ($syllabus['exam_board_id'] ?? '')], 'paper_number' => 'Paper ' . $paperNumber, 'paper' => $paperNumber, 'variant' => $topic['variant'], 'component' => mmh_classroom_component($paperNumber, (int) $topic['variant_number']), 'resources' => $resources, 'missing_resources' => $missing, 'existing_paper' => null];
                 if ($duplicateLookup) $candidate['existing_paper'] = $duplicateLookup($candidate);
                 $candidates[] = $candidate;
             }
@@ -372,6 +380,89 @@ if (!function_exists('mmh_classroom_build_preview')) {
         foreach ($candidates as $candidate) { $candidateStatusCounts[$candidate['status']] = ($candidateStatusCounts[$candidate['status']] ?? 0) + 1; foreach ($candidate['resources'] as $resource) if (isset($counts[$resource['resource_type']])) $counts[$resource['resource_type']]++; }
         foreach ($warnings as $warning) $warningStatusCounts[$warning['status']] = ($warningStatusCounts[$warning['status']] ?? 0) + 1;
         return ['approved_topics' => array_values($approved), 'ignored_topics' => $ignored, 'candidates' => $candidates, 'warnings' => $warnings, 'summary' => ['approved_topics' => count($approved), 'approved_expected' => 8, 'candidates' => count($candidates), 'candidates_expected' => 16, 'resources' => $counts, 'statuses' => $candidateStatusCounts, 'candidate_statuses' => $candidateStatusCounts, 'warning_statuses' => $warningStatusCounts, 'ignored_topics' => count($ignored)]];
+    }
+}
+
+if (!function_exists('mmh_classroom_candidate_importable')) {
+    function mmh_classroom_candidate_importable(array $candidate): bool
+    {
+        if (!in_array((string) ($candidate['status'] ?? ''), ['READY', 'WARNING'], true) || empty($candidate['resources']) || !empty($candidate['blocking_warning'])) return false;
+        foreach ((array) $candidate['resources'] as $resource) {
+            $source = (array) ($resource['source'] ?? []);
+            if ((string) ($resource['resource_type'] ?? '') === '' || !filter_var((string) ($source['source_url'] ?? ''), FILTER_VALIDATE_URL)) continue;
+            $scheme = strtolower((string) (parse_url((string) $source['source_url'], PHP_URL_SCHEME) ?? ''));
+            if ($scheme === 'https') return true;
+        }
+        return false;
+    }
+}
+
+if (!function_exists('mmh_classroom_import_candidates')) {
+    /** Import selected candidates from the authoritative session preview. */
+    function mmh_classroom_import_candidates(mysqli $conn, array $preview, array $selectedKeys, string $admin = ''): array
+    {
+        $selected = array_fill_keys(array_values(array_filter(array_map(static fn($key) => preg_replace('/[^a-f0-9]/i', '', (string) $key), $selectedKeys))), true);
+        $result = ['selected' => 0, 'created' => 0, 'skipped_existing' => 0, 'blocked' => 0, 'failed' => 0, 'resources_created' => 0, 'resource_duplicates' => 0, 'missing_optional' => 0, 'failures' => [], 'imported_keys' => []];
+        if (!$selected) return $result;
+        foreach ((array) ($preview['candidates'] ?? []) as $candidate) {
+            $key = (string) ($candidate['candidate_key'] ?? '');
+            if ($key === '' || !isset($selected[$key])) continue;
+            $result['selected']++;
+            if (!mmh_classroom_candidate_importable($candidate)) { $result['blocked']++; continue; }
+            $syllabus = (array) ($candidate['syllabus'] ?? []);
+            if (!mmh_classroom_is_target_syllabus(['syllabus_code' => $syllabus['code'] ?? '', 'board_name' => $syllabus['board'] ?? ''])) { $result['blocked']++; continue; }
+            $existing = mmh_classroom_lookup_existing_paper($conn, (string) ($syllabus['id'] ?? ''), (int) ($candidate['topic']['year'] ?? 0), (string) ($candidate['topic']['session'] ?? ''), (string) ($candidate['paper_number'] ?? ''), (string) ($candidate['variant'] ?? ''));
+            if ($existing) { $result['skipped_existing']++; continue; }
+            $conn->begin_transaction();
+            try {
+                [$paperOk, $paperMessage, $paperData] = array_pad(mmh_past_save_paper($conn, [
+                    'exam_board_id' => (string) ($syllabus['board_id'] ?? ''),
+                    'syllabus_id' => (string) ($syllabus['id'] ?? ''),
+                    'year' => (int) ($candidate['topic']['year'] ?? 0),
+                    'exam_session' => (string) ($candidate['topic']['session'] ?? 'Custom'),
+                    'paper_number' => (string) ($candidate['paper_number'] ?? ''),
+                    'variant' => (string) ($candidate['variant'] ?? ''),
+                    'short_title' => trim((string) ($candidate['topic']['session'] ?? '') . ' ' . (string) ($candidate['topic']['year'] ?? '') . ' ' . (string) ($candidate['paper_number'] ?? '') . ' ' . (string) ($candidate['variant'] ?? '')),
+                    'status' => 'published',
+                ]), 3, []);
+                if (!$paperOk || empty($paperData['paper_id'])) throw new RuntimeException($paperMessage ?: 'Unable to create the Past Paper.');
+                $paperId = (string) $paperData['paper_id'];
+                $seenResources = [];
+                foreach ((array) ($candidate['resources'] ?? []) as $resource) {
+                    $type = (string) ($resource['resource_type'] ?? '');
+                    $source = (array) ($resource['source'] ?? []);
+                    $url = trim((string) ($source['source_url'] ?? ''));
+                    if ($type === '' || $url === '') continue;
+                    $resourceKey = $type . '|' . $url;
+                    if (isset($seenResources[$resourceKey])) { $result['resource_duplicates']++; continue; }
+                    $seenResources[$resourceKey] = true;
+                    [$resourceOk, $resourceMessage] = array_pad(mmh_past_save_resource($conn, [
+                        'paper_id' => $paperId,
+                        'resource_type' => $type,
+                        'display_title' => mmh_past_resource_label($type),
+                        'storage_type' => 'url',
+                        'external_url' => $url,
+                        'access_level' => mmh_past_default_access($type),
+                        'unlock_rule' => 'immediate',
+                        'status' => 'published',
+                        'download_allowed' => 1,
+                        'preview_allowed' => 1,
+                    ], []), 2, []);
+                    if (!$resourceOk) throw new RuntimeException($resourceMessage ?: 'Unable to create a resource.');
+                    $result['resources_created']++;
+                }
+                $conn->commit();
+                $result['created']++; $result['imported_keys'][] = $key;
+                $result['missing_optional'] += count((array) ($candidate['missing_resources'] ?? []));
+            } catch (Throwable $exception) {
+                $conn->rollback();
+                $identity = trim((string) ($candidate['topic']['session'] ?? '') . ' ' . (string) ($candidate['topic']['year'] ?? '') . ' ' . (string) ($candidate['paper_number'] ?? '') . ' ' . (string) ($candidate['variant'] ?? ''));
+                $result['failed']++;
+                $result['failures'][] = ['identity' => $identity, 'message' => 'Unable to import this candidate safely.'];
+                error_log('[PastPaperClassroom] import failed: ' . $exception->getMessage());
+            }
+        }
+        return $result;
     }
 }
 

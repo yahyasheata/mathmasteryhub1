@@ -324,6 +324,12 @@ $router->mount('/admin', function() use ($router) {
         require __DIR__ . '/views/admin/requests/scan-classroom-past-papers.php';
     });
 
+    $router->post('/past-papers/classroom/import', function() {
+        require_once '__init.php';
+        mmh_admin_require_mutation();
+        require __DIR__ . '/views/admin/requests/import-classroom-past-papers.php';
+    });
+
     // Parent Reports renders and processes the same page so Preview, comments,
     // and PDF output retain the existing Admin form workflow.
     $router->post('/parent-reports', function() {
