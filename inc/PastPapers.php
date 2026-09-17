@@ -492,7 +492,7 @@ if (!function_exists('mmh_past_syllabus')) {
         if (!$syllabusId) {
             return null;
         }
-        $stmt = $conn->prepare('SELECT * FROM past_paper_syllabuses WHERE syllabus_id = ? LIMIT 1');
+        $stmt = $conn->prepare('SELECT s.*, b.name AS board_name FROM past_paper_syllabuses s LEFT JOIN past_paper_exam_boards b ON b.board_id = s.exam_board_id WHERE s.syllabus_id = ? LIMIT 1');
         $stmt->bind_param('s', $syllabusId);
         $stmt->execute();
         $row = $stmt->get_result()->fetch_assoc();
