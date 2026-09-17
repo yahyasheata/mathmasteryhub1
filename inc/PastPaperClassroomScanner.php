@@ -228,13 +228,32 @@ if (!function_exists('mmh_classroom_component')) {
 }
 
 if (!function_exists('mmh_classroom_attachment_papers')) {
+    function mmh_classroom_attachment_component(string $title): ?int
+    {
+        $normalized = strtolower(trim(preg_replace('/\s+/u', ' ', $title) ?? $title));
+        if (preg_match('/(?:0580\s*\/\s*|component\s*)?(2[1-3]|4[1-3])\b/i', $normalized, $match)) {
+            $prefix = strtolower((string) ($match[0] ?? ''));
+            if (str_contains($prefix, '/') || str_contains($prefix, 'component') || preg_match('/\bp(?:2[1-3]|4[1-3])\b/i', $normalized)) return (int) $match[1];
+        }
+        return null;
+    }
+
     function mmh_classroom_attachment_papers(string $title, array $classification, int $topicVariant): array
     {
         $normalized = strtolower(trim(preg_replace('/\s+/u', ' ', $title) ?? $title));
+        $component = mmh_classroom_attachment_component($title);
+        $expectedComponents = [20 + max(1, min(3, $topicVariant)), 40 + max(1, min(3, $topicVariant))];
+        if ($component !== null) {
+            if (!in_array($component, $expectedComponents, true)) return [];
+            return array_values(array_intersect([$component < 40 ? 2 : 4], $classification['papers'] ?? []));
+        }
+        $explicit = [];
+        if (preg_match('/\bp2\b/i', $normalized)) $explicit[] = 2;
+        if (preg_match('/\bp4\b/i', $normalized)) $explicit[] = 4;
+        if ($explicit) return array_values(array_intersect(array_values(array_unique($explicit)), $classification['papers'] ?? []));
         $found = [];
-        $variant = max(1, min(3, $topicVariant));
-        if (preg_match('/(?:0580\s*\/\s*)?' . (20 + $variant) . '\\b|\\bp' . (20 + $variant) . '\\b|paper\\s*2\\b/i', $normalized)) $found[] = 2;
-        if (preg_match('/(?:0580\s*\/\s*)?' . (40 + $variant) . '\\b|\\bp' . (40 + $variant) . '\\b|paper\\s*4\\b/i', $normalized)) $found[] = 4;
+        if (preg_match('/paper\\s*2\\b/i', $normalized)) $found[] = 2;
+        if (preg_match('/paper\\s*4\\b/i', $normalized)) $found[] = 4;
         $found = array_values(array_unique(array_intersect($found, $classification['papers'] ?? [])));
         return $found ?: ($classification['papers'] ?? []);
     }
@@ -287,14 +306,20 @@ if (!function_exists('mmh_classroom_topic_item_preview')) {
             }
         }
         $rows = [];
-        foreach ($attachments as $attachment) {
+        foreach ($attachments as $attachmentIndex => $attachment) {
             if (!is_array($attachment)) continue;
             $attachmentTitle = trim((string) ($attachment['title'] ?? ''));
+            $component = mmh_classroom_attachment_component($attachmentTitle);
+            $expectedComponents = [20 + max(1, min(3, (int) ($topic['variant_number'] ?? 1))), 40 + max(1, min(3, (int) ($topic['variant_number'] ?? 1)))];
+            if ($component !== null && !in_array($component, $expectedComponents, true)) {
+                $warnings[] = ['status' => 'NEEDS REVIEW', 'message' => 'Attachment component ' . $component . ' conflicts with topic variant ' . ($topic['variant'] ?? '') . '.', 'item_title' => $item['title'] ?? ''];
+                continue;
+            }
             $paperNumbers = mmh_classroom_attachment_papers($attachmentTitle, $classification, (int) $topic['variant_number']);
             foreach ($paperNumbers as $paperNumber) {
                 $rows[] = [
                     'resource_type' => $classification['resource_type'], 'paper_number' => $paperNumber,
-                    'source' => ['coursework_type' => $item['item_type'] ?? '', 'coursework_id' => $item['id'] ?? '', 'item_title' => $item['title'] ?? '', 'topic_id' => $topic['id'] ?? '', 'topic_title' => $topic['original_title'] ?? '', 'attachment_type' => $attachment['attachment_type'] ?? 'unknown', 'attachment_title' => $attachmentTitle, 'source_url' => $attachment['url'] ?? '', 'drive_file_id' => $attachment['drive_file_id'] ?? '', 'youtube_id' => $attachment['youtube_id'] ?? ''],
+                    'source' => ['coursework_type' => $item['item_type'] ?? '', 'coursework_id' => $item['id'] ?? '', 'item_title' => $item['title'] ?? '', 'topic_id' => $topic['id'] ?? '', 'topic_title' => $topic['original_title'] ?? '', 'attachment_index' => (int) $attachmentIndex + 1, 'attachment_type' => $attachment['attachment_type'] ?? 'unknown', 'attachment_title' => $attachmentTitle, 'detected_papers' => $paperNumbers, 'source_url' => $attachment['url'] ?? '', 'drive_file_id' => $attachment['drive_file_id'] ?? '', 'youtube_id' => $attachment['youtube_id'] ?? ''],
                 ];
             }
         }
@@ -343,10 +368,10 @@ if (!function_exists('mmh_classroom_build_preview')) {
                 $candidates[] = $candidate;
             }
         }
-        $counts = ['question_paper' => 0, 'model_answer' => 0, 'video_solution' => 0]; $statusCounts = ['READY' => 0, 'WARNING' => 0, 'NEEDS REVIEW' => 0, 'ERROR' => 0];
-        foreach ($candidates as $candidate) { $statusCounts[$candidate['status']] = ($statusCounts[$candidate['status']] ?? 0) + 1; foreach ($candidate['resources'] as $resource) if (isset($counts[$resource['resource_type']])) $counts[$resource['resource_type']]++; }
-        foreach ($warnings as $warning) $statusCounts[$warning['status']] = ($statusCounts[$warning['status']] ?? 0) + 1;
-        return ['approved_topics' => array_values($approved), 'ignored_topics' => $ignored, 'candidates' => $candidates, 'warnings' => $warnings, 'summary' => ['approved_topics' => count($approved), 'approved_expected' => 8, 'candidates' => count($candidates), 'candidates_expected' => 16, 'resources' => $counts, 'statuses' => $statusCounts, 'ignored_topics' => count($ignored)]];
+        $counts = ['question_paper' => 0, 'model_answer' => 0, 'video_solution' => 0]; $candidateStatusCounts = ['READY' => 0, 'WARNING' => 0, 'NEEDS REVIEW' => 0, 'ERROR' => 0]; $warningStatusCounts = ['READY' => 0, 'WARNING' => 0, 'NEEDS REVIEW' => 0, 'ERROR' => 0];
+        foreach ($candidates as $candidate) { $candidateStatusCounts[$candidate['status']] = ($candidateStatusCounts[$candidate['status']] ?? 0) + 1; foreach ($candidate['resources'] as $resource) if (isset($counts[$resource['resource_type']])) $counts[$resource['resource_type']]++; }
+        foreach ($warnings as $warning) $warningStatusCounts[$warning['status']] = ($warningStatusCounts[$warning['status']] ?? 0) + 1;
+        return ['approved_topics' => array_values($approved), 'ignored_topics' => $ignored, 'candidates' => $candidates, 'warnings' => $warnings, 'summary' => ['approved_topics' => count($approved), 'approved_expected' => 8, 'candidates' => count($candidates), 'candidates_expected' => 16, 'resources' => $counts, 'statuses' => $candidateStatusCounts, 'candidate_statuses' => $candidateStatusCounts, 'warning_statuses' => $warningStatusCounts, 'ignored_topics' => count($ignored)]];
     }
 }
 
@@ -376,15 +401,16 @@ if (!function_exists('mmh_classroom_scan')) {
             $listedWork = mmh_classroom_api_list_all(static fn($page) => $service->courses_courseWork->listCoursesCourseWork($courseId, array_filter(['courseWorkStates' => 'PUBLISHED', 'pageSize' => 100, 'pageToken' => $page, 'fields' => 'courseWork(id,title,topicId),nextPageToken'], static fn($v) => $v !== '')), 'courseWork');
             foreach ($listedWork as $item) $metadata[] = ['item_type' => 'coursework', 'id' => (string) ($item->getId() ?? ''), 'title' => (string) ($item->getTitle() ?? ''), 'topic_id' => (string) ($item->getTopicId() ?? '')];
             $approvedIds = []; foreach ($topicRows as $topic) if (mmh_classroom_parse_topic($topic['title'])) $approvedIds[(string) $topic['id']] = true;
-            $items = [];
+            $items = []; $sourceCounts = ['coursework_material' => 0, 'coursework' => 0];
             foreach ($metadata as $item) {
                 if ($item['topic_id'] === '' || !isset($approvedIds[$item['topic_id']])) continue;
+                $sourceCounts[$item['item_type']] = ($sourceCounts[$item['item_type']] ?? 0) + 1;
                 $full = $item['item_type'] === 'coursework_material' ? $service->courses_courseWorkMaterials->get($courseId, $item['id'], ['fields' => 'id,title,topicId,materials']) : $service->courses_courseWork->get($courseId, $item['id'], ['fields' => 'id,title,topicId,materials']);
                 $materials = method_exists($full, 'getMaterials') ? (array) ($full->getMaterials() ?? []) : [];
                 $items[] = array_merge($item, ['attachments' => array_map('mmh_classroom_normalize_attachment', $materials)]);
             }
             $preview = mmh_classroom_build_preview($topicRows, $items, $syllabus, static fn(array $candidate) => mmh_classroom_lookup_existing_paper($conn, (string) $syllabus['syllabus_id'], (int) $candidate['topic']['year'], (string) $candidate['topic']['session'], (string) $candidate['paper_number'], (string) $candidate['variant']));
-            $preview['course'] = ['id' => $courseId]; $preview['scanned_at'] = date('c');
+            $preview['course'] = ['id' => $courseId]; $preview['source_counts'] = $sourceCounts; $preview['scanned_at'] = date('c');
             return [true, 'Read-only Classroom scan complete. No Past Paper records were changed.', $preview];
         } catch (Throwable $exception) {
             error_log('[PastPaperClassroom] scan failed: ' . $exception->getMessage());

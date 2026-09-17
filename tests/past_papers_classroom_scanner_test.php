@@ -43,6 +43,23 @@ classroom_test($preview['candidates'][0]['component'] === '22' && $preview['cand
 classroom_test($preview['candidates'][0]['status'] === 'READY' && $preview['candidates'][1]['status'] === 'READY', 'Complete candidate was not ready.');
 classroom_test(!empty($preview['candidates'][0]['existing_paper']) && empty($preview['candidates'][1]['existing_paper']), 'Duplicate lookup result was not preserved.');
 
+$splitItems = [
+    ['item_type' => 'coursework_material', 'id' => 'split-qp', 'title' => 'Paper 2 and Paper 4 QP', 'topic_id' => 'topic-1', 'attachments' => [
+        ['attachment_type' => 'google_drive', 'title' => 'Nov 22 V2 P4 copy.pdf', 'drive_file_id' => 'split-p4'],
+        ['attachment_type' => 'google_drive', 'title' => 'Nov 22 V2 P2 copy.pdf', 'drive_file_id' => 'split-p2'],
+    ]],
+    ['item_type' => 'coursework', 'id' => 'split-ma', 'title' => 'Paper 2 and Paper 4 MA', 'topic_id' => 'topic-1', 'attachments' => [
+        ['attachment_type' => 'google_drive', 'title' => 'Nov 22 V2 P4 MA.pdf', 'drive_file_id' => 'split-ma4'],
+        ['attachment_type' => 'google_drive', 'title' => 'Nov 22 V2 P2 MA.pdf', 'drive_file_id' => 'split-ma2'],
+    ]],
+];
+$splitPreview = mmh_classroom_build_preview([$topic], $splitItems, ['syllabus_id' => 'syllabus-0580', 'public_title' => 'Cambridge Mathematics', 'syllabus_code' => '0580', 'board_name' => 'Cambridge']);
+classroom_test(count($splitPreview['candidates'][0]['resources']) === 2 && count($splitPreview['candidates'][1]['resources']) === 2, 'P2/P4-labelled attachments were not split between candidates.');
+classroom_test($splitPreview['candidates'][0]['resources'][0]['paper_number'] === 2 && $splitPreview['candidates'][1]['resources'][0]['paper_number'] === 4, 'Attachment paper routing did not preserve explicit P2/P4 labels.');
+classroom_test(mmh_classroom_attachment_papers('0580/22 QP.pdf', ['papers' => [2]], 2) === [2] && mmh_classroom_attachment_papers('0580/42 QP.pdf', ['papers' => [4]], 2) === [4], 'Component attachment mapping failed.');
+$componentConflict = mmh_classroom_build_preview([$topic], [['item_type' => 'coursework', 'id' => 'conflict-component', 'title' => 'Paper 2 QP', 'topic_id' => 'topic-1', 'attachments' => [['attachment_type' => 'google_drive', 'title' => '0580/23 QP.pdf', 'drive_file_id' => 'conflict']]]], ['syllabus_id' => 'syllabus-0580', 'public_title' => 'Cambridge Mathematics', 'syllabus_code' => '0580', 'board_name' => 'Cambridge']);
+classroom_test(count($componentConflict['warnings']) === 1 && $componentConflict['warnings'][0]['status'] === 'NEEDS REVIEW' && empty($componentConflict['candidates'][0]['resources']), 'Conflicting component was not held for review.');
+
 $conflict = mmh_classroom_build_preview([$topic], [['item_type' => 'coursework', 'id' => 'work', 'title' => 'Paper 2 and Paper 4 QP', 'topic_id' => 'topic-1', 'attachments' => [['attachment_type' => 'google_drive', 'title' => 'file-a.pdf', 'url' => 'https://drive.google.com/a'], ['attachment_type' => 'google_drive', 'title' => 'file-b.pdf', 'url' => 'https://drive.google.com/b']]]], ['syllabus_id' => 'syllabus-0580', 'public_title' => 'Cambridge Mathematics', 'syllabus_code' => '0580', 'board_name' => 'Cambridge']);
 classroom_test(count($conflict['warnings']) === 1 && $conflict['warnings'][0]['status'] === 'NEEDS REVIEW', 'Ambiguous combined attachments were not flagged.');
 
