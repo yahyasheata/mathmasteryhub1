@@ -45,11 +45,13 @@ $topics = $selectedCourseId ? mmh_academic_topic_list($conn, $selectedCourseId, 
 $flash = mmh_past_take_flash();
 $quickForm = is_array($_SESSION['past_quick_form'] ?? null) ? $_SESSION['past_quick_form'] : [];
 unset($_SESSION['past_quick_form']);
+$quickParsed = mmh_past_parse_paper_name($quickForm['paper_name'] ?? '');
 $driveSources = mmh_past_drive_sources($conn);
 $driveJobId = mmh_past_identifier($_GET['drive_job'] ?? '', 40);
 $driveJob = $driveJobId ? mmh_past_drive_job($conn, $driveJobId) : null;
 if ($driveJob) { mmh_past_drive_backfill_failure_details($conn, $driveJob['job_id']); }
-$driveFilter = in_array($_GET['drive_filter'] ?? '', ['', 'create', 'update', 'skip_duplicate', 'manual_review', 'unsupported', 'error', 'created', 'failed', 'skipped', 'mapping_required', 'pending'], true) ? $_GET['drive_filter'] : '';
+$rawDriveFilter = isset($_GET['drive_filter']) ? (string) $_GET['drive_filter'] : '';
+$driveFilter = in_array($rawDriveFilter, ['', 'create', 'update', 'skip_duplicate', 'manual_review', 'unsupported', 'error', 'created', 'failed', 'skipped', 'mapping_required', 'pending'], true) ? $rawDriveFilter : '';
 $drivePage = max(1, (int) ($_GET['drive_page'] ?? 1));
 $driveCandidatePage = $driveJob ? mmh_past_drive_candidates_page($conn, $driveJob['job_id'], $driveFilter, $drivePage, 50) : ['rows' => [], 'total' => 0, 'page' => 1, 'per_page' => 50, 'pages' => 0];
 $driveCandidates = $driveCandidatePage['rows'];
@@ -70,6 +72,7 @@ $driveImportProgress = [
 $driveReanalyzeState = is_array($driveSummary['reanalyze_state'] ?? null) ? $driveSummary['reanalyze_state'] : [];
 $driveConnection = mmh_past_drive_connection();
 $driveCsrf = mmh_past_drive_csrf_token();
+$hasManageQuery = (bool) array_filter($filters, static function ($value) { return (string) $value !== ''; });
 $requestBase = rtrim((string) $baseUrl, '/') . '/admin/requests/past-papers';
 $resourceBase = rtrim((string) $baseUrl, '/') . '/past-papers/resource/';
 
@@ -127,11 +130,10 @@ $unlockRules = [
                     <div>
                         <span class="ds-caption">Past Papers Center</span>
                         <h1 class="h3 mb-1">Past Papers</h1>
-                        <p class="mb-0">Organize exam-board papers, resources, and access rules without touching Course Builder lessons.</p>
+                        <p class="mb-0">Add a paper quickly, or manage your library when you need to.</p>
                     </div>
                     <div class="d-flex flex-wrap gap-2">
-                        <a class="btn btn-outline-secondary" href="#drive-import"><span class="fab fa-google-drive" aria-hidden="true"></span> Import</a>
-                        <a class="btn btn-primary" href="#quick-add"><span class="fas fa-plus" aria-hidden="true"></span> Add Past Paper</a>
+                        <a class="btn btn-outline-secondary" href="#import-tools"><span class="fab fa-google-drive" aria-hidden="true"></span> Import &amp; tools</a>
                     </div>
                 </section>
 
@@ -164,14 +166,14 @@ $unlockRules = [
                                 <input class="form-control" id="quick-paper-name" name="paper_name" value="<?=past_admin_html($quickForm['paper_name'] ?? '');?>" placeholder="May June V2 Paper 2" required autocomplete="off">
                                 <div id="quick-detected" class="past-papers-detected" aria-live="polite"></div>
                             </div>
-                            <div>
-                                <label class="form-label" for="quick-year">Year <span class="past-papers-optional">optional if in name</span></label>
+                            <div id="quick-year-field" class="<?= !empty($quickParsed['year']) ? 'is-detected' : ''; ?>">
+                                <label class="form-label" for="quick-year">Year <span class="past-papers-optional">only needed when not in the name</span></label>
                                 <input class="form-control" id="quick-year" type="number" min="1900" max="2100" name="year" value="<?=past_admin_html($quickForm['year'] ?? '');?>" placeholder="2022">
                             </div>
                         </div>
 
                         <fieldset class="past-papers-quick-resources">
-                            <legend>Resources <span class="past-papers-optional">add a link or upload a file</span></legend>
+                            <legend>Resources <span class="past-papers-optional">paste a link, or upload when needed</span></legend>
                             <?php foreach ([
                                 'question_paper' => ['Question Paper', true],
                                 'mark_scheme' => ['Mark Scheme', true],
@@ -182,7 +184,7 @@ $unlockRules = [
                                     <label class="form-label" for="quick-<?=$quickType;?>"><?=past_admin_html($quickResource[0]);?></label>
                                     <div class="past-papers-quick-resource-fields">
                                         <input class="form-control" id="quick-<?=$quickType;?>" type="url" name="quick_resources[<?=$quickType;?>][url]" value="<?=past_admin_html($quickValues['url'] ?? '');?>" placeholder="https://…">
-                                        <?php if ($quickResource[1]): ?><span class="past-papers-or">or</span><input class="form-control" type="file" name="quick_resources[<?=$quickType;?>][file]" accept=".pdf,.jpg,.jpeg,.png,.webp"><?php endif; ?>
+                                        <?php if ($quickResource[1]): $fileId = 'quick-' . $quickType . '-file'; ?><button class="btn btn-link btn-sm past-papers-upload-toggle" type="button" data-upload-toggle="<?=$fileId;?>">Upload file instead</button><div class="past-papers-file-picker" id="<?=$fileId;?>-wrap" hidden><input class="form-control" id="<?=$fileId;?>" type="file" name="quick_resources[<?=$quickType;?>][file]" accept=".pdf,.jpg,.jpeg,.png,.webp"><button class="btn btn-link btn-sm past-papers-url-toggle" type="button" data-url-toggle="quick-<?=$quickType;?>">Use URL instead</button></div><?php endif; ?>
                                     </div>
                                 </div>
                             <?php endforeach; ?>
@@ -190,8 +192,9 @@ $unlockRules = [
                                 <summary>+ Add other resource</summary>
                                 <div class="past-papers-quick-resource-fields mt-3">
                                     <input class="form-control" name="quick_resources[custom][title]" value="<?=past_admin_html($quickForm['quick_resources']['custom']['title'] ?? '');?>" placeholder="Resource title">
-                                    <input class="form-control" type="url" name="quick_resources[custom][url]" value="<?=past_admin_html($quickForm['quick_resources']['custom']['url'] ?? '');?>" placeholder="https://…">
-                                    <input class="form-control" type="file" name="quick_resources[custom][file]" accept=".pdf,.jpg,.jpeg,.png,.webp">
+                                    <input class="form-control" id="quick-custom-url" type="url" name="quick_resources[custom][url]" value="<?=past_admin_html($quickForm['quick_resources']['custom']['url'] ?? '');?>" placeholder="https://…">
+                                    <button class="btn btn-link btn-sm past-papers-upload-toggle" type="button" data-upload-toggle="quick-custom-file">Upload file instead</button>
+                                    <div class="past-papers-file-picker" id="quick-custom-file-wrap" hidden><input class="form-control" id="quick-custom-file" type="file" name="quick_resources[custom][file]" accept=".pdf,.jpg,.jpeg,.png,.webp"><button class="btn btn-link btn-sm past-papers-url-toggle" type="button" data-url-toggle="quick-custom-url">Use URL instead</button></div>
                                 </div>
                             </details>
                         </fieldset>
@@ -216,8 +219,8 @@ $unlockRules = [
                     </form>
                 </section>
 
-                <section class="past-papers-card past-papers-drive-import" id="drive-import">
-                    <details class="past-papers-secondary-workflow" <?= $driveJob ? 'open' : ''; ?>><summary><span class="fab fa-google-drive" aria-hidden="true"></span> Import from Google Drive</summary>
+                <section class="past-papers-card past-papers-drive-import" id="import-tools">
+                    <details class="past-papers-secondary-workflow" id="drive-import" <?= $driveJob ? 'open' : ''; ?>><summary><span class="fab fa-google-drive" aria-hidden="true"></span> Import &amp; migration tools</summary>
                     <div class="d-flex flex-wrap justify-content-between gap-3 align-items-start mb-3">
                         <div>
                             <div class="past-papers-step"><span>Drive</span><strong>Google Drive Import</strong></div>
@@ -326,6 +329,8 @@ $unlockRules = [
                     </details>
                 </section>
 
+                <details class="past-papers-secondary-workflow past-papers-manage-workflow" id="manage-papers" <?= $hasManageQuery ? 'open' : ''; ?>><summary>Manage Papers</summary>
+                <div class="past-papers-manage-content">
                 <section class="past-papers-card">
                     <div class="d-flex flex-wrap justify-content-between gap-3 align-items-end mb-3">
                         <div>
@@ -346,6 +351,8 @@ $unlockRules = [
                         <a class="btn btn-outline-secondary" href="past-papers">Reset</a>
                     </form>
                 </section>
+                </div>
+                </details>
 
                 <details class="past-papers-secondary-workflow past-papers-settings"><summary>Settings: Exam Boards &amp; Syllabuses</summary>
                 <div class="past-papers-grid">
@@ -410,7 +417,8 @@ $unlockRules = [
                 </section>
                 </details>
 
-                <section class="past-papers-card" id="resources">
+                <details class="past-papers-secondary-workflow past-papers-resources-workflow" id="resources" <?= ($editingResource || isset($_GET['resource_type'])) ? 'open' : ''; ?>><summary>Resources &amp; access</summary>
+                <section class="past-papers-card">
                     <div class="past-papers-step"><span>4</span><strong>Resources and Access</strong></div>
                     <?php if (!$selectedPaper): ?>
                         <div class="past-papers-empty">Save or select a Past Paper before attaching resources.</div>
@@ -458,6 +466,7 @@ $unlockRules = [
                         <?php endforeach; endif; ?>
                     <?php endif; ?>
                 </section>
+                </details>
 
                 <details class="past-papers-secondary-workflow"><summary>Bulk resource tools</summary>
                 <section class="past-papers-card past-papers-bulk-links" id="bulk-links">
@@ -471,6 +480,7 @@ $unlockRules = [
                 </section>
                 </details>
 
+                <details class="past-papers-secondary-workflow past-papers-review-workflow" <?= $hasManageQuery ? 'open' : ''; ?>><summary>Review Papers</summary>
                 <section class="past-papers-card">
                     <div class="past-papers-step"><span>6</span><strong>Review Papers</strong></div>
                     <div class="table-responsive">
@@ -497,6 +507,7 @@ $unlockRules = [
                         </table>
                     </div>
                 </section>
+                </details>
             </main>
         </div>
     </div>
@@ -505,11 +516,12 @@ $unlockRules = [
 (function () {
     const name = document.getElementById('quick-paper-name');
     const year = document.getElementById('quick-year');
+    const yearField = document.getElementById('quick-year-field');
     const output = document.getElementById('quick-detected');
     if (!name || !output) return;
     const detect = function () {
         const value = name.value.trim();
-        if (!value) { output.textContent = ''; return; }
+        if (!value) { if (yearField) yearField.hidden = false; output.textContent = ''; return; }
         const session = /\b(?:may\s*[\/-]?\s*june|m\s*\/\s*j|\bjune\b)/i.test(value) ? 'May/June' : (/\b(?:oct(?:ober)?\s*[\/-]?\s*nov(?:ember)?|o\s*\/\s*n|\bnov(?:ember)?\b)/i.test(value) ? 'October/November' : (/\b(?:feb(?:ruary)?\s*[\/-]?\s*mar(?:ch)?|f\s*\/\s*m)/i.test(value) ? 'February/March' : ''));
         const yearMatch = value.match(/\b(?:19|20)\d{2}\b/);
         const componentMatch = value.match(/\b(?:p(?:aper)?\s*)?([24])([1-3])\b/i);
@@ -519,20 +531,58 @@ $unlockRules = [
         let variant = componentMatch ? componentMatch[2] : (variantMatch ? variantMatch[1] : '');
         const bits = [];
         if (session) bits.push(session);
-        if (yearMatch) { bits.push(yearMatch[0]); if (!year.value) year.value = yearMatch[0]; }
+        if (yearMatch) {
+            bits.push(yearMatch[0]);
+            if (year && (!year.value || year.dataset.parserYear === year.value)) {
+                year.value = yearMatch[0];
+                year.dataset.parserYear = yearMatch[0];
+            }
+        } else if (year && year.dataset.parserYear && year.value === year.dataset.parserYear) {
+            year.value = '';
+            delete year.dataset.parserYear;
+        }
         if (paper) bits.push(paper);
         if (variant) bits.push('Variant ' + variant);
         if (componentMatch) bits.push('Component ' + componentMatch[1] + componentMatch[2]);
         const missing = [];
         if (!session) missing.push('session');
-        if (!yearMatch && !year.value) missing.push('year');
+        if (!yearMatch && (!year || !year.value)) missing.push('year');
         if (!paper) missing.push('paper');
         if (!variant) missing.push('variant');
+        if (yearField) yearField.hidden = Boolean(yearMatch);
         output.classList.toggle('is-missing', missing.length > 0);
         output.textContent = bits.length ? 'Detected: ' + bits.join(' · ') + (missing.length ? ' · Missing: ' + missing.join(', ') : '') : 'Add session, year, paper, and variant details to detect metadata.';
     };
     name.addEventListener('input', detect);
-    year.addEventListener('input', detect);
+    if (year) year.addEventListener('input', function () {
+        if (year.dataset.parserYear !== year.value) delete year.dataset.parserYear;
+        detect();
+    });
+    document.querySelectorAll('[data-upload-toggle]').forEach(function (toggle) {
+        toggle.addEventListener('click', function () {
+            const picker = document.getElementById(toggle.dataset.uploadToggle + '-wrap');
+            if (!picker) return;
+            const row = toggle.closest('.past-papers-quick-resource-fields');
+            const url = row ? row.querySelector('input[type="url"]') : null;
+            if (url) { url.hidden = true; url.setAttribute('aria-hidden', 'true'); }
+            picker.hidden = false;
+            toggle.hidden = true;
+        });
+    });
+    document.querySelectorAll('[data-url-toggle]').forEach(function (toggle) {
+        toggle.addEventListener('click', function () {
+            const picker = toggle.closest('.past-papers-file-picker');
+            const url = document.getElementById(toggle.dataset.urlToggle);
+            if (!picker || !url) return;
+            const file = picker.querySelector('input[type="file"]');
+            if (file) file.value = '';
+            picker.hidden = true;
+            url.hidden = false;
+            url.removeAttribute('aria-hidden');
+            const uploadToggle = picker.closest('.past-papers-quick-resource-fields')?.querySelector('[data-upload-toggle]');
+            if (uploadToggle) uploadToggle.hidden = false;
+        });
+    });
     document.querySelectorAll('a[href="#paper-form"]').forEach(function (link) {
         link.addEventListener('click', function () {
             const details = document.getElementById('paper-form') && document.getElementById('paper-form').closest('details');

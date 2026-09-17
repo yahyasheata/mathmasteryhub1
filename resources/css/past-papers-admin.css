@@ -74,6 +74,9 @@
 .past-papers-quick-add { border-color: color-mix(in srgb, var(--primary) 32%, var(--border)); }
 .past-papers-quick-grid { display: grid; gap: var(--space-4); grid-template-columns: minmax(0, 1.4fr) minmax(0, 1.4fr) minmax(150px, .6fr); }
 .past-papers-quick-grid > div { min-width: 0; }
+.past-papers-quick-grid #quick-year-field.is-detected { display: none; }
+.past-papers-file-picker[hidden],
+#quick-year-field[hidden] { display: none !important; }
 .past-papers-quick-resources { border: 0; margin: var(--space-5) 0 0; padding: 0; }
 .past-papers-quick-resources legend { color: var(--text-primary); font-size: 1rem; font-weight: 800; margin-bottom: var(--space-3); }
 .past-papers-optional { color: var(--text-muted); font-size: .78rem; font-weight: 500; }
@@ -83,6 +86,18 @@
 .past-papers-quick-resource-fields > * { min-width: 0; }
 .past-papers-quick-resource-fields .form-control { flex: 1 1 0; }
 .past-papers-or { color: var(--text-muted); font-size: .8rem; }
+.past-papers-upload-toggle,
+.past-papers-url-toggle { color: var(--primary); flex: 0 0 auto; font-size: .78rem; padding: .25rem .35rem; white-space: nowrap; }
+.past-papers-upload-toggle:hover,
+.past-papers-url-toggle:hover { color: var(--text-primary); }
+.past-papers-file-picker { align-items: center; display: flex; gap: var(--space-2); min-width: 0; width: 100%; }
+.past-papers-file-picker .form-control { min-width: 0; }
+.past-papers-manage-content,
+.past-papers-review-workflow > .past-papers-card,
+.past-papers-resources-workflow > .past-papers-card { margin-top: var(--space-4); }
+.past-papers-secondary-workflow.past-papers-manage-workflow,
+.past-papers-secondary-workflow.past-papers-review-workflow,
+.past-papers-secondary-workflow.past-papers-resources-workflow { padding-bottom: var(--space-4); }
 .past-papers-other-resource,
 .past-papers-advanced-settings { border-top: 1px solid var(--border); margin-top: var(--space-2); padding-top: var(--space-3); }
 .past-papers-detected { color: var(--secondary); font-size: .82rem; font-weight: 700; min-height: 1.25rem; padding-top: .4rem; }
@@ -196,6 +211,7 @@ html[data-bs-theme="dark"] .past-papers-card {
   .past-papers-quick-grid { grid-template-columns: 1fr; }
   .past-papers-quick-resource { align-items: stretch; grid-template-columns: 1fr; }
   .past-papers-quick-resource-fields { align-items: stretch; flex-direction: column; }
+  .past-papers-file-picker { align-items: stretch; flex-direction: column; }
   .past-papers-or { text-align: center; }
   .past-papers-quick-actions { justify-content: stretch; }
   .past-papers-quick-actions .btn { flex: 1 1 100%; }
