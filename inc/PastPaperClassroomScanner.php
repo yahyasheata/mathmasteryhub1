@@ -166,6 +166,15 @@ if (!function_exists('mmh_classroom_approved_topic_keys')) {
     }
 }
 
+if (!function_exists('mmh_classroom_is_target_syllabus')) {
+    /** The Phase 2 mapping is intentionally limited to Cambridge Mathematics 0580. */
+    function mmh_classroom_is_target_syllabus(array $syllabus): bool
+    {
+        return preg_match('/\A0*580\z/', trim((string) ($syllabus['syllabus_code'] ?? ''))) === 1
+            && stripos((string) ($syllabus['board_name'] ?? ''), 'cambridge') !== false;
+    }
+}
+
 if (!function_exists('mmh_classroom_normalize_topic_name')) {
     function mmh_classroom_normalize_topic_name(string $name): string
     {
@@ -356,7 +365,7 @@ if (!function_exists('mmh_classroom_scan')) {
         $courseId = trim($courseId); $syllabusId = trim($syllabusId);
         if ($courseId === '' || strlen($courseId) > 200 || !preg_match('/\A[A-Za-z0-9_-]+\z/', $courseId)) return [false, 'Choose a valid Classroom course.', null];
         $syllabus = mmh_past_syllabus($conn, $syllabusId);
-        if (!$syllabus || !preg_match('/\A0*580\z/', (string) ($syllabus['syllabus_code'] ?? '')) || stripos((string) ($syllabus['board_name'] ?? ''), 'cambridge') === false) return [false, 'Select the configured Cambridge Mathematics 0580 syllabus.', null];
+        if (!$syllabus || !mmh_classroom_is_target_syllabus($syllabus)) return [false, 'Select the configured Cambridge Mathematics 0580 syllabus.', null];
         $service = mmh_classroom_service($baseUrl); if (!$service) return [false, 'Connect a Google account with Classroom read-only access first.', null];
         try {
             $topics = mmh_classroom_api_list_all(static fn($page) => $service->courses_topics->listCoursesTopics($courseId, array_filter(['pageSize' => 100, 'pageToken' => $page, 'fields' => 'topic(id,name),nextPageToken'], static fn($v) => $v !== '')), 'topic');

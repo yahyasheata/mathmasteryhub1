@@ -10,6 +10,9 @@ function classroom_test(bool $condition, string $message): void
 
 $approved = mmh_classroom_parse_topic('May June 2022 V1 (New Syllabus)');
 classroom_test(is_array($approved) && $approved['session'] === 'May/June' && $approved['year'] === 2022 && $approved['variant'] === 'V1', 'May June topic parsing failed.');
+classroom_test(mmh_classroom_is_target_syllabus(['syllabus_code' => '0580', 'board_name' => 'Cambridge']) === true, 'Cambridge 0580 target syllabus was rejected.');
+classroom_test(mmh_classroom_is_target_syllabus(['syllabus_code' => '4MA1', 'board_name' => 'Edexcel']) === false, 'Edexcel 4MA1 was accepted as a Classroom target.');
+classroom_test(mmh_classroom_is_target_syllabus(['syllabus_code' => '0580', 'board_name' => 'Edexcel']) === false, 'Non-Cambridge 0580 was accepted as a Classroom target.');
 classroom_test(mmh_classroom_parse_topic('May/June 2022 V3') !== null, 'May/June alias parsing failed.');
 classroom_test(mmh_classroom_parse_topic('Oct Nov 2022 V2 (New Syllabus)')['session'] === 'October/November', 'Oct Nov parsing failed.');
 classroom_test(mmh_classroom_parse_topic('May June 2023 V3') === null, 'Out-of-scope May June topic was accepted.');
