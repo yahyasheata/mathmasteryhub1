@@ -11,6 +11,112 @@ require_once __DIR__ . '/AssignmentIdentity.php';
  */
 final class CourseContentCopyService
 {
+    /**
+     * Create an independent course session from existing academic content.
+     * Student records and live-session schedules are intentionally excluded.
+     * The cloned teaching structure is always Draft until an Admin publishes it.
+     *
+     * @return array{course_id:string,section_ids:array<string,string>,item_ids:array<string,string>,warnings:array<int,string>}
+     */
+    public static function createNextSession(mysqli $conn, string $sourceCourseId, string $title, float $price, string $courseState, string $adminUsername): array
+    {
+        $sourceCourseId = trim($sourceCourseId);
+        $title = trim($title);
+        $courseState = strtolower(trim($courseState));
+        $titleLength = function_exists('mb_strlen') ? mb_strlen($title) : strlen($title);
+        if ($sourceCourseId === '' || $title === '' || $titleLength > 190) {
+            throw new InvalidArgumentException('Enter a session name of 1–190 characters.');
+        }
+        if (!in_array($courseState, ['draft', 'private', 'public'], true)) {
+            throw new InvalidArgumentException('Choose a valid course status.');
+        }
+        if (!is_finite($price) || $price < 0 || $price > 99999999) {
+            throw new InvalidArgumentException('Enter a valid course price.');
+        }
+
+        $sourceCourse = self::fetchOne($conn, 'SELECT * FROM courses WHERE course_id = ? LIMIT 1', 's', [$sourceCourseId]);
+        if (!$sourceCourse || !empty($sourceCourse['archived_at'])) throw new RuntimeException('The source course is not available.');
+        $courseColumns = self::tableColumns($conn, 'courses');
+        $sectionColumns = self::tableColumns($conn, 'course_sections');
+
+        $conn->begin_transaction();
+        try {
+            $newCourseId = self::uniqueCourseId($conn);
+            $isPublished = $courseState === 'draft' ? '0' : '1';
+            $legacyVisibility = $courseState === 'public' ? 'public' : 'private';
+            $courseValues = [
+                'course_id' => $newCourseId,
+                'course_title' => $title,
+                'course_title_en' => $title,
+                'course_description' => (string) ($sourceCourse['course_description'] ?? ''),
+                'course_image' => (string) ($sourceCourse['course_image'] ?? ''),
+                'course_price' => $price,
+                // Promotions are session-specific; do not carry an old discount forward.
+                'preDiscount_course_price' => 0,
+                'course_category' => $sourceCourse['course_category'] ?? 0,
+                // A previous session's private class-chat link is not reusable by default.
+                'whatsapp_group' => null,
+                'sequential_learning' => $sourceCourse['sequential_learning'] ?? 0,
+                'default_homework_score_mode' => $sourceCourse['default_homework_score_mode'] ?? 'disabled',
+                'username' => $adminUsername,
+                'course_state' => $courseState,
+                'course_status' => $isPublished,
+                'course_visibility' => $legacyVisibility,
+                'archived_at' => null,
+            ];
+            $courseValues = array_intersect_key($courseValues, array_flip($courseColumns));
+            self::insertRow($conn, 'courses', $courseValues);
+
+            $sections = self::fetchAll($conn, 'SELECT * FROM course_sections WHERE course_id = ? ORDER BY sort_order ASC, id ASC', 's', [$sourceCourseId]);
+            $items = self::fetchAll($conn, 'SELECT ci.*, COALESCE(cs.sort_order, 2147483647) AS source_section_sort, COALESCE(cs.id, 2147483647) AS source_section_id FROM course_items ci LEFT JOIN course_sections cs ON cs.course_id = ci.course_id AND cs.section_id = ci.section_id WHERE ci.course_id = ? ORDER BY source_section_sort ASC, source_section_id ASC, ci.page_order ASC, ci.sort_order ASC, ci.id ASC', 's', [$sourceCourseId]);
+            $sections = array_values(array_filter($sections, static fn(array $row): bool => self::isActiveCopySource($row)));
+            $items = array_values(array_filter($items, static fn(array $row): bool => self::isActiveCopySource($row)));
+
+            $maps = ['sections' => [], 'items' => [], 'assignments' => [], 'assignment_refs' => []];
+            $warnings = [];
+            $sectionSort = 1;
+            foreach ($sections as $section) {
+                $oldId = (string) ($section['section_id'] ?? '');
+                if ($oldId === '') throw new RuntimeException('A source section is missing its identifier.');
+                $newId = self::uniqueId($conn, 'course_sections', 'section_id', $newCourseId, 10000, 999999);
+                $values = self::sectionValues($section, $newCourseId, $newId, $sectionSort++, $warnings, '', true);
+                $values = array_intersect_key($values, array_flip($sectionColumns));
+                self::insertRow($conn, 'course_sections', $values);
+                $maps['sections'][$oldId] = $newId;
+            }
+
+            $itemIds = [];
+            $perSectionOrder = [];
+            foreach ($items as $item) {
+                $oldSection = trim((string) ($item['section_id'] ?? ''));
+                $newSection = $oldSection !== '' ? ($maps['sections'][$oldSection] ?? null) : null;
+                // Orphaned/archived section content is not smuggled into General.
+                if ($oldSection !== '' && $newSection === null) continue;
+                $sectionKey = $newSection ?? '__general__';
+                $order = ($perSectionOrder[$sectionKey] ?? 0) + 1;
+                $perSectionOrder[$sectionKey] = $order;
+                $copy = self::copyItemRow($conn, $item, $newCourseId, $newSection, $maps, $order, '', true);
+                $itemIds[(string) $item['item_id']] = $copy['item_id'];
+                $warnings = array_merge($warnings, $copy['warnings']);
+            }
+
+            foreach ($maps['sections'] as $oldSectionId => $newSectionId) {
+                $sourceSection = null;
+                foreach ($sections as $candidate) {
+                    if ((string) ($candidate['section_id'] ?? '') === $oldSectionId) { $sourceSection = $candidate; break; }
+                }
+                if ($sourceSection) self::remapSectionReferences($conn, $newSectionId, $sourceSection, $maps, $warnings);
+            }
+            foreach (array_values($itemIds) as $newItemId) self::finalizeItemReferences($conn, $newItemId, $maps);
+            self::finalizeAssignmentReferences($conn, $maps);
+            $conn->commit();
+            return ['course_id' => $newCourseId, 'section_ids' => $maps['sections'], 'item_ids' => $itemIds, 'warnings' => array_values(array_unique($warnings))];
+        } catch (Throwable $e) {
+            $conn->rollback();
+            throw $e;
+        }
+    }
+
     /** @return array{course_id:string,section_id:?string,item_id:string,warnings:array<int,string>} */
     public static function copyItem(mysqli $conn, string $sourceCourseId, string $sourceItemId, string $destinationCourseId, ?string $destinationSectionId = null): array
     {
@@ -143,6 +249,23 @@ final class CourseContentCopyService
         }
     }
 
+    private static function uniqueCourseId(mysqli $conn): string
+    {
+        do {
+            $candidate = (string) random_int(100, 9999999);
+            $row = self::fetchOne($conn, 'SELECT 1 FROM courses WHERE course_id = ? LIMIT 1', 's', [$candidate]);
+        } while ($row);
+        return $candidate;
+    }
+
+    private static function isActiveCopySource(array $row): bool
+    {
+        foreach (['archived_at', 'deleted_at'] as $column) {
+            if (isset($row[$column]) && trim((string) $row[$column]) !== '') return false;
+        }
+        return !in_array(strtolower(trim((string) ($row['status'] ?? ''))), ['archived', 'deleted', 'removed'], true);
+    }
+
     private static function normalizeDestinationSection(mysqli $conn, string $courseId, ?string $sectionId): ?string
     {
         $sectionId = trim((string) $sectionId);
@@ -155,7 +278,7 @@ final class CourseContentCopyService
         return $sectionId;
     }
 
-    private static function copyItemRow(mysqli $conn, array $source, string $destinationCourseId, ?string $destinationSectionId, array &$maps, ?int $forcedOrder = null): array
+    private static function copyItemRow(mysqli $conn, array $source, string $destinationCourseId, ?string $destinationSectionId, array &$maps, ?int $forcedOrder = null, string $titleSuffix = ' (Copy)', bool $forceDraft = false): array
     {
         $sourceItemId = (string) ($source['item_id'] ?? '');
         $newItemId = self::uniqueId($conn, 'course_items', 'item_id', $destinationCourseId, 100, 999999);
@@ -170,7 +293,7 @@ final class CourseContentCopyService
         }
         $newAssignmentId = null;
         if ($assignmentId !== '') {
-            $newAssignmentId = self::copyAssignment($conn, $source, $assignmentId, $destinationCourseId, $destinationSectionId, $newItemId, $maps, $warnings);
+            $newAssignmentId = self::copyAssignment($conn, $source, $assignmentId, $destinationCourseId, $destinationSectionId, $newItemId, $maps, $warnings, $forceDraft);
             if ($newAssignmentId !== null) {
                 $maps['assignments'][$assignmentId] = $newAssignmentId;
             }
@@ -179,11 +302,11 @@ final class CourseContentCopyService
         $template = strtolower(trim((string) ($source['template_type'] ?? $source['item_type'] ?? '')));
         $templateData = self::jsonRemap($source['template_data'] ?? null, $maps);
         $metadata = self::jsonRemap(self::jsonSanitize($source['metadata'] ?? null, $warnings), $maps);
-        $copiedStatus = $template === 'timed_exam' ? 'draft' : (string) ($source['status'] ?? 'draft');
+        $copiedStatus = ($forceDraft || $template === 'timed_exam') ? 'draft' : (string) ($source['status'] ?? 'draft');
         $description = self::remapAssignmentIdentityHtml((string) ($source['item_description'] ?? ''), $newAssignmentId);
         $values = [
             'item_id' => $newItemId,
-            'item_title' => rtrim((string) ($source['item_title'] ?? '')) . ' (Copy)',
+            'item_title' => rtrim((string) ($source['item_title'] ?? '')) . $titleSuffix,
             'item_description' => $description,
             'item_type' => (string) ($source['item_type'] ?? 'file'),
             'section_id' => $destinationSectionId,
@@ -192,7 +315,7 @@ final class CourseContentCopyService
             'metadata' => $metadata,
             'duration_minutes' => $source['duration_minutes'] ?? null,
             'assignment_id' => $newAssignmentId !== null && ctype_digit((string) $newAssignmentId) ? (int) $newAssignmentId : null,
-            'due_date' => $source['due_date'] ?? null,
+            'due_date' => $forceDraft ? null : ($source['due_date'] ?? null),
             'status' => $copiedStatus,
             'sort_order' => $order,
             'course_id' => $destinationCourseId,
@@ -206,7 +329,7 @@ final class CourseContentCopyService
         return ['item_id' => $newItemId, 'warnings' => $warnings];
     }
 
-    private static function copyAssignment(mysqli $conn, array $sourceItem, string $oldId, string $destinationCourseId, ?string $destinationSectionId, string $newItemId, array $maps, array &$warnings): ?string
+    private static function copyAssignment(mysqli $conn, array $sourceItem, string $oldId, string $destinationCourseId, ?string $destinationSectionId, string $newItemId, array &$maps, array &$warnings, bool $clearSessionDates = false): ?string
     {
         $oldId = trim($oldId);
         $assignment = self::fetchOne($conn, 'SELECT * FROM assignments WHERE assignment_id = ? AND course_id = ? LIMIT 1', 'ss', [$oldId, (string) ($sourceItem['course_id'] ?? '')]);
@@ -225,6 +348,7 @@ final class CourseContentCopyService
         $assignment['course_id'] = $destinationCourseId;
         $assignment['item_id'] = $newItemId;
         $assignment['section_id'] = $destinationSectionId;
+        if ($clearSessionDates && array_key_exists('due_date', $assignment)) $assignment['due_date'] = null;
         foreach (['archived_at', 'deleted_at'] as $column) {
             if (array_key_exists($column, $assignment)) $assignment[$column] = null;
         }
@@ -269,7 +393,7 @@ final class CourseContentCopyService
         $warnings[] = 'Timed Exam copied as Draft with its schedule cleared for review. Open the copied item, configure its window, and publish it before students can access it.';
     }
 
-    private static function sectionValues(array $source, string $destinationCourseId, string $newSectionId, int $sort, array &$warnings): array
+    private static function sectionValues(array $source, string $destinationCourseId, string $newSectionId, int $sort, array &$warnings, string $titleSuffix = ' (Copy)', bool $forceDraft = false): array
     {
         $sourceUnlock = strtolower(trim((string) ($source['unlock_mode'] ?? 'always')));
         if ($sourceUnlock !== '' && $sourceUnlock !== 'always') {
@@ -282,14 +406,14 @@ final class CourseContentCopyService
         return [
             'section_id' => $newSectionId,
             'course_id' => $destinationCourseId,
-            'title' => rtrim((string) ($source['title'] ?? 'Section')) . ' (Copy)',
+            'title' => rtrim((string) ($source['title'] ?? 'Section')) . $titleSuffix,
             'section_type' => $source['section_type'] ?? null,
             'custom_type' => $source['custom_type'] ?? null,
             'icon' => $source['icon'] ?? null,
             'description' => $source['description'] ?? null,
             'metadata' => self::jsonSanitize($source['metadata'] ?? null, $warnings),
             'sort_order' => $sort,
-            'status' => (string) ($source['status'] ?? 'draft'),
+            'status' => $forceDraft ? 'draft' : (string) ($source['status'] ?? 'draft'),
             'unlock_mode' => 'always',
             'completion_rule' => (string) ($source['completion_rule'] ?? 'manual_completion'),
             'unlock_at' => null,

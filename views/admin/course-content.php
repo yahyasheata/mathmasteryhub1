@@ -76,6 +76,7 @@ $admin_base = rtrim((string) $baseUrl, '/') . '/admin/';
                     <div class="course-manager-eyebrow">Course content</div>
                     <h1><?=$safe_course_title;?></h1>
                     <p>Manage sections and lessons from one focused workspace.</p>
+                    <div class="mt-2"><a class="btn btn-outline-primary" href="<?=htmlspecialchars(rtrim((string) $baseUrl, '/') . '/admin/courses/' . rawurlencode($course_id) . '/next-session', ENT_QUOTES, 'UTF-8');?>">Create Next Session</a></div>
                 </div>
                 <div class="course-manager-summary" aria-label="Course content summary">
                     <span><strong><?=$lesson_count;?></strong> lessons</span>
