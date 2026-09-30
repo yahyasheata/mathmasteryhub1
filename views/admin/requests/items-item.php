@@ -5,6 +5,7 @@ require_once 'inc/CourseDuration.php';
 require_once 'inc/learning_schema.php';
 require_once 'inc/CourseSectionAvailability.php';
 require_once 'inc/CourseResourceResolver.php';
+require_once 'inc/AssignmentIdentity.php';
 require_once 'inc/AdminAssessmentService.php';
 require_once 'inc/AdminCourseService.php';
 
@@ -342,8 +343,9 @@ function items_item_manager_render_lesson($row, $section_locked = false, array $
     $is_assignment = $template_type === 'classified_assignment';
     if ($is_assignment) {
         $assignment_id = trim((string) ($row['assignment_id'] ?? ''));
-        if ($assignment_id === '' && function_exists('mmh_course_assignment_id')) {
-            $assignment_id = mmh_course_assignment_id($row);
+        if ($assignment_id === '' && isset($GLOBALS['conn']) && $GLOBALS['conn'] instanceof mysqli) {
+            $identity = mmh_assignment_identity_for_item($GLOBALS['conn'], $row, true);
+            $assignment_id = (string) ($identity['assignment_id'] ?? '');
         }
         $meta = $assignment_stats[$assignment_id] ?? null;
         if ($meta) {
@@ -617,8 +619,9 @@ while ($row = $items_result->fetch_assoc()) {
     $counts_by_section[$section_id]++;
     if (strtolower(trim((string) ($row['template_type'] ?? ''))) === 'classified_assignment') {
         $assignment_id = trim((string) ($row['assignment_id'] ?? ''));
-        if ($assignment_id === '' && function_exists('mmh_course_assignment_id')) {
-            $assignment_id = mmh_course_assignment_id($row);
+        if ($assignment_id === '' && $conn instanceof mysqli) {
+            $identity = mmh_assignment_identity_for_item($conn, $row, true);
+            $assignment_id = (string) ($identity['assignment_id'] ?? '');
         }
         if ($assignment_id !== '') {
             $assignment_ids[] = $assignment_id;

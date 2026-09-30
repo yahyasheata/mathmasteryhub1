@@ -65,7 +65,7 @@ try {
         item_progress_response(false, 'This lesson is unavailable.', [], 403);
     }
 
-    if ($action === 'complete' && !student_course_progress_manual_completion_eligible($selection['item'])) {
+    if ($action === 'complete' && !student_course_progress_manual_completion_eligible($selection['item'], $conn)) {
         item_progress_response(false, 'This lesson is completed through its assignment or exam workflow.', [], 422);
     }
 

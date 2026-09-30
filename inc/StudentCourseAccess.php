@@ -10,6 +10,7 @@
 require_once __DIR__ . '/learning_schema.php';
 require_once __DIR__ . '/CourseSectionAvailability.php';
 require_once __DIR__ . '/AssignmentProgress.php';
+require_once __DIR__ . '/AssignmentIdentity.php';
 require_once __DIR__ . '/CourseVisibility.php';
 
 if (!function_exists('student_course_access_identifier')) {
@@ -645,7 +646,7 @@ if (!function_exists('student_course_access_assignment')) {
             return null;
         }
 
-        $stmt = $conn->prepare('SELECT assignment_id, assignment_title, due_date, late_submission_enabled, late_submission_until, course_id, section_id, item_id, allow_self_score, require_teacher_verification, max_score, completion_requirement, completion_rule, minimum_score FROM assignments WHERE assignment_id = ? AND archived_at IS NULL LIMIT 1');
+        $stmt = $conn->prepare('SELECT assignment_id, assignment_title, due_date, late_submission_enabled, late_submission_until, course_id, section_id, allow_self_score, require_teacher_verification, max_score, completion_requirement, completion_rule, minimum_score FROM assignments WHERE assignment_id = ? AND archived_at IS NULL LIMIT 1');
         if (!$stmt) {
             return null;
         }
@@ -659,8 +660,16 @@ if (!function_exists('student_course_access_assignment')) {
 }
 
 if (!function_exists('student_course_access_assignment_matches_item')) {
-    function student_course_access_assignment_matches_item(array $assignment, array $item)
+    function student_course_access_assignment_matches_item(mysqli $conn, array $assignment, array $item)
     {
+        $assignmentCourse = trim((string) ($assignment['course_id'] ?? ''));
+        $itemCourse = trim((string) ($item['course_id'] ?? ''));
+        if ($assignmentCourse === '' || $assignmentCourse !== $itemCourse) return false;
+        $identity = mmh_assignment_identity_for_item($conn, $item, true);
+        if (!in_array((string) ($identity['status'] ?? ''), ['CLEAN', 'CONFLICT', 'LEGACY_FALLBACK'], true)) return false;
+        if ((string) ($identity['assignment_id'] ?? '') === ''
+            || (string) $identity['assignment_id'] !== (string) ($assignment['assignment_id'] ?? '')) return false;
+
         $assignmentSection = student_course_access_normalize_section_id($assignment['section_id'] ?? '');
         $itemSection = student_course_access_normalize_section_id($item['section_id'] ?? '');
         if ($assignmentSection === null || $itemSection === null) {
@@ -669,19 +678,6 @@ if (!function_exists('student_course_access_assignment_matches_item')) {
         if ($assignmentSection !== '' && $assignmentSection !== $itemSection) {
             return false;
         }
-
-        $assignmentItem = trim((string) ($assignment['item_id'] ?? ''));
-        if ($assignmentItem !== '') {
-            if ($assignmentItem !== (string) ($item['item_id'] ?? '') || $assignmentSection !== $itemSection) {
-                return false;
-            }
-        }
-
-        $itemAssignment = trim((string) ($item['assignment_id'] ?? ''));
-        if ($itemAssignment !== '' && $itemAssignment !== (string) ($assignment['assignment_id'] ?? '')) {
-            return false;
-        }
-
         return true;
     }
 }

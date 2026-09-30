@@ -4,6 +4,7 @@ require_once 'inc/functions.php';
 require_once 'inc/learning_schema.php';
 require_once 'inc/AcademicMetadata.php';
 require_once 'inc/CourseSectionAvailability.php';
+require_once 'inc/AssignmentIdentity.php';
 
 header('Content-Type: application/json; charset=utf-8');
 
@@ -178,24 +179,31 @@ function form_section_homework_options(mysqli $conn, $course_id, $section_id, $s
     if (trim((string) $section_id) === '') {
         return $html;
     }
-
-    $stmt = $conn->prepare("SELECT DISTINCT assignments.assignment_id, assignments.assignment_title
-        FROM assignments
-        INNER JOIN course_items ON course_items.course_id = assignments.course_id
-          AND course_items.section_id = ?
-          AND (
-            CAST(course_items.assignment_id AS CHAR) = assignments.assignment_id
-            OR JSON_UNQUOTE(JSON_EXTRACT(course_items.template_data, '$.assignment_id')) = assignments.assignment_id
-          )
-        WHERE assignments.course_id = ?
-        ORDER BY assignments.created_at ASC, assignments.id ASC");
-    if (!$stmt) {
-        return $html;
+    $itemArchiveFilter = mmh_assignment_identity_column_exists($conn, 'course_items', 'archived_at') ? " AND (archived_at IS NULL OR archived_at = '')" : '';
+    $itemStmt = $conn->prepare("SELECT * FROM course_items WHERE course_id = ? AND section_id = ?" . $itemArchiveFilter . "
+        AND (status IS NULL OR status = '' OR status = 'published') ORDER BY page_order ASC, id ASC");
+    if (!$itemStmt) return $html;
+    $itemStmt->bind_param('ss', $course_id, $section_id);
+    $itemStmt->execute();
+    $allowed = [];
+    $items = $itemStmt->get_result();
+    while ($item = $items->fetch_assoc()) {
+        if (!mmh_assignment_identity_is_homework_item($item)) continue;
+        $identity = mmh_assignment_identity_for_item($conn, $item, true);
+        if (in_array((string) ($identity['status'] ?? ''), ['CLEAN', 'CONFLICT', 'LEGACY_FALLBACK'], true) && ($identity['assignment_id'] ?? '') !== '') {
+            $allowed[(string) $identity['assignment_id']] = true;
+        }
     }
-    $stmt->bind_param('ss', $section_id, $course_id);
+    $itemStmt->close();
+    if (!$allowed) return $html;
+
+    $stmt = $conn->prepare('SELECT assignment_id, assignment_title FROM assignments WHERE course_id = ? ORDER BY created_at ASC, id ASC');
+    if (!$stmt) return $html;
+    $stmt->bind_param('s', $course_id);
     $stmt->execute();
     $result = $stmt->get_result();
     while ($row = $result->fetch_assoc()) {
+        if (!isset($allowed[(string) $row['assignment_id']])) continue;
         $value = form_section_html($row['assignment_id']);
         $label = form_section_html($row['assignment_title'] . ' #' . $row['assignment_id']);
         $is_selected = (string) $row['assignment_id'] === (string) $selected ? 'selected' : '';

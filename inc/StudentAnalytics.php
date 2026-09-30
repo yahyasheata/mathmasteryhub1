@@ -10,6 +10,7 @@
 require_once __DIR__ . '/AcademicMetadata.php';
 require_once __DIR__ . '/LearningEvents.php';
 require_once __DIR__ . '/AssignmentProgress.php';
+require_once __DIR__ . '/AssignmentIdentity.php';
 
 if (!function_exists('mmh_analytics_config')) {
     function mmh_analytics_config(array $overrides = [])
@@ -235,7 +236,7 @@ if (!function_exists('mmh_analytics_course_dataset')) {
         $courseId = (string) $courseId;
         $assignments = mmh_analytics_fetch_rows(
             $conn,
-            'SELECT assignment_id, assignment_title, due_date, course_id, section_id, item_id, topic, subtopic, topic_id, subtopic_id, additional_topic_ids, max_score, passing_score, weight, difficulty, recommended_recording_item_id, recommended_notes_item_id, recommended_revision_item_id, allow_self_score, require_teacher_verification, completion_requirement, completion_rule, minimum_score FROM assignments WHERE course_id = ? AND archived_at IS NULL ORDER BY due_date ASC, id ASC',
+            'SELECT assignment_id, assignment_title, due_date, course_id, section_id, topic, subtopic, topic_id, subtopic_id, additional_topic_ids, max_score, passing_score, weight, difficulty, recommended_recording_item_id, recommended_notes_item_id, recommended_revision_item_id, allow_self_score, require_teacher_verification, completion_requirement, completion_rule, minimum_score FROM assignments WHERE course_id = ? AND archived_at IS NULL ORDER BY due_date ASC, id ASC',
             's',
             [$courseId]
         );
@@ -260,6 +261,10 @@ if (!function_exists('mmh_analytics_course_dataset')) {
         }
 
         foreach ($assignments as &$assignment) {
+            $context = mmh_assignment_identity_item_for_assignment($conn, $courseId, (string) ($assignment['assignment_id'] ?? ''), true);
+            $sourceItem = is_array($context['item'] ?? null) ? $context['item'] : null;
+            $assignment['_course_item_id'] = $sourceItem ? (string) ($sourceItem['item_id'] ?? '') : '';
+            $assignment['_resolved_section_id'] = $sourceItem ? (string) ($sourceItem['section_id'] ?? '') : (string) ($assignment['section_id'] ?? '');
             $assignment['_submission'] = $submissionByAssignment[(string) $assignment['assignment_id']] ?? null;
             $assignment['_state'] = mmh_assignment_progress_evaluate($assignment, $assignment['_submission']);
             $assignment['_score'] = mmh_analytics_valid_score($assignment, $assignment['_submission']);
@@ -848,7 +853,7 @@ if (!function_exists('getStudentRecommendationCandidates')) {
                         continue;
                     }
                     $elementKeys[$dedupe] = true;
-                    $candidates[] = mmh_analytics_candidate($definition[0], $definition[1], 'medium', $courseId, $assignment['section_id'] ?? null, $topicRef, $itemId, $assignment['assignment_id'], $definition[1] . ' for ' . $topic['title'] . '.');
+                    $candidates[] = mmh_analytics_candidate($definition[0], $definition[1], 'medium', $courseId, $assignment['_resolved_section_id'] ?? null, $topicRef, $itemId, $assignment['assignment_id'], $definition[1] . ' for ' . $topic['title'] . '.');
                 }
             }
         }
@@ -861,16 +866,16 @@ if (!function_exists('getStudentRecommendationCandidates')) {
                     $timing['overdue'] ? 'Homework is overdue' : 'Homework has not been submitted',
                     $timing['overdue'] ? 'high' : 'medium',
                     $courseId,
-                    $assignment['section_id'] ?? null,
+                    $assignment['_resolved_section_id'] ?? null,
                     null,
-                    $assignment['item_id'] ?? null,
+                    $assignment['_course_item_id'] ?? null,
                     $assignment['assignment_id'],
                     $assignment['assignment_title'] . ' has not been submitted.'
                 );
                 continue;
             }
             if (in_array(strtolower(trim((string) ($submission['self_score_status'] ?? ''))), ['pending_verification', 'pending'], true)) {
-                $candidates[] = mmh_analytics_candidate('pending_homework', 'Homework is pending verification', 'medium', $courseId, $assignment['section_id'] ?? null, null, $assignment['item_id'] ?? null, $assignment['assignment_id'], $assignment['assignment_title'] . ' is awaiting teacher verification.');
+                $candidates[] = mmh_analytics_candidate('pending_homework', 'Homework is pending verification', 'medium', $courseId, $assignment['_resolved_section_id'] ?? null, null, $assignment['_course_item_id'] ?? null, $assignment['assignment_id'], $assignment['assignment_title'] . ' is awaiting teacher verification.');
             }
         }
         foreach (mmh_analytics_model_answer_candidates($conn, $studentId, $courseId) as $item) {

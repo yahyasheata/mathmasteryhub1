@@ -5,7 +5,7 @@ if (!function_exists('mmh_assignment_submission_file_load')) {
     function mmh_assignment_submission_file_load(mysqli $conn, int $fileId): ?array
     {
         if ($fileId <= 0) return null;
-        $stmt = $conn->prepare('SELECT f.id, f.submission_id, f.file_path, f.original_filename, s.student_id, s.assignment_id, a.course_id, a.item_id, a.section_id FROM assignment_submission_files f INNER JOIN assignment_submissions s ON s.id = f.submission_id INNER JOIN assignments a ON a.assignment_id = s.assignment_id WHERE f.id = ? LIMIT 1');
+        $stmt = $conn->prepare('SELECT f.id, f.submission_id, f.file_path, f.original_filename, s.student_id, s.assignment_id, a.course_id, a.section_id FROM assignment_submission_files f INNER JOIN assignment_submissions s ON s.id = f.submission_id INNER JOIN assignments a ON a.assignment_id = s.assignment_id WHERE f.id = ? LIMIT 1');
         if (!$stmt) return null;
         $stmt->bind_param('i', $fileId);
         $stmt->execute();
@@ -33,11 +33,9 @@ if (!function_exists('mmh_assignment_submission_file_serve')) {
                 $sectionState = student_course_access_section_state($conn, $course, $sectionId, $studentId);
                 if (!$sectionState || !empty($sectionState['state']['locked'])) { http_response_code(403); exit('This file is not available.'); }
             }
-            $itemId = trim((string) ($file['item_id'] ?? ''));
-            if ($itemId !== '') {
-                $item = student_course_access_item($conn, $file['course_id'], $itemId);
-                if (!$item || !student_course_access_assignment_matches_item($assignment, $item)) { http_response_code(403); exit('This file is not available.'); }
-            }
+            $itemContext = mmh_assignment_identity_item_for_assignment($conn, (string) ($file['course_id'] ?? ''), (string) ($file['assignment_id'] ?? ''), true);
+            $item = is_array($itemContext['item'] ?? null) ? student_course_access_item($conn, $file['course_id'], $itemContext['item']['item_id'] ?? '') : null;
+            if (($itemContext['status'] ?? '') !== 'FOUND' || !$item || !student_course_access_assignment_matches_item($conn, $assignment, $item)) { http_response_code(403); exit('This file is not available.'); }
         } elseif (empty($_SESSION['admin'])) {
             http_response_code(403); exit('Administrator access is required.');
         }

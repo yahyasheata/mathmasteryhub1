@@ -5,6 +5,8 @@ require_once 'inc/Auth.php';
 require_once 'inc/LearningEvents.php';
 require_once 'inc/LiveSessions.php';
 require_once 'inc/CourseResourceResolver.php';
+require_once 'inc/AssignmentIdentity.php';
+require_once 'inc/StudentCourseAccess.php';
 
 header('Content-Type: application/json; charset=utf-8');
 
@@ -134,15 +136,16 @@ if ($operation !== '') {
     if ($operation === 'map_homework') {
         $assignmentId = section_integrity_id($_POST['assignment_id'] ?? '');
         if ($assignmentId === null) { section_integrity_response(false, 'Invalid homework reference.', [], 422); }
-        $stmt = $conn->prepare('SELECT assignment_id, item_id FROM assignments WHERE assignment_id = ? AND course_id = ? LIMIT 1');
+        $stmt = $conn->prepare('SELECT assignment_id, section_id FROM assignments WHERE assignment_id = ? AND course_id = ? LIMIT 1');
         $stmt->bind_param('ss', $assignmentId, $courseId); $stmt->execute(); $assignment = $stmt->get_result()->fetch_assoc(); $stmt->close();
         if (!$assignment) { section_integrity_response(false, 'Homework not found for this course.', [], 404); }
-        $itemId = trim((string) ($assignment['item_id'] ?? ''));
-        if ($itemId !== '') {
-            $itemStmt = $conn->prepare('SELECT section_id FROM course_items WHERE item_id = ? AND course_id = ? LIMIT 1');
-            $itemStmt->bind_param('ss', $itemId, $courseId); $itemStmt->execute(); $item = $itemStmt->get_result()->fetch_assoc(); $itemStmt->close();
-            $itemSection = $item ? trim((string) ($item['section_id'] ?? '')) : '';
-            if ($item && $itemSection !== $sectionId) { section_integrity_response(false, 'The linked lesson belongs to a different section. Move the lesson first or select its existing section.', [], 422); }
+        $context = mmh_assignment_identity_item_for_assignment($conn, $courseId, $assignmentId, false);
+        if (($context['status'] ?? '') === 'DUPLICATE_CANONICAL_CLAIM') {
+            section_integrity_response(false, 'This Homework has conflicting Course Content links and needs review before section mapping.', [], 409);
+        }
+        if (($context['status'] ?? '') === 'FOUND' && is_array($context['item'] ?? null)) {
+            $itemSection = trim((string) ($context['item']['section_id'] ?? ''));
+            if ($itemSection !== $sectionId) { section_integrity_response(false, 'The linked lesson belongs to a different section. Move the lesson first or select its existing section.', [], 422); }
         }
         $update = $conn->prepare('UPDATE assignments SET section_id = ? WHERE assignment_id = ? AND course_id = ? LIMIT 1');
         $update->bind_param('sss', $sectionId, $assignmentId, $courseId);
@@ -166,8 +169,18 @@ if ($operation !== '') {
 
 $sections = section_integrity_sections($conn, $courseId);
 $sectionOptions = section_integrity_section_options($sections);
-$assignmentStmt = $conn->prepare("SELECT a.assignment_id, a.assignment_title, a.item_id, a.section_id, i.section_id AS item_section_id, i.item_title FROM assignments a LEFT JOIN course_items i ON i.course_id = a.course_id AND i.item_id = a.item_id WHERE a.course_id = ? AND (a.section_id IS NULL OR a.section_id = '') ORDER BY a.due_date ASC, a.id ASC");
+$assignmentStmt = $conn->prepare("SELECT a.assignment_id, a.assignment_title, a.section_id, a.course_id, a.due_date FROM assignments a WHERE a.course_id = ? AND (a.section_id IS NULL OR a.section_id = '') ORDER BY a.due_date ASC, a.id ASC");
 $assignmentStmt->bind_param('s', $courseId); $assignmentStmt->execute(); $unresolvedHomework = $assignmentStmt->get_result()->fetch_all(MYSQLI_ASSOC); $assignmentStmt->close();
+foreach ($unresolvedHomework as &$unresolvedAssignment) {
+    $context = mmh_assignment_identity_item_for_assignment($conn, $courseId, (string) $unresolvedAssignment['assignment_id'], false);
+    $unresolvedAssignment['item_id'] = '';
+    $unresolvedAssignment['item_title'] = '';
+    if (($context['status'] ?? '') === 'FOUND' && is_array($context['item'] ?? null)) {
+        $unresolvedAssignment['item_id'] = (string) ($context['item']['item_id'] ?? '');
+        $unresolvedAssignment['item_title'] = (string) ($context['item']['item_title'] ?? '');
+    }
+}
+unset($unresolvedAssignment);
 $itemStmt = $conn->prepare("SELECT * FROM course_items WHERE course_id = ? AND (section_id IS NULL OR section_id = '') ORDER BY page_order ASC, id ASC");
 $itemStmt->bind_param('s', $courseId); $itemStmt->execute(); $itemRows = $itemStmt->get_result()->fetch_all(MYSQLI_ASSOC); $itemStmt->close();
 $unresolvedRecordings = [];

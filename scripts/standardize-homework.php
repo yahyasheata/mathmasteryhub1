@@ -9,7 +9,7 @@
  * student submission was ever attached.
  */
 require_once __DIR__ . '/../connection/config.php';
-require_once __DIR__ . '/../inc/CourseResourceResolver.php';
+require_once __DIR__ . '/../inc/AssignmentIdentity.php';
 require_once __DIR__ . '/../inc/CourseHomeworkRenderer.php';
 
 const MMH_HOMEWORK_MIGRATION_VERSION = 1;
@@ -68,6 +68,14 @@ function hmw_rows(mysqli $conn, ?string $courseFilter, ?string $itemFilter): arr
     if ($types !== '') $stmt->bind_param($types, ...$params);
     $stmt->execute(); $result = $stmt->get_result(); $rows = [];
     while ($row = $result->fetch_assoc()) {
+        $identity = mmh_assignment_identity_for_item($conn, $row, true);
+        if (!in_array((string) ($identity['status'] ?? ''), ['CLEAN', 'CONFLICT', 'LEGACY_FALLBACK'], true)
+            || (string) ($identity['assignment_id'] ?? '') === '') {
+            // This read-only planner cannot safely classify the record without
+            // a resolved canonical/central-compatibility identity.
+            continue;
+        }
+        $row['assignment_id'] = (string) $identity['assignment_id'];
         $resource = mmh_course_resource_resolve($row);
         if (($resource['action'] ?? '') !== 'homework') continue;
         $assignmentId = (string) ($resource['assignment_id'] ?? '');

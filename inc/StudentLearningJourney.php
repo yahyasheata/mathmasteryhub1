@@ -11,6 +11,7 @@ require_once __DIR__ . '/StudentCourseProgress.php';
 require_once __DIR__ . '/AssignmentProgress.php';
 require_once __DIR__ . '/CourseResourceResolver.php';
 require_once __DIR__ . '/TimedExam.php';
+require_once __DIR__ . '/AssignmentIdentity.php';
 
 function mmh_learning_journey_schema_available(mysqli $conn): bool
 {
@@ -76,6 +77,13 @@ function mmh_learning_journey_visible_items(mysqli $conn, string $courseId): arr
     $stmt->execute();
     $items = $stmt->get_result()->fetch_all(MYSQLI_ASSOC);
     $stmt->close();
+    foreach ($items as &$item) {
+        $identity = mmh_assignment_identity_for_item($conn, $item, true);
+        // Replace rather than conditionally overlay: orphaned/ambiguous
+        // canonical identities must not leak through as valid Journey links.
+        $item['assignment_id'] = (string) ($identity['assignment_id'] ?? '');
+    }
+    unset($item);
     return $items;
 }
 

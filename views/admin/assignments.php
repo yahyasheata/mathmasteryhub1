@@ -15,6 +15,7 @@ mmh_ensure_learning_schema($conn);
 $assignment_rows = mmh_admin_assignment_rows($conn);
 $submission_counts = mmh_admin_assignment_submission_counts($conn);
 $canonical_item_map = mmh_admin_assignment_item_map($conn);
+$canonical_identity_conflicts = (array) ($canonical_item_map['_identity_conflicts'] ?? []);
 ?>
 <!DOCTYPE html>
 <html lang="en">
@@ -68,7 +69,7 @@ $canonical_item_map = mmh_admin_assignment_item_map($conn);
                   <td><?= (int) ($submission_counts[$assignment_id] ?? 0); ?></td>
                   <td class="text-nowrap">
                     <a class="btn btn-sm btn-outline-primary" href="<?= htmlspecialchars($submission_url, ENT_QUOTES, 'UTF-8'); ?>"><span class="fas fa-list me-1" aria-hidden="true"></span>Submissions</a>
-                    <?php if ($content_url !== ''): ?><a class="btn btn-sm btn-outline-secondary" href="<?= htmlspecialchars($content_url, ENT_QUOTES, 'UTF-8'); ?>"><span class="fas fa-edit me-1" aria-hidden="true"></span>Open element</a><?php else: ?><span class="badge bg-secondary">Legacy / archived</span><?php endif; ?>
+                    <?php if (isset($canonical_identity_conflicts[$assignment_id])): ?><span class="badge bg-warning text-dark">Conflicting Course Items</span><?php elseif ($content_url !== ''): ?><a class="btn btn-sm btn-outline-secondary" href="<?= htmlspecialchars($content_url, ENT_QUOTES, 'UTF-8'); ?>"><span class="fas fa-edit me-1" aria-hidden="true"></span>Open element</a><?php else: ?><span class="badge bg-secondary">Legacy / archived</span><?php endif; ?>
                   </td>
                 </tr>
               <?php endforeach; endif; ?>

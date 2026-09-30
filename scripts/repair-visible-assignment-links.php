@@ -1,11 +1,11 @@
 <?php
 /**
- * Give every active visible assignment lesson its own canonical assignment.
- * Dry-run by default: php scripts/repair-visible-assignment-links.php --course=3078
- * Apply:              php scripts/repair-visible-assignment-links.php --course=3078 --apply
+ * Report duplicate canonical Homework claims for manual review.
+ * Automatic splitting is disabled because a reverse Assignment.item_id value
+ * cannot safely choose which Course Item owns existing student history.
  */
 require_once dirname(__DIR__) . '/connection/config.php';
-require_once dirname(__DIR__) . '/inc/CourseAssignmentLinks.php';
+require_once dirname(__DIR__) . '/inc/AssignmentIdentity.php';
 
 if (PHP_SAPI !== 'cli') {
     http_response_code(404);
@@ -32,12 +32,17 @@ $stmt = $conn->prepare(
 $stmt->bind_param('s', $courseId);
 $stmt->execute();
 $items = [];
+$conflicts = [];
 $result = $stmt->get_result();
 while ($item = $result->fetch_assoc()) {
-    $assignmentId = mmh_course_assignment_id($item);
-    $type = strtolower(trim((string) ($item['template_type'] ?? '')));
-    $legacyType = strtolower(trim((string) ($item['item_type'] ?? '')));
-    if ($assignmentId !== '' && (in_array($type, ['classified_assignment', 'assignment', 'homework'], true) || in_array($legacyType, ['quiz', 'assignment', 'homework'], true))) {
+    if (!mmh_assignment_identity_is_homework_item($item)) continue;
+    $identity = mmh_assignment_identity_for_item($conn, $item, true);
+    if (($identity['status'] ?? '') === 'DUPLICATE_CANONICAL_CLAIM') {
+        $conflicts[] = ['assignment_id' => (string) ($identity['canonical_assignment_id'] ?? ''), 'item_id' => (string) $item['item_id'], 'claimant_item_ids' => (array) ($identity['claimant_item_ids'] ?? [])];
+        continue;
+    }
+    $assignmentId = (string) ($identity['assignment_id'] ?? '');
+    if ($assignmentId !== '' && in_array((string) ($identity['status'] ?? ''), ['CLEAN', 'CONFLICT', 'LEGACY_FALLBACK'], true)) {
         $item['_assignment_id'] = $assignmentId;
         $items[] = $item;
     }
@@ -48,52 +53,17 @@ $groups = [];
 foreach ($items as $item) {
     $groups[$item['_assignment_id']][] = $item;
 }
-$repairs = [];
+$duplicateGroups = [];
 foreach ($groups as $assignmentId => $linkedItems) {
-    if (count($linkedItems) < 2) {
-        continue;
-    }
-    $owner = null;
-    $ownerStmt = $conn->prepare('SELECT item_id FROM assignments WHERE assignment_id = ? AND course_id = ? LIMIT 1');
-    $ownerStmt->bind_param('ss', $assignmentId, $courseId);
-    $ownerStmt->execute();
-    $owner = trim((string) ($ownerStmt->get_result()->fetch_assoc()['item_id'] ?? ''));
-    $ownerStmt->close();
-    foreach ($linkedItems as $index => $item) {
-        if ($owner !== '' && (string) $item['item_id'] === $owner) {
-            continue;
-        }
-        if ($owner === '' && $index === 0) {
-            continue;
-        }
-        $repairs[] = $item;
-    }
+    if (count($linkedItems) > 1) $duplicateGroups[$assignmentId] = array_map(static fn($item) => (string) $item['item_id'], $linkedItems);
 }
 
 echo 'visible_assignments=' . count($items) . PHP_EOL;
 echo 'distinct_assignment_ids=' . count($groups) . PHP_EOL;
-echo 'repairs=' . count($repairs) . PHP_EOL;
-foreach ($repairs as $item) {
-    echo ($apply ? 'repair' : 'would_repair') . ' item=' . $item['item_id'] . ' source_assignment=' . $item['_assignment_id'] . ' title=' . $item['item_title'] . PHP_EOL;
-}
-if (!$apply || !$repairs) {
-    exit(0);
-}
-
-try {
-    $conn->begin_transaction();
-    foreach ($repairs as $item) {
-        $oldId = (string) $item['_assignment_id'];
-        $newId = mmh_course_assignment_clone_for_item($conn, $courseId, $oldId, (string) $item['item_id'], (string) ($item['section_id'] ?? ''));
-        if ($newId === null) {
-            throw new RuntimeException('Source assignment ' . $oldId . ' was not found.');
-        }
-        mmh_course_assignment_relink_item($conn, $courseId, (string) $item['item_id'], $oldId, $newId);
-        echo 'relinked item=' . $item['item_id'] . ' assignment=' . $newId . PHP_EOL;
-    }
-    $conn->commit();
-} catch (Throwable $exception) {
-    $conn->rollback();
-    fwrite(STDERR, $exception->getMessage() . PHP_EOL);
-    exit(1);
+echo 'manual_review_conflicts=' . (count($conflicts) + count($duplicateGroups)) . PHP_EOL;
+foreach ($duplicateGroups as $assignmentId => $itemIds) echo 'duplicate_canonical_claim assignment=' . $assignmentId . ' items=' . implode(',', $itemIds) . PHP_EOL;
+foreach ($conflicts as $conflict) echo 'duplicate_canonical_claim assignment=' . $conflict['assignment_id'] . ' items=' . implode(',', $conflict['claimant_item_ids']) . PHP_EOL;
+if ($apply) {
+    fwrite(STDERR, "Automatic duplicate splitting is disabled; reverse item_id cannot select an owner. No writes were made.\n");
+    exit(3);
 }

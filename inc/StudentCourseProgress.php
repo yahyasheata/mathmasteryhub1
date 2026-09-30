@@ -9,6 +9,7 @@
 
 require_once __DIR__ . '/StudentCourseAccess.php';
 require_once __DIR__ . '/AssignmentProgress.php';
+require_once __DIR__ . '/AssignmentIdentity.php';
 
 if (!function_exists('student_course_progress_available')) {
     function student_course_progress_available(mysqli $conn)
@@ -114,7 +115,7 @@ if (!function_exists('student_course_progress_is_completed')) {
 }
 
 if (!function_exists('student_course_progress_item_depends_on_assessment')) {
-    function student_course_progress_item_depends_on_assessment(array $item)
+    function student_course_progress_item_depends_on_assessment(array $item, ?mysqli $conn = null)
     {
         $templateType = strtolower(trim((string) ($item['template_type'] ?? '')));
         $itemType = strtolower(trim((string) ($item['item_type'] ?? '')));
@@ -124,40 +125,37 @@ if (!function_exists('student_course_progress_item_depends_on_assessment')) {
         }
 
         $data = json_decode((string) ($item['template_data'] ?? ''), true);
-        if (is_array($data) && (
-            trim((string) ($data['assignment_id'] ?? '')) !== '' ||
-            trim((string) ($data['exam_id'] ?? '')) !== ''
-        )) {
+        if (is_array($data) && trim((string) ($data['exam_id'] ?? '')) !== '') {
             return true;
         }
-
-        return trim((string) ($item['assignment_id'] ?? '')) !== '';
+        if ($conn) {
+            $identity = mmh_assignment_identity_for_item($conn, $item, true);
+            return in_array((string) ($identity['status'] ?? ''), ['CLEAN', 'CONFLICT', 'LEGACY_FALLBACK', 'ORPHANED_CANONICAL', 'INVALID_CANONICAL', 'LOOKUP_ERROR', 'DUPLICATE_CANONICAL_CLAIM', 'AMBIGUOUS', 'CONFLICTING_LEGACY', 'COMPETING_CANONICAL_CLAIM'], true)
+                && (trim((string) ($item['assignment_id'] ?? '')) !== '' || (string) ($identity['assignment_id'] ?? '') !== '');
+        }
+        return mmh_course_assignment_canonical_id($item) !== '';
     }
 }
 
 if (!function_exists('student_course_progress_manual_completion_eligible')) {
-    function student_course_progress_manual_completion_eligible(array $item)
+    function student_course_progress_manual_completion_eligible(array $item, ?mysqli $conn = null)
     {
-        return !student_course_progress_item_depends_on_assessment($item);
+        return !student_course_progress_item_depends_on_assessment($item, $conn);
     }
 }
 
 if (!function_exists('student_course_progress_assignment_id')) {
-    function student_course_progress_assignment_id(array $item)
+    function student_course_progress_assignment_id(array $item, ?mysqli $conn = null)
     {
-        $assignmentId = trim((string) ($item['assignment_id'] ?? ''));
-        if ($assignmentId !== '') {
-            return $assignmentId;
-        }
-        $data = json_decode((string) ($item['template_data'] ?? ''), true);
-        return is_array($data) ? trim((string) ($data['assignment_id'] ?? '')) : '';
+        if ($conn) return mmh_assignment_identity_id($conn, $item, true);
+        return mmh_course_assignment_canonical_id($item);
     }
 }
 
 if (!function_exists('student_course_progress_assignment_state')) {
-    function student_course_progress_assignment_state(array $item, array $assignmentMap)
+    function student_course_progress_assignment_state(array $item, array $assignmentMap, ?mysqli $conn = null)
     {
-        $assignmentId = student_course_progress_assignment_id($item);
+        $assignmentId = student_course_progress_assignment_id($item, $conn);
         return $assignmentId !== '' && isset($assignmentMap[$assignmentId])
             ? ($assignmentMap[$assignmentId]['_state'] ?? null)
             : null;
@@ -165,7 +163,7 @@ if (!function_exists('student_course_progress_assignment_state')) {
 }
 
 if (!function_exists('student_course_progress_calculate')) {
-    function student_course_progress_calculate(array $accessibleItems, array $progressMap, array $assignmentMap = [])
+    function student_course_progress_calculate(array $accessibleItems, array $progressMap, array $assignmentMap = [], ?mysqli $conn = null)
     {
         $eligible = 0;
         $completed = 0;
@@ -181,7 +179,7 @@ if (!function_exists('student_course_progress_calculate')) {
                 $accessibleSections[$sectionId] = true;
             }
             $manualEligible = !empty($item['manual_eligible']);
-            $assignmentState = student_course_progress_assignment_state($item, $assignmentMap);
+            $assignmentState = student_course_progress_assignment_state($item, $assignmentMap, $conn);
             // Lesson-scoped requirements complete their linked lesson. Section
             // requirements are counted once below, not once per lesson card.
             $requiredAssignment = !empty($assignmentState['required'])
@@ -194,7 +192,7 @@ if (!function_exists('student_course_progress_calculate')) {
                 ? student_course_progress_is_completed($progressMap, $item['item_id'] ?? '')
                 : !empty($assignmentState['complete']);
             if ($requiredAssignment) {
-                $assignmentId = student_course_progress_assignment_id($item);
+                $assignmentId = student_course_progress_assignment_id($item, $conn);
                 if ($assignmentId !== '') {
                     $countedRequiredAssignments[$assignmentId] = true;
                 }

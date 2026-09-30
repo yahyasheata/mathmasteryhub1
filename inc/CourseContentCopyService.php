@@ -1,6 +1,8 @@
 <?php
 declare(strict_types=1);
 
+require_once __DIR__ . '/AssignmentIdentity.php';
+
 /**
  * Transactional, configuration-only copying for Course Content.
  *
@@ -160,12 +162,11 @@ final class CourseContentCopyService
         $order = $forcedOrder ?? self::nextItemOrder($conn, $destinationCourseId, $destinationSectionId);
         $maps['items'][$sourceItemId] = $newItemId;
         $warnings = [];
-        $assignmentId = trim((string) ($source['assignment_id'] ?? ''));
-        if ($assignmentId === '') {
-            $rawTemplate = is_string($source['template_data'] ?? null) ? json_decode((string) $source['template_data'], true) : null;
-            if (is_array($rawTemplate)) {
-                $assignmentId = trim((string) ($rawTemplate['assignment_id'] ?? ($rawTemplate['homework']['assignment_id'] ?? '')));
-            }
+        $identity = mmh_assignment_identity_for_item($conn, $source, true, true);
+        $assignmentId = (string) ($identity['assignment_id'] ?? '');
+        if (($identity['status'] ?? '') === 'AMBIGUOUS') {
+            $warnings[] = 'The source Homework has conflicting assignment links and was copied without an assignment definition.';
+            $assignmentId = '';
         }
         $newAssignmentId = null;
         if ($assignmentId !== '') {
@@ -177,12 +178,13 @@ final class CourseContentCopyService
 
         $template = strtolower(trim((string) ($source['template_type'] ?? $source['item_type'] ?? '')));
         $templateData = self::jsonRemap($source['template_data'] ?? null, $maps);
-        $metadata = self::jsonSanitize($source['metadata'] ?? null, $warnings);
+        $metadata = self::jsonRemap(self::jsonSanitize($source['metadata'] ?? null, $warnings), $maps);
         $copiedStatus = $template === 'timed_exam' ? 'draft' : (string) ($source['status'] ?? 'draft');
+        $description = self::remapAssignmentIdentityHtml((string) ($source['item_description'] ?? ''), $newAssignmentId);
         $values = [
             'item_id' => $newItemId,
             'item_title' => rtrim((string) ($source['item_title'] ?? '')) . ' (Copy)',
-            'item_description' => (string) ($source['item_description'] ?? ''),
+            'item_description' => $description,
             'item_type' => (string) ($source['item_type'] ?? 'file'),
             'section_id' => $destinationSectionId,
             'template_type' => $source['template_type'] ?? null,
@@ -361,7 +363,11 @@ final class CourseContentCopyService
         $walk = static function ($node) use (&$walk, $maps) {
             if (!is_array($node)) return $node;
             foreach ($node as $key => $child) {
-                if ($key === 'assignment_id' && isset($maps['assignments'][(string) $child])) $node[$key] = $maps['assignments'][(string) $child];
+                if ($key === 'assignment_id') {
+                    if (isset($maps['assignments'][(string) $child])) $node[$key] = $maps['assignments'][(string) $child];
+                    elseif (in_array((string) $child, array_map('strval', array_values($maps['assignments'] ?? [])), true)) $node[$key] = (string) $child;
+                    else unset($node[$key]);
+                }
                 elseif (in_array($key, ['item_id', 'recommended_item_id', 'recording_item_id', 'notes_item_id', 'revision_item_id'], true) && isset($maps['items'][(string) $child])) $node[$key] = $maps['items'][(string) $child];
                 elseif ($key === 'section_id' && isset($maps['sections'][(string) $child])) $node[$key] = $maps['sections'][(string) $child];
                 else $node[$key] = $walk($child);
@@ -370,6 +376,30 @@ final class CourseContentCopyService
         };
         $result = $walk($decoded);
         return json_encode($result, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE);
+    }
+
+    /** Never carry a source Assignment identity into a copy without its own definition. */
+    private static function remapAssignmentIdentityHtml(string $html, ?string $newAssignmentId): string
+    {
+        return preg_replace_callback('/<[^>]*>/s', static function (array $tagMatch) use ($newAssignmentId): string {
+            $tag = $tagMatch[0];
+            $hasAssignmentField = preg_match('/\bname\s*=\s*(["\'])assignment_id\1/i', $tag) === 1;
+            if ($newAssignmentId === null || $newAssignmentId === '') {
+                $tag = preg_replace('/\s+data-assignment-id\s*=\s*(["\'])[^"\']*\1/i', '', $tag) ?? $tag;
+                if ($hasAssignmentField) $tag = preg_replace('/\s+value\s*=\s*(["\'])[^"\']*\1/i', '', $tag) ?? $tag;
+                return $tag;
+            }
+            $safeId = htmlspecialchars($newAssignmentId, ENT_QUOTES, 'UTF-8');
+            $tag = preg_replace('/(\bdata-assignment-id\s*=\s*)(["\'])[^"\']*\2/i', '$1"' . $safeId . '"', $tag) ?? $tag;
+            if ($hasAssignmentField) {
+                if (preg_match('/\bvalue\s*=/i', $tag)) {
+                    $tag = preg_replace('/(\bvalue\s*=\s*)(["\'])[^"\']*\2/i', '$1"' . $safeId . '"', $tag, 1) ?? $tag;
+                } else {
+                    $tag = preg_replace('/>\s*$/', ' value="' . $safeId . '">', $tag) ?? $tag;
+                }
+            }
+            return $tag;
+        }, $html) ?? $html;
     }
 
     private static function jsonSanitize($value, array &$warnings): ?string

@@ -9,6 +9,7 @@ require_once 'inc/StudentCourseCsrf.php';
 require_once 'inc/StudentCourseProgress.php';
 require_once 'inc/StudentLearningJourney.php';
 require_once 'inc/AssignmentProgress.php';
+require_once 'inc/AssignmentIdentity.php';
 require_once 'inc/CourseResourceResolver.php';
 require_once 'inc/CourseHomeworkRenderer.php';
 require_once 'inc/TimedExam.php';
@@ -358,14 +359,15 @@ if ($coures_result && mysqli_num_rows($coures_result) > 0) {
     $template_data = student_course_template_data($courses_data['template_data'] ?? '');
     $lesson_section_id = !empty($courses_data['section_sid']) ? (string) $courses_data['section_sid'] : '';
     $section_key = $lesson_section_id !== '' ? $lesson_section_id : '__general__';
-    $raw_lesson_assignment_id = mmh_course_assignment_id($courses_data);
+    $lesson_assignment_identity = mmh_assignment_identity_for_item($conn, $courses_data, true);
+    $raw_lesson_assignment_id = (string) ($lesson_assignment_identity['assignment_id'] ?? '');
     $lesson_assignment_progress = $raw_lesson_assignment_id !== '' ? ($assignment_progress_map[$raw_lesson_assignment_id] ?? null) : null;
     $lesson_requirement_state = mmh_assignment_progress_item_state($assignment_progress_map, (string) ($courses_data['item_id'] ?? ''), $lesson_section_id);
     $resource_resolution = mmh_course_resource_resolve([
       'item_type' => $courses_data['item_type'] ?? '',
       'template_type' => $template_type,
       'template_data' => $courses_data['template_data'] ?? '',
-      'assignment_id' => $courses_data['assignment_id'] ?? '',
+      'assignment_id' => $raw_lesson_assignment_id,
       'item_description' => $courses_data['item_description'] ?? '',
       'item_title' => $courses_data['item_title'] ?? '',
       'metadata' => $courses_data['metadata'] ?? '',
@@ -432,10 +434,10 @@ if ($coures_result && mysqli_num_rows($coures_result) > 0) {
       'item_type' => $courses_data['item_type'] ?? '',
       'template_type' => $template_type,
       'template_data' => $courses_data['template_data'] ?? '',
-      'assignment_id' => $courses_data['assignment_id'] ?? '',
+      'assignment_id' => $raw_lesson_assignment_id,
       'duration_minutes' => $courses_data['duration_minutes'] ?? null,
     ];
-    $lesson_manual_eligible = $lesson_progress_available && student_course_progress_manual_completion_eligible($lesson_progress_item);
+    $lesson_manual_eligible = $lesson_progress_available && student_course_progress_manual_completion_eligible($lesson_progress_item, $conn);
     $lesson_assignment_complete = !empty($lesson_requirement_state['has_requirements']) && !empty($lesson_requirement_state['complete']);
     $lesson_completed = !empty($learning_journey_item_map[$lesson_progress_item['item_id']]['is_completed']) || $lesson_assignment_complete;
     $lesson_completion_action = '';
@@ -996,6 +998,8 @@ if ($course_access_allowed) {
       <div class="modal-body">
         <form id="assignmentSubmissionForm" action="" enctype="multipart/form-data">
           <input type="hidden" name="assignment_id" id="modalAssignmentId">
+          <input type="hidden" name="course_id" value="<?=student_course_html($course_id);?>">
+          <input type="hidden" name="course_item_id" id="modalCourseItemId">
           <input type="hidden" name="csrf_token" value="<?=student_course_html($student_course_csrf_token);?>">
           <div class="mb-3 d-none" data-self-score-wrap>
             <label for="assignmentSelfScore" class="form-label" id="assignmentSelfScoreLabel">My score</label>
@@ -1021,7 +1025,11 @@ document.addEventListener('DOMContentLoaded', function () {
   var assignmentModal = new bootstrap.Modal(document.getElementById('assignmentModal'));
   document.querySelectorAll('.show-assignment').forEach(function(btn) {
     btn.addEventListener('click', function() {
-      var assignmentId = this.getAttribute('data-assignment-id');
+      var lessonCard = this.closest('[data-course-item-id]');
+      if (!lessonCard) return;
+      // The card's server-resolved relationship is the only UI hint. Legacy
+      // HTML data-assignment-id values may be stale and are not consulted.
+      var assignmentId = lessonCard.getAttribute('data-learning-assignment-id') || '';
       var allowSelfScore = this.getAttribute('data-allow-self-score') === '1';
       var maxScore = this.getAttribute('data-max-score');
       var scoreMode = this.getAttribute('data-score-mode') || (allowSelfScore ? 'require_teacher_verification' : 'disabled');
@@ -1032,6 +1040,7 @@ document.addEventListener('DOMContentLoaded', function () {
       var selfScoreError = document.getElementById('assignmentSelfScoreError');
       document.getElementById('assignmentSubmissionForm').reset();
       document.getElementById('modalAssignmentId').value = assignmentId;
+      document.getElementById('modalCourseItemId').value = lessonCard.getAttribute('data-course-item-id') || '';
       document.getElementById('assignmentSubmissionMsg').innerHTML = '';
       if (selfScoreError) {
         selfScoreError.textContent = '';

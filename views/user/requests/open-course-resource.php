@@ -125,7 +125,7 @@ function course_resource_render_viewer(mysqli $conn, $baseUrl, $userId, array $c
     $isCompleted = !empty($journeyItem['is_completed']);
     $completionLabel = $isCompleted ? 'Completed' : 'Not completed';
     $completionIcon = $isCompleted ? 'fas fa-check-circle' : 'far fa-circle';
-    $manualCompletion = !$isCompleted && student_course_progress_manual_completion_eligible($selection['item']);
+    $manualCompletion = !$isCompleted && student_course_progress_manual_completion_eligible($selection['item'], $conn);
 
     // External recordings record the truthful event when the student clicks
     // Open Recording below. Embedded resources keep their existing open event
@@ -251,7 +251,7 @@ function course_resource_open_homework_part(mysqli $conn, $baseUrl, $userId, arr
     $gatewayContext = $gatewayContext ?: (is_array($planContext['_gateway_context'] ?? null) ? $planContext['_gateway_context'] : null);
     $assignmentId = trim((string) ($resource['assignment_id'] ?? ''));
     $assignment = mmh_homework_assignment($conn, $assignmentId, (string) $course['course_id']);
-    if (!$assignment || !student_course_access_assignment_matches_item($assignment, $selection['item'])) {
+    if (!$assignment || !student_course_access_assignment_matches_item($conn, $assignment, $selection['item'])) {
         course_resource_notice(404, 'Homework unavailable', 'This homework is no longer linked to this lesson.', $course['course_id']);
     }
     $submissions = mmh_assignment_progress_latest_submissions($conn, (int) $userId, (string) $course['course_id']);

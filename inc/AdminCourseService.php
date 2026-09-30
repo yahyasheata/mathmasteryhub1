@@ -1,5 +1,6 @@
 <?php
 /** Canonical admin mutations for course ownership and visibility. */
+require_once __DIR__ . '/AssignmentIdentity.php';
 if (!function_exists('mmh_admin_course_archive')) {
     function mmh_admin_course_archive(mysqli $conn, int $courseId): void
     {
@@ -89,8 +90,23 @@ if (!function_exists('mmh_admin_course_item_has_activity')) {
         if ($tableExists('student_learning_evidence') && $hasColumns('student_learning_evidence', ['course_id', 'item_id']) && $hasRows('SELECT COUNT(*) AS total FROM student_learning_evidence WHERE course_id = ? AND item_id = ?', 'ss', [$courseId, $itemId])) return true;
         if ($tableExists('timed_exams') && $hasRows('SELECT COUNT(*) AS total FROM timed_exams WHERE course_id = ? AND item_id = ?', 'ss', [$courseId, $itemId])) return true;
         if ($tableExists('timed_exams') && $tableExists('timed_exam_attempts') && $hasRows('SELECT COUNT(*) AS total FROM timed_exam_attempts a INNER JOIN timed_exams e ON e.id = a.timed_exam_id WHERE e.course_id = ? AND e.item_id = ?', 'ss', [$courseId, $itemId])) return true;
-        if ($tableExists('assignments') && $hasRows('SELECT COUNT(*) AS total FROM assignments WHERE course_id = ? AND item_id = ?', 'ss', [$courseId, $itemId])) return true;
-        if ($tableExists('assignments') && $tableExists('assignment_submissions') && $hasRows('SELECT COUNT(*) AS total FROM assignment_submissions s INNER JOIN assignments a ON a.assignment_id = s.assignment_id WHERE a.course_id = ? AND a.item_id = ?', 'ss', [$courseId, $itemId])) return true;
+        if ($tableExists('assignments')) {
+            $itemStmt = $conn->prepare('SELECT * FROM course_items WHERE course_id = ? AND item_id = ? LIMIT 1');
+            if ($itemStmt) {
+                $itemStmt->bind_param('ss', $courseId, $itemId);
+                $itemStmt->execute();
+                $item = $itemStmt->get_result()->fetch_assoc() ?: null;
+                $itemStmt->close();
+                if ($item) {
+                    $identity = mmh_assignment_identity_for_item($conn, $item, true);
+                    $assignmentId = (string) ($identity['assignment_id'] ?? '');
+                    if (in_array((string) ($identity['status'] ?? ''), ['CLEAN', 'CONFLICT', 'LEGACY_FALLBACK'], true) && $assignmentId !== '') {
+                        if ($hasRows('SELECT COUNT(*) AS total FROM assignments WHERE course_id = ? AND assignment_id = ?', 'ss', [$courseId, $assignmentId])) return true;
+                        if ($tableExists('assignment_submissions') && $hasRows('SELECT COUNT(*) AS total FROM assignment_submissions WHERE assignment_id = ?', 's', [$assignmentId])) return true;
+                    }
+                }
+            }
+        }
         if ($tableExists('revision_plan_template_requirements') && $tableExists('revision_plan_template_days') && $tableExists('revision_plan_template_batches') && $tableExists('revision_plan_template_versions') && $tableExists('revision_plan_templates') && $hasRows('SELECT COUNT(*) AS total FROM revision_plan_template_requirements r INNER JOIN revision_plan_template_versions v ON v.id = r.version_id INNER JOIN revision_plan_templates t ON t.id = v.template_id WHERE t.course_id = ? AND r.linked_course_item_id = ?', 'ss', [$courseId, $itemId])) return true;
         return false;
     }

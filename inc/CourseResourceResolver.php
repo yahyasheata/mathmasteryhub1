@@ -151,42 +151,27 @@ if (!function_exists('mmh_course_resource_template_data')) {
     }
 }
 
-if (!function_exists('mmh_course_assignment_links')) {
+if (!function_exists('mmh_course_assignment_canonical_id')) {
     /**
-     * Return every explicit, supported assignment relationship on a course
-     * item. Arbitrary numbers in prose are deliberately ignored.
+     * The authoritative Course Item -> Assignment link.
+     *
+     * Legacy JSON/HTML references are intentionally not consulted here. They
+     * are inspected only by the centralized Assignment identity compatibility
+     * resolver, so normal readers have one writable source of truth.
      */
-    function mmh_course_assignment_links(array $item): array
+    function mmh_course_assignment_canonical_id(array $item): string
     {
-        $data = mmh_course_resource_template_data($item['template_data'] ?? '');
-        $candidates = [
-            'course_items.assignment_id' => $item['assignment_id'] ?? '',
-            'template_data.assignment_id' => $data['assignment_id'] ?? '',
-            'template_data.assignment.assignment_id' => $data['assignment']['assignment_id'] ?? '',
-            'template_data.homework_resource.assignment_id' => $data['homework_resource']['assignment_id'] ?? '',
-            'template_data.resource.assignment_id' => $data['resource']['assignment_id'] ?? '',
-        ];
-        $links = [];
-        foreach ($candidates as $source => $candidate) {
-            $candidate = trim((string) $candidate);
-            if ($candidate !== '' && strlen($candidate) <= 40 && preg_match('/\A[A-Za-z0-9_-]+\z/', $candidate)) {
-                $links[$candidate][] = $source;
-            }
-        }
-        if (preg_match_all('/\bdata-assignment-id\s*=\s*(["\'])\s*([A-Za-z0-9_-]{1,40})\s*\1/i', (string) ($item['item_description'] ?? ''), $matches)) {
-            foreach ($matches[2] as $candidate) {
-                $links[(string) $candidate][] = 'legacy_html.data-assignment-id';
-            }
-        }
-        return $links;
+        $candidate = trim((string) ($item['assignment_id'] ?? ''));
+        return $candidate !== '' && strlen($candidate) <= 40 && preg_match('/\A[A-Za-z0-9_-]+\z/', $candidate)
+            ? $candidate
+            : '';
     }
 }
 
 if (!function_exists('mmh_course_assignment_id')) {
     function mmh_course_assignment_id(array $item): string
     {
-        $links = mmh_course_assignment_links($item);
-        return $links ? (string) array_key_first($links) : '';
+        return mmh_course_assignment_canonical_id($item);
     }
 }
 

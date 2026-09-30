@@ -14,6 +14,7 @@ require_once __DIR__ . '/RecoveryPlan.php';
 require_once __DIR__ . '/TimedExam.php';
 require_once __DIR__ . '/AssignmentModelAnswerAccess.php';
 require_once __DIR__ . '/RevisionPlan.php';
+require_once __DIR__ . '/AssignmentIdentity.php';
 
 if (!function_exists('mmh_student_resource_url')) {
     /** Build the one canonical authenticated course-item URL. */
@@ -157,6 +158,22 @@ if (!function_exists('mmh_student_resource_gateway')) {
             return mmh_student_resource_denial(403, 'This resource is not available yet.', $studentId, $course);
         }
 
+        // Resolve the Course Item's Assignment identity once at the
+        // authenticated boundary. Legacy references are read-only fallbacks;
+        // opening a resource must never repair or rewrite course structure.
+        $assignmentIdentity = mmh_assignment_identity_for_item($conn, $item, true);
+        $identityStatus = (string) ($assignmentIdentity['status'] ?? 'UNRESOLVED');
+        $resolvedAssignmentId = (string) ($assignmentIdentity['assignment_id'] ?? '');
+        if (mmh_assignment_identity_is_homework_item($item)
+            && (!in_array($identityStatus, ['CLEAN', 'CONFLICT', 'LEGACY_FALLBACK'], true) || $resolvedAssignmentId === '')) {
+            return mmh_student_resource_denial(409, 'This Homework resource has an invalid or conflicting Assignment relationship.', $studentId, $course);
+        }
+        // Downstream resource, progress, and Learning Journey helpers receive
+        // only the validated canonical result; stale JSON/HTML cannot leak
+        // back into a later identity decision.
+        $item['assignment_id'] = $resolvedAssignmentId;
+        $selection['item'] = $item;
+
         $requestedPlanId = (int) ($options['recovery_plan_id'] ?? $options['plan_id'] ?? 0);
         $requestedTaskId = (int) ($options['recovery_task_id'] ?? $options['task_id'] ?? 0);
         if (($requestedPlanId > 0) !== ($requestedTaskId > 0)) {
@@ -190,7 +207,7 @@ if (!function_exists('mmh_student_resource_gateway')) {
             return mmh_student_resource_denial(404, 'This Homework resource could not be found.', $studentId, $course);
         }
         if ($homeworkPart === 'model-answer') {
-            $assignmentId = mmh_course_assignment_id($item);
+            $assignmentId = $resolvedAssignmentId;
             if ($assignmentId === '' || !mmh_assignment_model_answer_access_can($conn, $assignmentId, $canonicalCourseId, $studentId)) {
                 return mmh_student_resource_denial(403, 'This Model Answer is not available for your account.', $studentId, $course);
             }
@@ -201,7 +218,7 @@ if (!function_exists('mmh_student_resource_gateway')) {
         $navigation['context'] = !empty($recoveryContext['valid']) ? 'recovery_plan' : 'normal_course';
         $courseState = mmh_course_state($course);
 
-        $assignmentId = mmh_course_assignment_id($item);
+        $assignmentId = $resolvedAssignmentId;
         $journeyKind = mmh_learning_journey_item_kind($item);
         $completion = [
             'kind' => $journeyKind,

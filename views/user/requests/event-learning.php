@@ -125,7 +125,7 @@ try {
         if ($assignmentId !== '') {
             $assignment = student_course_access_assignment($conn, $assignmentId);
             if (!$assignment || (string) $assignment['course_id'] !== $courseId
-                || !student_course_access_assignment_matches_item($assignment, $item)) {
+                || !student_course_access_assignment_matches_item($conn, $assignment, $item)) {
                 learning_event_response(false, 'The assignment context is unavailable.', [], 403);
             }
         }

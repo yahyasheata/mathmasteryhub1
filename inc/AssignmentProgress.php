@@ -9,7 +9,7 @@
  */
 require_once __DIR__ . '/learning_schema.php';
 require_once __DIR__ . '/CourseResourceResolver.php';
-require_once __DIR__ . '/CourseAssignmentLinks.php';
+require_once __DIR__ . '/AssignmentIdentity.php';
 
 if (!function_exists('mmh_assignment_progress_id')) {
     function mmh_assignment_progress_id($value, $maxLength = 40)
@@ -193,92 +193,7 @@ if (!function_exists('mmh_assignment_progress_latest_submissions')) {
     }
 }
 
-if (!function_exists('mmh_assignment_progress_decode_template_data')) {
-    function mmh_assignment_progress_decode_template_data($value)
-    {
-        $data = json_decode((string) $value, true);
-        return is_array($data) ? $data : [];
-    }
-}
-
-if (!function_exists('mmh_assignment_progress_legacy_assignment_ids')) {
-    function mmh_assignment_progress_legacy_assignment_ids($html)
-    {
-        $html = (string) $html;
-        if ($html === '' || stripos($html, 'show-assignment') === false) {
-            return [];
-        }
-        preg_match_all('/\bdata-assignment-id\s*=\s*(["\'])\s*([A-Za-z0-9_-]{1,40})\s*\1/i', $html, $matches);
-        $ids = [];
-        foreach ($matches[2] ?? [] as $candidate) {
-            $assignmentId = mmh_assignment_progress_id($candidate);
-            if ($assignmentId !== null) {
-                $ids[$assignmentId] = true;
-            }
-        }
-        return array_keys($ids);
-    }
-}
-
 if (!function_exists('mmh_assignment_progress_course_sources')) {
-    function mmh_assignment_progress_repair_duplicate_sources(mysqli $conn, $courseId, array $items): void
-    {
-        $groups = [];
-        foreach ($items as $item) {
-            $assignmentId = mmh_course_assignment_id($item);
-            $templateType = strtolower(trim((string) ($item['template_type'] ?? '')));
-            $itemType = strtolower(trim((string) ($item['item_type'] ?? '')));
-            if ($assignmentId === '' || !(in_array($templateType, ['classified_assignment', 'assignment', 'homework'], true) || in_array($itemType, ['quiz', 'assignment', 'homework'], true))) {
-                continue;
-            }
-            $groups[$assignmentId][] = $item;
-        }
-        $duplicates = array_filter($groups, static fn(array $group): bool => count($group) > 1);
-        if (!$duplicates) {
-            return;
-        }
-
-        $conn->begin_transaction();
-        try {
-            foreach ($duplicates as $sourceAssignmentId => $group) {
-                $ownerStmt = $conn->prepare('SELECT item_id FROM assignments WHERE assignment_id = ? AND course_id = ? LIMIT 1 FOR UPDATE');
-                $ownerStmt->bind_param('ss', $sourceAssignmentId, $courseId);
-                $ownerStmt->execute();
-                $owner = trim((string) ($ownerStmt->get_result()->fetch_assoc()['item_id'] ?? ''));
-                $ownerStmt->close();
-                $ownerKept = false;
-                foreach ($group as $item) {
-                    $itemId = (string) ($item['item_id'] ?? '');
-                    if ($itemId === '') {
-                        continue;
-                    }
-                    $currentStmt = $conn->prepare('SELECT assignment_id FROM course_items WHERE course_id = ? AND item_id = ? LIMIT 1 FOR UPDATE');
-                    $currentStmt->bind_param('ss', $courseId, $itemId);
-                    $currentStmt->execute();
-                    $currentId = trim((string) ($currentStmt->get_result()->fetch_assoc()['assignment_id'] ?? ''));
-                    $currentStmt->close();
-                    if ($currentId !== $sourceAssignmentId) {
-                        continue;
-                    }
-                    if (($owner !== '' && $itemId === $owner) || ($owner === '' && !$ownerKept)) {
-                        $ownerKept = true;
-                        continue;
-                    }
-                    $sectionId = (string) ($item['section_id'] ?? '');
-                    $newId = mmh_course_assignment_clone_for_item($conn, (string) $courseId, $sourceAssignmentId, $itemId, $sectionId);
-                    if ($newId === null) {
-                        throw new RuntimeException('Unable to clone visible assignment ' . $sourceAssignmentId . '.');
-                    }
-                    mmh_course_assignment_relink_item($conn, (string) $courseId, $itemId, $sourceAssignmentId, $newId);
-                }
-            }
-            $conn->commit();
-        } catch (Throwable $exception) {
-            $conn->rollback();
-            throw $exception;
-        }
-    }
-
     function mmh_assignment_progress_course_sources(mysqli $conn, $courseId)
     {
         $courseId = mmh_assignment_progress_id($courseId);
@@ -310,6 +225,7 @@ if (!function_exists('mmh_assignment_progress_course_sources')) {
         $items = [];
         $visibleRows = [];
         $assignmentSources = [];
+        $identityConflicts = [];
         if ($stmt->execute()) {
             $result = $stmt->get_result();
             while ($item = $result->fetch_assoc()) {
@@ -318,15 +234,13 @@ if (!function_exists('mmh_assignment_progress_course_sources')) {
                     continue;
                 }
 
+                $identity = mmh_assignment_identity_for_item($conn, $item, true);
+                $item['_assignment_identity'] = $identity;
                 $visibleRows[] = $item;
             }
         }
         $stmt->close();
 
-        // Production courses may contain copied homework cards that still
-        // point at the source assignment. Repair those relationships from the
-        // visible course structure before building the student list.
-        mmh_assignment_progress_repair_duplicate_sources($conn, $courseId, $visibleRows);
         foreach ($visibleRows as $item) {
                 $itemId = mmh_assignment_progress_id($item['item_id'] ?? '');
                 if ($itemId === null) {
@@ -347,23 +261,40 @@ if (!function_exists('mmh_assignment_progress_course_sources')) {
 
                 $templateType = strtolower(trim((string) ($item['template_type'] ?? '')));
                 $itemType = strtolower(trim((string) ($item['item_type'] ?? '')));
-                $assignmentLinks = mmh_course_assignment_links($item);
+                $identity = $item['_assignment_identity'] ?? mmh_assignment_identity_for_item($conn, $item, true);
+                $assignmentId = (string) ($identity['assignment_id'] ?? '');
+                if (($identity['status'] ?? '') === 'DUPLICATE_CANONICAL_CLAIM') {
+                    $claimants = array_map('strval', (array) ($identity['claimant_item_ids'] ?? []));
+                    $identityConflicts[(string) ($identity['canonical_assignment_id'] ?? '')] = [
+                        'status' => 'DUPLICATE_CANONICAL_CLAIM',
+                        'assignment_id' => (string) ($identity['canonical_assignment_id'] ?? ''),
+                        'item_ids' => $claimants,
+                    ];
+                }
                 $isAssignmentItem = in_array($templateType, ['classified_assignment', 'assignment', 'homework', 'exam'], true)
                     || in_array($itemType, ['quiz', 'assignment', 'homework'], true)
-                    || !empty($assignmentLinks);
+                    || $assignmentId !== '';
 
                 if (!$isAssignmentItem) {
                     continue;
                 }
 
-                foreach (array_keys($assignmentLinks) as $assignmentId) {
-                    if (!isset($assignmentSources[$assignmentId])) {
+                if ($assignmentId !== '' && in_array((string) ($identity['status'] ?? ''), ['CLEAN', 'CONFLICT', 'LEGACY_FALLBACK'], true)) {
+                    if (isset($identityConflicts[$assignmentId])) continue;
+                    if (isset($assignmentSources[$assignmentId])) {
+                        $identityConflicts[$assignmentId] = [
+                            'status' => 'DUPLICATE_CANONICAL_CLAIM',
+                            'assignment_id' => $assignmentId,
+                            'item_ids' => [(string) $assignmentSources[$assignmentId]['item_id'], $itemId],
+                        ];
+                        unset($assignmentSources[$assignmentId]);
+                    } else {
                         $assignmentSources[$assignmentId] = $source;
                     }
                 }
         }
 
-        return ['items' => $items, 'assignments' => $assignmentSources];
+        return ['items' => $items, 'assignments' => $assignmentSources, 'conflicts' => array_values($identityConflicts)];
     }
 }
 
@@ -529,11 +460,10 @@ if (!function_exists('mmh_assignment_progress_load_course')) {
             return [];
         }
         $sources = mmh_assignment_progress_course_sources($conn, $courseId);
-        $activeItems = $sources['items'];
         $assignmentSources = $sources['assignments'];
         $stmt = $conn->prepare(
             "SELECT a.assignment_id, a.assignment_title, a.assignment_description, a.due_date, a.late_submission_enabled, a.late_submission_until,
-                    a.file_path, a.course_id, a.section_id, a.item_id, a.max_score, a.passing_score, a.allow_self_score,
+                    a.file_path, a.course_id, a.section_id, a.max_score, a.passing_score, a.allow_self_score,
                     a.require_teacher_verification, a.completion_requirement, a.completion_rule, a.minimum_score, a.id
              FROM assignments AS a
              WHERE a.course_id = ?
@@ -548,23 +478,19 @@ if (!function_exists('mmh_assignment_progress_load_course')) {
             $result = $stmt->get_result();
             while ($row = $result->fetch_assoc()) {
                 $assignmentId = (string) $row['assignment_id'];
-                $source = null;
-                $itemId = mmh_assignment_progress_id($row['item_id'] ?? '');
-                if ($itemId !== null && isset($activeItems[$itemId])) {
-                    $source = $activeItems[$itemId];
-                } elseif (isset($assignmentSources[$assignmentId])) {
-                    $source = $assignmentSources[$assignmentId];
-                }
+                // The Course Item projection is authoritative. The
+                // assignments.item_id column remains a compatibility index,
+                // so it must not independently attach an assignment to a
+                // visible item when the identity resolver found no safe link.
+                $source = $assignmentSources[$assignmentId] ?? null;
                 if ($source === null) {
                     continue;
                 }
 
-                if (trim((string) ($row['item_id'] ?? '')) === '') {
-                    $row['item_id'] = $source['item_id'];
-                }
-                if (trim((string) ($row['section_id'] ?? '')) === '') {
-                    $row['section_id'] = $source['section_id'];
-                }
+                // Item/section context comes from the canonical Course Item,
+                // never the legacy reverse index on assignments.
+                $row['item_id'] = $source['item_id'];
+                $row['section_id'] = $source['section_id'];
                 $row['_source_item_id'] = $source['item_id'];
                 $row['_source_section_id'] = $source['section_id'];
                 $row['_source_item_title'] = $source['item_title'];

@@ -7,6 +7,7 @@ require_once __DIR__ . '/SchemaMigration.php';
 require_once __DIR__ . '/CourseResourceResolver.php';
 require_once __DIR__ . '/Auth.php';
 require_once __DIR__ . '/StudentLearningJourney.php';
+require_once __DIR__ . '/AssignmentIdentity.php';
 
 function mmh_parent_report_ensure_schema(mysqli $conn): void
 {
@@ -576,8 +577,21 @@ function mmh_report_resolve(mysqli $conn, string $courseId, int $studentId, stri
         if ($itemKey !== '' && !isset($opened[$itemKey])) { $opened[$itemKey] = ''; }
     }
 
-    $assignmentStmt = $conn->prepare("SELECT a.*, i.section_id AS item_section_id FROM assignments a LEFT JOIN course_items i ON i.course_id = a.course_id AND i.item_id = a.item_id WHERE a.course_id = ? AND (a.item_id IS NULL OR a.item_id = '' OR i.status = 'published') ORDER BY a.due_date ASC, a.id ASC");
+    $assignmentStmt = $conn->prepare('SELECT a.* FROM assignments a WHERE a.course_id = ? ORDER BY a.due_date ASC, a.id ASC');
     $assignmentStmt->bind_param('s', $courseId); $assignmentStmt->execute(); $allAssignments = $assignmentStmt->get_result()->fetch_all(MYSQLI_ASSOC); $assignmentStmt->close();
+    foreach ($allAssignments as $index => $assignment) {
+        $context = mmh_assignment_identity_item_for_assignment($conn, $courseId, (string) ($assignment['assignment_id'] ?? ''), false);
+        if (($context['status'] ?? '') === 'FOUND' && is_array($context['item'] ?? null)) {
+            $item = $context['item'];
+            if (!student_course_access_item_is_active($item)) { unset($allAssignments[$index]); continue; }
+            $allAssignments[$index]['_course_item_id'] = (string) ($item['item_id'] ?? '');
+            $allAssignments[$index]['_resolved_section_id'] = (string) ($item['section_id'] ?? '');
+        } else {
+            $allAssignments[$index]['_course_item_id'] = '';
+            $allAssignments[$index]['_resolved_section_id'] = (string) ($assignment['section_id'] ?? '');
+        }
+    }
+    $allAssignments = array_values($allAssignments);
     $submissionStmt = $conn->prepare('SELECT s.* FROM assignment_submissions s INNER JOIN assignments a ON a.assignment_id = s.assignment_id WHERE s.student_id = ? AND a.course_id = ? ORDER BY s.submitted_at DESC, s.id DESC');
     $submissionStmt->bind_param('is', $studentId, $courseId); $submissionStmt->execute(); $submissionRows = $submissionStmt->get_result()->fetch_all(MYSQLI_ASSOC); $submissionStmt->close();
     $submissions = []; foreach ($submissionRows as $row) { $submissions[(string) $row['assignment_id']] ??= $row; }
@@ -593,7 +607,7 @@ function mmh_report_resolve(mysqli $conn, string $courseId, int $studentId, stri
     foreach ($allAssignments as $assignment) {
         $dueDate = trim((string) ($assignment['due_date'] ?? ''));
         if ($dueDate !== '' && strtotime($dueDate) !== false && strtotime($dueDate) > time()) { continue; }
-        $assignmentSection = trim((string) ($assignment['section_id'] ?? '')) ?: trim((string) ($assignment['item_section_id'] ?? ''));
+        $assignmentSection = trim((string) ($assignment['_resolved_section_id'] ?? ''));
         if ($assignmentSection === '') { $unresolvedHomework++; continue; }
         if (isset($sectionSet[$assignmentSection])) {
             $assignmentKey = mmh_learning_journey_entity_key('homework', '', (string) $assignment['assignment_id']);
@@ -628,7 +642,7 @@ function mmh_report_resolve(mysqli $conn, string $courseId, int $studentId, stri
     if ($minOrder !== null) foreach ($allAssignments as $assignment) {
         $dueDate = trim((string) ($assignment['due_date'] ?? ''));
         if ($dueDate !== '' && strtotime($dueDate) !== false && strtotime($dueDate) > time()) { continue; }
-        $sectionId = trim((string) ($assignment['section_id'] ?? '')) ?: trim((string) ($assignment['item_section_id'] ?? ''));
+        $sectionId = trim((string) ($assignment['_resolved_section_id'] ?? ''));
         if ($sectionId === '' || !isset($sectionMeta[$sectionId]) || (int) $sectionMeta[$sectionId]['sort_order'] >= $minOrder || isset($submissions[(string) $assignment['assignment_id']])) { continue; }
         $outstanding[] = ['title' => $assignment['assignment_title'], 'section_title' => $sectionMeta[$sectionId]['title'], 'due_date' => (string) ($assignment['due_date'] ?? '')];
     }
@@ -687,11 +701,11 @@ function mmh_report_student_summary(array $report): array
             else { $status = ['key' => 'awaiting_grading', 'label' => 'Awaiting Grading']; $homeworkSubmitted++; $homeworkAwaiting++; }
             if ($submitted && $status['key'] === 'graded') { $homeworkSubmitted++; }
             $assignment = $homework['assignment'] ?? [];
-            $homeworkRows[] = ['assignment_id' => (string) ($assignment['assignment_id'] ?? ''), 'item_id' => (string) ($assignment['item_id'] ?? ''), 'title' => (string) ($assignment['assignment_title'] ?? ''), 'status' => $status, 'submitted_at' => (string) ($state['submitted_at'] ?? ''), 'grade' => $grade === '' || $grade === 'Grade not entered' ? '' : $grade, 'feedback' => (string) ($state['feedback'] ?? '')];
+            $homeworkRows[] = ['assignment_id' => (string) ($assignment['assignment_id'] ?? ''), 'item_id' => (string) ($assignment['_course_item_id'] ?? ''), 'title' => (string) ($assignment['assignment_title'] ?? ''), 'status' => $status, 'submitted_at' => (string) ($state['submitted_at'] ?? ''), 'grade' => $grade === '' || $grade === 'Grade not entered' ? '' : $grade, 'feedback' => (string) ($state['feedback'] ?? '')];
             if (!$submitted) {
                 $weak[$sectionId] ??= ['section_id' => $sectionId, 'section_title' => (string) $section['title'], 'reasons' => [], 'actions' => []];
                 $weak[$sectionId]['reasons'][] = 'Homework missing';
-                if ((string) ($assignment['item_id'] ?? '') !== '') { $weak[$sectionId]['actions'][] = ['type' => 'homework', 'item_id' => (string) $assignment['item_id'], 'label' => 'Open Homework']; }
+                if ((string) ($assignment['_course_item_id'] ?? '') !== '') { $weak[$sectionId]['actions'][] = ['type' => 'homework', 'item_id' => (string) $assignment['_course_item_id'], 'label' => 'Open Homework']; }
             }
             if ($grade !== '' && $grade !== 'Grade not entered' && preg_match('/^\s*(\d+(?:\.\d+)?)\s*\/\s*(\d+(?:\.\d+)?)/', $grade, $match) && (float) $match[2] > 0) { $gradeTotal += ((float) $match[1] / (float) $match[2]) * 10; $gradeCount++; }
         }

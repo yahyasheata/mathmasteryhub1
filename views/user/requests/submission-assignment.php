@@ -30,14 +30,14 @@ if (empty($_SESSION['username'])) {
 if (!student_course_csrf_valid($_POST['csrf_token'] ?? null)) {
     assignment_submission_response(false, 'Your session has expired. Please refresh the course and try again.', [], 403);
 }
-if (empty($_POST['assignment_id']) || (empty($_FILES['submission_files']) && empty($_FILES['submission_file']))) {
+if (empty($_POST['assignment_id']) || empty($_POST['course_id']) || empty($_POST['course_item_id']) || (empty($_FILES['submission_files']) && empty($_FILES['submission_file']))) {
     assignment_submission_response(false, 'The data is incomplete.', [], 422);
 }
 
 $assignmentId = student_course_access_identifier($_POST['assignment_id'], 40);
-if ($assignmentId === null) {
-    assignment_submission_response(false, 'Invalid assignment reference.', [], 422);
-}
+$requestedCourseId = student_course_access_identifier($_POST['course_id'], 40);
+$courseItemId = student_course_access_identifier($_POST['course_item_id'], 40);
+if ($assignmentId === null || $requestedCourseId === null || $courseItemId === null) assignment_submission_response(false, 'Invalid assignment reference.', [], 422);
 
 try {
     $conn = db();
@@ -48,20 +48,31 @@ try {
         assignment_submission_response(false, 'Your account is unavailable.', [], 403);
     }
 
-    $assignment = student_course_access_assignment($conn, $assignmentId);
-    if (!$assignment) {
-        assignment_submission_response(false, 'The requested assignment was not found.', [], 404);
-    }
-    $course = student_course_access_course($conn, $assignment['course_id'] ?? '');
-    if (!$course || (string) $course['course_id'] !== (string) $assignment['course_id']) {
+    $course = student_course_access_authorized_course($conn, $studentId, $requestedCourseId);
+    if (!$course) {
         assignment_submission_response(false, 'This assignment is unavailable.', [], 403);
     }
     $courseId = (string) $course['course_id'];
-    if (!student_course_access_enrolled($conn, $studentId, $courseId)) {
-        assignment_submission_response(false, 'You are not enrolled in this course.', [], 403);
+    $assignmentItem = student_course_access_item($conn, $courseId, $courseItemId);
+    if (!$assignmentItem || !mmh_assignment_identity_is_homework_item($assignmentItem)) {
+        assignment_submission_response(false, 'This assignment lesson is unavailable.', [], 403);
+    }
+    $identity = mmh_assignment_identity_for_item($conn, $assignmentItem, true);
+    if (!in_array((string) ($identity['status'] ?? ''), ['CLEAN', 'CONFLICT', 'LEGACY_FALLBACK'], true)
+        || (string) ($identity['assignment_id'] ?? '') === '') {
+        assignment_submission_response(false, 'This assignment relationship is unavailable.', [], 403);
+    }
+    $canonicalAssignmentId = (string) $identity['assignment_id'];
+    if (!hash_equals($canonicalAssignmentId, $assignmentId)) {
+        assignment_submission_response(false, 'The submitted assignment no longer matches this lesson. Refresh the course and try again.', [], 409);
+    }
+    $assignment = student_course_access_assignment($conn, $canonicalAssignmentId);
+    if (!$assignment || (string) ($assignment['course_id'] ?? '') !== $courseId
+        || !student_course_access_assignment_matches_item($conn, $assignment, $assignmentItem)) {
+        assignment_submission_response(false, 'This assignment is unavailable.', [], 403);
     }
 
-    $assignmentSectionId = student_course_access_normalize_section_id($assignment['section_id'] ?? '');
+    $assignmentSectionId = student_course_access_normalize_section_id($assignmentItem['section_id'] ?? '');
     if ($assignmentSectionId === null) {
         assignment_submission_response(false, 'This assignment has an invalid section.', [], 403);
     }
@@ -75,13 +86,7 @@ try {
         }
     }
 
-    $assignmentItemId = trim((string) ($assignment['item_id'] ?? ''));
-    if ($assignmentItemId !== '') {
-        $assignmentItem = student_course_access_item($conn, $courseId, $assignmentItemId);
-        if (!$assignmentItem || !student_course_access_assignment_matches_item($assignment, $assignmentItem)) {
-            assignment_submission_response(false, 'This assignment lesson is unavailable.', [], 403);
-        }
-    }
+    $assignmentItemId = (string) $assignmentItem['item_id'];
 
     if (!mmh_assignment_submission_open($assignment)) {
         assignment_submission_response(false, 'The submission deadline for this assignment has passed and solutions can no longer be uploaded.', [], 422);

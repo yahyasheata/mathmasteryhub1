@@ -10,7 +10,7 @@
 require_once 'connection/config.php';
 require_once '__init.php';
 require_once 'inc/functions.php';
-require_once 'inc/CourseResourceResolver.php';
+require_once 'inc/AssignmentIdentity.php';
 require_once 'inc/TimedExam.php';
 
 $pageName = 'courses';
@@ -62,6 +62,13 @@ if (!$item) {
     exit('Content item not found.');
 }
 
+$assignmentIdentity = mmh_assignment_identity_for_item($conn, $item, true);
+if (in_array((string) ($assignmentIdentity['status'] ?? ''), ['CLEAN', 'CONFLICT', 'LEGACY_FALLBACK'], true)
+    && (string) ($assignmentIdentity['assignment_id'] ?? '') !== '') {
+    // Feed the central resolver's result to the resource renderer; do not
+    // interpret legacy JSON/HTML identity in this preview route.
+    $item['assignment_id'] = (string) $assignmentIdentity['assignment_id'];
+}
 $resource = mmh_course_resource_resolve($item);
 $action = (string) ($resource['action'] ?? 'unavailable');
 $title = (string) ($item['item_title'] ?? 'Untitled lesson');

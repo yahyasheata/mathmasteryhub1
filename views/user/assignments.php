@@ -3,7 +3,6 @@ require_once 'connection/config.php';
 require_once '__init.php';
 require_once 'inc/functions.php';
 require_once 'inc/learning_schema.php';
-require_once 'inc/LiveAssignmentRepair.php';
 require_once 'inc/StudentResourceGateway.php';
 
 // LiteSpeed installations may keep included PHP files in OPcache while the
@@ -15,6 +14,8 @@ if (function_exists('opcache_invalidate')) {
         __DIR__ . '/../../inc/AssignmentProgress.php',
         __DIR__ . '/../../inc/CourseResourceResolver.php',
         __DIR__ . '/../../inc/CourseAssignmentLinks.php',
+        __DIR__ . '/../../inc/AssignmentIdentity.php',
+        __DIR__ . '/../../inc/StudentResourceGateway.php',
     ] as $resolverFile) {
         @opcache_invalidate($resolverFile, true);
     }
@@ -62,7 +63,6 @@ if ($userId > 0) {
 
 $assignmentRows = [];
 foreach ($courseRows as $course) {
-    mmh_live_assignment_repair($conn, (string) $course['course_id']);
     foreach (mmh_assignment_progress_load_course($conn, $userId, (string) $course['course_id']) as $assignment) {
         $assignment['course_title'] = $course['course_title'];
         $assignmentRows[] = $assignment;

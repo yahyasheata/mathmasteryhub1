@@ -3,6 +3,7 @@ require_once 'connection/config.php';
 require_once 'inc/functions.php';
 require_once 'inc/AcademicMetadata.php';
 require_once 'inc/CourseResourceResolver.php';
+require_once 'inc/AssignmentIdentity.php';
 require_once 'inc/TimedExam.php';
 require_once 'inc/AssignmentModelAnswerAccess.php';
 
@@ -418,7 +419,7 @@ foreach ($pane_templates as $pane_template) {
 }
 
 $item_hidden = $is_edit ? "<input type='hidden' name='item_id' value='{$safe_item_id}' />" : '';
-$existing_assignment_id_raw = (string) ($template_data['assignment_id'] ?? $item['assignment_id'] ?? '');
+$existing_assignment_id_raw = $is_edit ? mmh_assignment_identity_id($conn, $item, true) : '';
 $existing_assignment_id = htmlspecialchars($existing_assignment_id_raw, ENT_QUOTES, 'UTF-8');
 $assignment_record = [];
 if ($template_type === 'classified_assignment' && $existing_assignment_id_raw !== '') {

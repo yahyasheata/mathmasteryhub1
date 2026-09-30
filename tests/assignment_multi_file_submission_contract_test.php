@@ -24,5 +24,9 @@ foreach (["payload.delete('submission_files[]')", "payload.append('submission_fi
     if (!str_contains($js, $needle)) throw new RuntimeException('Canonical selected-file FormData contract is missing: ' . $needle);
 }
 if (!str_contains($handler, 'fileEntries') || !str_contains($handler, 'INSERT INTO assignment_submission_files')) throw new RuntimeException('Upload handler does not persist normalized child files.');
+foreach (['student_course_access_item($conn, $courseId, $courseItemId)', 'mmh_assignment_identity_for_item($conn, $assignmentItem, true)', 'hash_equals($canonicalAssignmentId, $assignmentId)', 'course_item_id'] as $needle) {
+    if (!str_contains($handler, $needle)) throw new RuntimeException('Submission is not bound to its Course Item canonical Assignment: ' . $needle);
+}
+if (str_contains(file_get_contents($root . '/views/user/course.php'), "this.getAttribute('data-assignment-id')")) throw new RuntimeException('Legacy embedded HTML Assignment ID still drives the student submission modal.');
 if (!str_contains(file_get_contents($root . '/inc/AssignmentSubmissionFiles.php'), 'student_course_access_authorized_course')) throw new RuntimeException('Protected submission-file route is missing enrollment authorization.');
 echo "Multi-file Homework contract passed.\n";
