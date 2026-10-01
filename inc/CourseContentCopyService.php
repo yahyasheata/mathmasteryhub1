@@ -348,7 +348,13 @@ final class CourseContentCopyService
         $assignment['course_id'] = $destinationCourseId;
         $assignment['item_id'] = $newItemId;
         $assignment['section_id'] = $destinationSectionId;
-        if ($clearSessionDates && array_key_exists('due_date', $assignment)) $assignment['due_date'] = null;
+        if ($clearSessionDates && array_key_exists('due_date', $assignment)) {
+            // Assignment deadlines are required by the current schema and the
+            // normal Homework workflow has no "unscheduled" value. Next
+            // Session copies stay Draft/hidden, so use a future placeholder
+            // until the teacher configures the new session's real deadline.
+            $assignment['due_date'] = date('Y-m-d H:i:s', strtotime('+1 year'));
+        }
         foreach (['archived_at', 'deleted_at'] as $column) {
             if (array_key_exists($column, $assignment)) $assignment[$column] = null;
         }
