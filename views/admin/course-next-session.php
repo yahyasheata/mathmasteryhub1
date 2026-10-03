@@ -18,7 +18,7 @@ if (!$source || !empty($source['archived_at'])) { http_response_code(404); exit(
 $error = '';
 $titleValue = trim((string) ($_POST['session_title'] ?? ''));
 $priceValue = (string) ($_POST['course_price'] ?? $source['course_price'] ?? '0');
-$stateValue = strtolower(trim((string) ($_POST['course_state'] ?? 'draft')));
+$stateValue = strtolower(trim((string) ($_POST['course_state'] ?? 'private')));
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     try {
         $result = CourseContentCopyService::createNextSession(

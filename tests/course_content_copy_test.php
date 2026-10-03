@@ -4,6 +4,7 @@ declare(strict_types=1);
 if (PHP_SAPI !== 'cli') exit("CLI only\n");
 require_once dirname(__DIR__) . '/connection/config.php';
 require_once dirname(__DIR__) . '/inc/CourseContentCopyService.php';
+require_once dirname(__DIR__) . '/inc/EnrollmentService.php';
 
 $dbHost = (string) $host; $dbUser = (string) $user; $dbPass = (string) $pass;
 $database = 'mmh_course_copy_test_' . getmypid() . '_' . bin2hex(random_bytes(4));
@@ -20,7 +21,7 @@ try {
     $query($admin, "CREATE TABLE assignments (id INT AUTO_INCREMENT PRIMARY KEY, assignment_id VARCHAR(20) NOT NULL, assignment_title VARCHAR(255) NOT NULL, assignment_description TEXT, due_date DATETIME NOT NULL, file_path VARCHAR(255), course_id VARCHAR(20) NOT NULL, section_id VARCHAR(20), item_id VARCHAR(20), max_score DECIMAL(6,2) NULL, recommended_recording_item_id VARCHAR(40), recommended_notes_item_id VARCHAR(40), recommended_revision_item_id VARCHAR(40), archived_at DATETIME NULL)");
     $query($admin, "CREATE TABLE assignment_model_answer_access (id INT AUTO_INCREMENT PRIMARY KEY, assignment_id VARCHAR(20) NOT NULL, user_id INT NOT NULL)");
     $query($admin, "CREATE TABLE assignment_submissions (id INT AUTO_INCREMENT PRIMARY KEY, assignment_id VARCHAR(20) NOT NULL, student_id INT NOT NULL)");
-    $query($admin, "CREATE TABLE course_logs (id INT AUTO_INCREMENT PRIMARY KEY, course_id VARCHAR(20) NOT NULL, user_id INT NOT NULL)");
+    $query($admin, "CREATE TABLE course_logs (id INT AUTO_INCREMENT PRIMARY KEY, course_id VARCHAR(20) NOT NULL, user_id INT NOT NULL, course_title VARCHAR(190) NULL, purchase_date DATETIME NULL, KEY idx_enrollment(course_id,user_id))");
     $query($admin, "CREATE TABLE course_live_schedules (id INT AUTO_INCREMENT PRIMARY KEY, course_id VARCHAR(20) NOT NULL, scheduled_start_at DATETIME NULL)");
     $query($admin, "CREATE TABLE timed_exams (id INT AUTO_INCREMENT PRIMARY KEY, course_id VARCHAR(20) NOT NULL, item_id VARCHAR(20) NOT NULL, title VARCHAR(190) NOT NULL, instructions TEXT, status VARCHAR(16) NOT NULL DEFAULT 'draft', timing_mode VARCHAR(24) NOT NULL DEFAULT 'fixed_window', scheduled_start_at_utc DATETIME NULL, duration_minutes INT NOT NULL DEFAULT 60, grace_minutes INT NOT NULL DEFAULT 0, max_attempts INT NOT NULL DEFAULT 1, allowed_answer_types VARCHAR(255) NOT NULL DEFAULT 'pdf', max_file_size_bytes BIGINT NOT NULL DEFAULT 10485760, paper_source VARCHAR(24) NOT NULL DEFAULT 'external_link', paper_external_url VARCHAR(1000), paper_external_preview_url VARCHAR(1000), paper_external_download_url VARCHAR(1000), paper_fallback_instructions TEXT, paper_storage_key VARCHAR(255), paper_original_name VARCHAR(255), paper_mime VARCHAR(120), paper_size_bytes BIGINT NULL, paper_view_allowed TINYINT NOT NULL DEFAULT 1, paper_download_allowed TINYINT NOT NULL DEFAULT 1, late_submission_allowed TINYINT NOT NULL DEFAULT 1, expiry_policy VARCHAR(32) NOT NULL DEFAULT 'auto_submit_latest', max_marks DECIMAL(10,2), results_release_at_utc DATETIME NULL, recovery_window_start_at_utc DATETIME NULL, recovery_window_end_at_utc DATETIME NULL, recovery_allowed TINYINT NOT NULL DEFAULT 0, attempt_generation INT UNSIGNED NOT NULL DEFAULT 1, deleted_at DATETIME NULL, roster_finalized_at_utc DATETIME NULL, roster_finalized_generation INT UNSIGNED NULL, created_by INT NULL, updated_by INT NULL, created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP, updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP)");
     $query($admin, "INSERT INTO courses (course_id,course_title,course_state) VALUES ('source','Source','public'),('destination','Destination','draft')");
@@ -116,6 +117,24 @@ try {
     $assert($rollbackObserved, 'Forced Course Item copy failure did not propagate.');
     $assert((int) $admin->query('SELECT COUNT(*) AS n FROM courses')->fetch_assoc()['n'] === $coursesBeforeFailedClone, 'Failed Next Session left a partial Course row.');
     $assert((int) $admin->query("SELECT COUNT(*) AS n FROM course_sections WHERE course_id NOT IN ('source','destination','{$nextCourseId}')")->fetch_assoc()['n'] === 0, 'Failed Next Session left partial Sections.');
+
+    // The Admin's Add Student flow intentionally excludes Draft Courses.
+    // A newly-created session should therefore default to Private while its
+    // copied teaching content remains Draft/hidden.
+    $enrollableNext = CourseContentCopyService::createNextSession($admin, 'source', 'Source Private Session', 125, 'private', 'admin-user');
+    $enrollableCourseId = $admin->real_escape_string($enrollableNext['course_id']);
+    $enrollableCourse = $admin->query("SELECT course_id,course_title,course_state,archived_at FROM courses WHERE course_id='{$enrollableCourseId}'")->fetch_assoc();
+    $assert(($enrollableCourse['course_state'] ?? '') === 'private', 'Private Next Session did not retain its selected state.');
+    $courseLookup = $admin->prepare("SELECT course_id,course_title,course_state FROM courses WHERE course_id = ? AND archived_at IS NULL AND course_state IN ('public', 'private') LIMIT 1");
+    $courseLookup->bind_param('s', $enrollableNext['course_id']);
+    $courseLookup->execute();
+    $adminEnrollmentCourse = $courseLookup->get_result()->fetch_assoc();
+    $courseLookup->close();
+    $assert((bool) $adminEnrollmentCourse, 'Admin Add Student course lookup rejected a Private Next Session.');
+    $assert(mmh_enrollment_ensure($admin, 9, $enrollableNext['course_id'], $enrollableCourse['course_title']), 'Admin enrollment service rejected a Private Next Session.');
+    $assert((int) $admin->query("SELECT COUNT(*) AS n FROM course_logs WHERE course_id='{$enrollableCourseId}' AND user_id=9")->fetch_assoc()['n'] === 1, 'Student was not enrolled in the new session.');
+    $assert((int) $admin->query("SELECT COUNT(*) AS n FROM course_logs WHERE course_id='source' AND user_id=9")->fetch_assoc()['n'] === 0, 'New-session enrollment changed source-course enrollment.');
+    $assert((int) $admin->query("SELECT COUNT(*) AS n FROM course_items WHERE course_id='{$enrollableCourseId}' AND status <> 'draft'")->fetch_assoc()['n'] === 0, 'Private Next Session copied visible Course Items instead of Draft content.');
     echo "Course Content copy tests passed.\n";
 } finally {
     $cleanup = mysqli_connect($dbHost, $dbUser, $dbPass);
