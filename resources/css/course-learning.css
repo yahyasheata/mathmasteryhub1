@@ -2055,6 +2055,11 @@ body.theme-light .course-learning-page .student-course-section.is-locked .studen
   min-height: clamp(440px, 72vh, 820px);
   height: clamp(440px, 72vh, 820px);
 }
+.course-resource-viewer-page .course-resource-viewer[data-resource-viewer-kind='google'] .course-resource-viewer-stage[data-resource-kind='recording'] {
+  min-height: 0;
+  height: auto;
+  aspect-ratio: 16 / 9;
+}
 .course-resource-viewer-page .course-resource-viewer-stage:fullscreen {
   display: grid;
   width: 100%;

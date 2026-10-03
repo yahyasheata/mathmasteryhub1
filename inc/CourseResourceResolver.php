@@ -453,6 +453,19 @@ if (!function_exists('mmh_course_resource_embed_details')) {
         }
 
         if ($isHost('drive.google.com') || $isHost('docs.google.com') || $isHost('drive.usercontent.google.com')) {
+            // Recording items may embed only a real Drive file share URL.
+            // Preserve the broader Google preview support for Notes and other
+            // resources, but do not turn a Recording into a Docs, Sheets,
+            // folder, or arbitrary Google-hosted preview.
+            if ($type === 'recording'
+                && (strtolower((string) ($parts['scheme'] ?? '')) !== 'https'
+                    || $host !== 'drive.google.com'
+                    || isset($parts['user'])
+                    || isset($parts['pass'])
+                    || !preg_match('~^/file/d/([A-Za-z0-9_-]+)(?:/|$)~i', $path))) {
+                return null;
+            }
+
             // Drive folders have their own permission and navigation model.
             if (preg_match('~/(?:drive/)?folders/[^/?]+~i', $path)) {
                 return null;

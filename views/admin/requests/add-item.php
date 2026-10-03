@@ -658,10 +658,15 @@ function item_build_template(mysqli $conn, $template_type, $course_id, $item_tit
             if (($recordingStatus['state'] ?? '') === 'legacy_embed') {
                 item_response(false, 'This is a legacy embed.aspx URL. Paste the normal SharePoint / Microsoft Stream sharing link students can open externally.');
             }
-            if (($recordingStatus['state'] ?? '') !== 'external') {
-                item_response(false, 'Validation failed. Paste a valid HTTPS SharePoint or Microsoft Teams recording sharing link.');
+            if (($recordingStatus['state'] ?? '') === 'external') {
+                $url = (string) $recordingStatus['url'];
+            } else {
+                $drivePreview = mmh_course_resource_embed_details($url, 'recording');
+                if (($drivePreview['kind'] ?? '') !== 'google') {
+                    item_response(false, 'Validation failed. Paste a supported SharePoint, Microsoft Teams, or Google Drive file recording link.');
+                }
+                $url = (string) mmh_course_resource_safe_url($url);
             }
-            $url = (string) $recordingStatus['url'];
             $lesson_number = item_post('page_order');
             $template_data = array_merge($template_data, [
                 'url' => $url,

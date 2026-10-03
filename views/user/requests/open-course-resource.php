@@ -101,6 +101,9 @@ function course_resource_render_viewer(mysqli $conn, $baseUrl, $userId, array $c
         . ($isExternalRecording ? '?v=recording-card-20260809' : '');
     $downloadUrl = trim((string) ($resource['download_url'] ?? ''));
     $kind = (string) ($resource['embed_kind'] ?? 'resource');
+    $stageKind = $kind === 'google' && strtolower(trim((string) ($resource['label'] ?? ''))) === 'recording'
+        ? 'recording'
+        : $kind;
     $primaryActionLabel = 'View resource';
     $primaryActionIcon = 'fas fa-external-link-alt';
     if ($isExternalRecording || in_array($kind, ['recording', 'microsoft_stream'], true)) {
@@ -205,7 +208,7 @@ function course_resource_render_viewer(mysqli $conn, $baseUrl, $userId, array $c
         <span class="visually-hidden" data-resource-status role="status" aria-live="polite"></span>
     </section>
 
-    <section id="resource-viewer-stage" class="course-resource-viewer-stage" data-resource-viewer-stage data-resource-kind="<?= course_resource_escape($kind); ?>" aria-label="<?= course_resource_escape($title); ?> viewer" tabindex="-1" aria-busy="true">
+    <section id="resource-viewer-stage" class="course-resource-viewer-stage" data-resource-viewer-stage data-resource-kind="<?= course_resource_escape($stageKind); ?>" aria-label="<?= course_resource_escape($title); ?> viewer" tabindex="-1" aria-busy="true">
         <div class="course-resource-viewer-loading" data-resource-viewer-loading><span class="fas fa-circle-notch fa-spin" aria-hidden="true"></span><span>Preparing your resource…</span></div>
         <iframe data-resource-viewer-frame data-resource-viewer-src="<?= course_resource_escape($embedUrl); ?>" title="<?= course_resource_escape($title); ?>" loading="eager" referrerpolicy="no-referrer" allow="fullscreen; picture-in-picture" allowfullscreen></iframe>
     </section>

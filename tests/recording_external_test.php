@@ -52,6 +52,45 @@ if (($youtube['action'] ?? '') !== 'embed' || ($youtube['embed_kind'] ?? '') !==
     throw new RuntimeException('Non-Microsoft video embedding regressed.');
 }
 
+$driveRecordingUrl = 'https://drive.google.com/file/d/abc123_ABC-9/view?usp=sharing';
+$driveRecording = mmh_course_resource_resolve_core([
+    'template_type' => 'recording', 'item_type' => 'video', 'item_title' => 'Drive recording',
+    'template_data' => json_encode(['url' => $driveRecordingUrl]), 'item_description' => '',
+]);
+if (($driveRecording['action'] ?? '') !== 'embed'
+    || ($driveRecording['embed_kind'] ?? '') !== 'google'
+    || ($driveRecording['embed_url'] ?? '') !== 'https://drive.google.com/file/d/abc123_ABC-9/preview'
+    || ($driveRecording['open_url'] ?? '') !== $driveRecordingUrl
+    || ($driveRecording['url'] ?? '') !== $driveRecordingUrl) {
+    throw new RuntimeException('Google Drive Recording did not derive preview while retaining its original URL.');
+}
+foreach ([
+    'http://drive.google.com/file/d/abc123/view',
+    'https://drive.google.com/drive/folders/folder123',
+    'https://docs.google.com/document/d/doc123/edit',
+    'https://drive.google.com/open?id=abc123',
+    'https://example.com/file/d/abc123/view',
+    'https://user:password@drive.google.com/file/d/abc123/view',
+] as $unsupportedDriveRecordingUrl) {
+    if (mmh_course_resource_embed_details($unsupportedDriveRecordingUrl, 'recording') !== null) {
+        throw new RuntimeException('Unsupported Google Recording URL was accepted: ' . $unsupportedDriveRecordingUrl);
+    }
+}
+
+$itemSaver = file_get_contents(dirname(__DIR__) . '/views/admin/requests/add-item.php');
+$form = file_get_contents(dirname(__DIR__) . '/views/admin/requests/form-item.php');
+$viewer = file_get_contents(dirname(__DIR__) . '/views/user/requests/open-course-resource.php');
+if (!is_string($itemSaver)
+    || !str_contains($itemSaver, 'mmh_course_resource_embed_details($url, \'recording\')')
+    || !str_contains($itemSaver, "'url' => " . '$url')
+    || !is_string($form)
+    || !str_contains($form, 'Paste a supported SharePoint, Microsoft Teams, or Google Drive recording link.')
+    || !is_string($viewer)
+    || !str_contains($viewer, "? 'recording'")
+    || !str_contains($viewer, 'data-resource-kind="<?= course_resource_escape($stageKind); ?>"')) {
+    throw new RuntimeException('Admin Recording storage or shared viewer wiring is incomplete.');
+}
+
 $route = file_get_contents(dirname(__DIR__) . '/views/user/requests/open-course-resource.php');
 $migration = file_get_contents(dirname(__DIR__) . '/scripts/reconcile-recordings.php');
 $legacyMigration = file_get_contents(dirname(__DIR__) . '/scripts/migrate-course-resources.php');
@@ -63,6 +102,9 @@ if (!is_string($route) || !str_contains($route, 'Microsoft Recording') || !str_c
     || !str_contains($route, 'recording-card-20260809')
     || !is_string($css) || !str_contains($css, "data-resource-viewer-kind='recording_external'") || !str_contains($css, 'course-resource-recording-card')) {
     throw new RuntimeException('Recording Launch Card presentation is not wired.');
+}
+if (!str_contains($css, "data-resource-kind='recording']") || !str_contains($css, 'aspect-ratio: 16 / 9')) {
+    throw new RuntimeException('Google Drive Recording does not use the responsive video-stage ratio.');
 }
 $course = file_get_contents(dirname(__DIR__) . '/views/user/course.php');
 if (!is_string($course) || !str_contains($course, "'recording_external'") || !str_contains($course, "'recording_unavailable'")) {
@@ -79,4 +121,4 @@ if (!is_string($legacyMigration) || !str_contains($legacyMigration, 'Microsoft e
     throw new RuntimeException('Legacy migration still permits guessed Microsoft recording conversions.');
 }
 
-echo "external_links=passed legacy_embed=guarded youtube_regression=passed card_flow=passed migration_contract=present\n";
+echo "external_links=passed legacy_embed=guarded youtube_regression=passed google_drive_recording=passed unsupported_google_links=guarded shared_viewer=passed card_flow=passed migration_contract=present\n";

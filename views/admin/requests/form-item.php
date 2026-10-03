@@ -882,9 +882,9 @@ $html_response = "
             <div class='{$pane_class['recording']}' data-template-pane='recording'>
               <div class='row'>
                 <div class='col-12 col-lg-8 p-2'>
-                  <label for='{$form_id}-recording-url'>Microsoft Recording Link</label>
-                  <input id='{$form_id}-recording-url' type='url' class='form-control' name='recording_url' data-template-required='recording' value='" . form_item_json_value(['url' => $recording_url], 'url') . "' placeholder='https://...sharepoint.com/...'>
-                  <small class='text-muted d-block mt-2'>Paste the SharePoint / Microsoft Stream sharing link students can open. Do not paste iframe HTML or an embed.aspx URL.</small>
+                  <label for='{$form_id}-recording-url'>Recording URL</label>
+                  <input id='{$form_id}-recording-url' type='url' class='form-control' name='recording_url' data-template-required='recording' value='" . form_item_json_value(['url' => $recording_url], 'url') . "' placeholder='https://...'>
+                  <small class='text-muted d-block mt-2'>Paste a supported SharePoint, Microsoft Teams, or Google Drive recording link. Do not paste iframe HTML or an embed.aspx URL.</small>
                   {$recording_warning}
                 </div>
                 {$recording_lesson_number_field}
