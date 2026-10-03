@@ -127,6 +127,24 @@
   min-width: 0;
 }
 
+.course-learning-page .course-cover-banner {
+  width: 100%;
+  height: clamp(140px, 20vw, 230px);
+  margin-bottom: 14px;
+  overflow: hidden;
+  background: var(--surface-inset);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+}
+
+.course-learning-page .course-cover-banner img {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  object-position: center center;
+}
+
 .course-learning-page .course-header-card {
   padding: clamp(14px, 2vw, 20px);
   margin-bottom: 14px;
@@ -1100,6 +1118,10 @@ html[data-student-theme="dark"] .course-learning-page .panel.course-lesson-panel
 @media (max-width: 767.98px) {
   .course-learning-page .course-learning-main {
     padding: 14px 10px 26px;
+  }
+
+  .course-learning-page .course-cover-banner {
+    height: clamp(150px, 48vw, 220px);
   }
 
   .course-learning-page .course-header-actions {

@@ -327,6 +327,7 @@ if ($coures_result && mysqli_num_rows($coures_result) > 0) {
   $course_sequential_learning = 0;
   $course_title = "";
   $course_description = "";
+  $course_image = '';
   $categorie_title = "";
   $category_description = "";
   $first_lesson_anchor = '#course-content';
@@ -334,6 +335,7 @@ if ($coures_result && mysqli_num_rows($coures_result) > 0) {
   while( $courses_data = mysqli_fetch_assoc($coures_result) ){
     $course_title = $courses_data['course_title'];
     $course_description = $courses_data['course_description'];
+    $course_image = trim((string) ($courses_data['course_image'] ?? ''));
     $course_sequential_learning = isset($courses_data['sequential_learning']) ? (int) $courses_data['sequential_learning'] : 0;
     $has_visible_item = !empty($courses_data['iid']);
     $categorie_title = $courses_data['course_category'] ?? '';
@@ -688,6 +690,7 @@ if ($coures_result && mysqli_num_rows($coures_result) > 0) {
 }else{
     $course_title = "Course unavailable";
     $course_description = "";
+    $course_image = '';
     $categorie_title = "";
     $category_description = "";
     $course_item_count = 0;
@@ -708,6 +711,7 @@ if ($coures_result && mysqli_num_rows($coures_result) > 0) {
 
 $course_title_html = student_course_html($course_title);
 $course_description_html = student_course_html($course_description);
+$course_image_html = student_course_html($course_image);
 $category_title_html = student_course_html($categorie_title);
 $course_page_url = $course_id !== ''
   ? rtrim($baseUrl, '/') . '/user/course/' . rawurlencode($course_id)
@@ -783,6 +787,11 @@ $has_continue_lesson = $continue_lesson !== null && !empty($continue_lesson['ite
         <main class="course-learning-main font-2">
             <div class="course-learning-shell">
                 <section class="course-learning-content" id="course-content">
+                    <?php if ($course_image_html !== ''): ?>
+                    <div class="course-cover-banner">
+                        <img src="<?=$baseUrl?>/<?=$course_image_html;?>" alt="" loading="eager">
+                    </div>
+                    <?php endif; ?>
                     <div class="course-header-card">
                         <nav class="course-breadcrumb" aria-label="Breadcrumb">
                             <a href="<?=$baseUrl;?>/user/my-courses">My Courses</a>

@@ -47,6 +47,7 @@ foreach ([
     'student_course_access_active_item_sql(\'course_items\')',
     'mmh_course_resource_resolve(',
     'mmh_learning_journey_resolve(',
+    'if ($course_image_html !== \'\')',
 ] as $required) {
     if (!str_contains($view, $required)) {
         throw new RuntimeException('Missing conditional UI or preserved learning behavior: ' . $required);
@@ -54,7 +55,10 @@ foreach ([
 }
 
 if (!preg_match('/\.course-learning-shell\s*\{\s*display:\s*block;/', $css)
-    || str_contains($css, '.course-overview-card')) {
+    || str_contains($css, '.course-overview-card')
+    || !str_contains($css, 'object-fit: cover;')
+    || !str_contains($css, 'object-position: center center;')
+    || !str_contains($css, 'height: clamp(150px, 48vw, 220px);')) {
     throw new RuntimeException('The student Course layout still reserves sidebar styling.');
 }
 
