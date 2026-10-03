@@ -24,12 +24,10 @@ if($_SERVER['REQUEST_METHOD'] == "POST" ){
                 $course_title = $course_data["course_title"];
                 // $course_link = $course_data["course_link"];
                 $course_description = $course_data["course_description"];
-                $course_title_en = $course_data["course_title_en"];
                 $course_image = $course_data["course_image"];
                 $course_price = $course_data["course_price"];
                 $preDiscount_course_price = $course_data["preDiscount_course_price"];
                 $c_course_category = $course_data["course_category"];
-                $whatsapp_group = $course_data["whatsapp_group"];
                 $sequential_learning = isset($course_data["sequential_learning"]) ? (int) $course_data["sequential_learning"] : 0;
                 $sequential_off_selected = $sequential_learning === 1 ? '' : 'selected';
                 $sequential_on_selected = $sequential_learning === 1 ? 'selected' : '';
@@ -65,14 +63,11 @@ if($_SERVER['REQUEST_METHOD'] == "POST" ){
                         <form action='requests/course/edit' method='POST' id='updateCourse' enctype='multipart/form-data'>
 
                             <fieldset class='form-fieldset api-mode'>
-                            <label
-                            class='ds-text-secondary' style='display: flex; justify-content: center; font-size: 18px'>Details
-                            Course</label>
-        
                             <div class='col-12 p-3 row'>
         
                             
         
+                            <div class='col-12 p-2'><h6 class='mb-0'>Course Details</h6></div>
                             <div class='col-12 col-lg-12 p-2'>
                                 <div class='col-12'>
                                     Category
@@ -90,48 +85,8 @@ if($_SERVER['REQUEST_METHOD'] == "POST" ){
                                     Title
                                     </div>
                                     <div class='col-12 pt-3'>
-                                        <input type='text' name='course_title' required='' maxlength='190' class='form-control' value='$course_title'  placeholder='اكتب عنوان Course'>
+                                        <input type='text' name='course_title' required='' maxlength='190' class='form-control' value='$course_title' placeholder='Course title'>
                                     </div>
-                                </div>
-        
-        
-                                <div class='col-12 col-lg-6 p-2'>
-                                    <div class='col-12'>
-                                    English Title
-                                    </div>
-                                    <div class='col-12 pt-3'>
-                                        <input type='text' name='course_title_en' required='' maxlength='190' class='form-control' value='$course_title_en' placeholder='اكتب عنوان Course بالأنجلش'>
-                                    </div>
-                                </div>
-
-                                <div class='col-12 col-lg-6 p-2'>
-                                    <div class='col-12'>Default Homework Score Mode</div>
-                                    <div class='col-12 pt-3'>
-                                        <select name='default_homework_score_mode' class='form-control'>
-                                            <option value='disabled' $score_disabled_selected>Disabled</option>
-                                            <option value='accept_automatically' $score_auto_selected>Accept Automatically</option>
-                                            <option value='require_teacher_verification' $score_verify_selected>Require Teacher Verification</option>
-                                        </select>
-                                    </div>
-                                </div>
-        
-        
-                                <div class='col-12 col-lg-6 p-2'>
-                                    <div class='col-12'>
-                                    Price الفعلي
-                                    </div>
-                                    <div class='col-12 pt-3'>
-                                        <input type='number' name='course_price' required='' min='0' maxlength='190' class='form-control' value='$course_price' placeholder='سعر Course باللغة الانجليزية'>
-                                </div>
-                                </div>        
-        
-                                <div class='col-12 col-lg-6 p-2'>
-                                    <div class='col-12'>
-                                    Price قبل التخفيض
-                                    </div>
-                                    <div class='col-12 pt-3'>
-                                        <input type='number' name='preDiscount_course_price' required='' min='0' maxlength='190' class='form-control' value='$preDiscount_course_price' placeholder='سعر Course باللغة الانجليزية'>
-                                </div>
                                 </div>
         
         
@@ -140,18 +95,40 @@ if($_SERVER['REQUEST_METHOD'] == "POST" ){
                                     Description
                                     </div>
                                     <div class='col-12 pt-3'>
-                                        <textarea class='form-control' name='course_description' rows='2' placeholder='اكتب وصف Course هنا - SEO' required>$course_description</textarea>
+                                        <textarea class='form-control' name='course_description' rows='2' placeholder='Describe this course for students and visitors' required>$course_description</textarea>
                                     </div>
                                 </div>
-        
-        
 
                                 <div class='col-12 col-lg-12 p-2'>
-                                    <div class='col-12'>
-                                    WhatsApp Group Link
-                                    </div>
+                                    <div class='col-12'>Course Image</div>
+                                    <div class='col-12 pt-2 small text-muted'>Choose a new image only if you want to replace the current one.</div>
+                                    <div class='col-12 pt-3'><input type='file' name='course_image' class='form-control' accept='image/*'></div>
+                                    <div class='col-12 pt-3'><img src='$baseUrl/$course_image' alt='Current Course image' style='width: 100px'></div>
+                                </div>
+
+                                <div class='col-12 p-2 mt-2'><h6 class='mb-0'>Pricing</h6></div>
+                                <div class='col-12 col-lg-6 p-2'>
+                                    <div class='col-12'>Price</div>
+                                    <div class='col-12 pt-3'><input type='number' name='course_price' required min='0' step='1' class='form-control' value='$course_price'></div>
+                                </div>
+                                <div class='col-12 col-lg-6 p-2'>
+                                    <div class='col-12'>Previous Price (optional)</div>
                                     <div class='col-12 pt-3'>
-                                        <input type='url' name='whatsapp_group' class='form-control'  placeholder='WhatsApp Group Link' value='$whatsapp_group'>
+                                        <input type='number' name='preDiscount_course_price' min='0' step='1' class='form-control' value='$preDiscount_course_price'>
+                                        <small class='form-text text-muted'>Shown as the previous crossed-out price. Leave blank if there is no discount.</small>
+                                    </div>
+                                </div>
+
+                                <div class='col-12 p-2 mt-2'><h6 class='mb-0'>Learning</h6></div>
+                                <div class='col-12 col-lg-6 p-2'>
+                                    <div class='col-12'>Default Homework Marking</div>
+                                    <div class='col-12 pt-3'>
+                                        <select name='default_homework_score_mode' class='form-control'>
+                                            <option value='disabled' $score_disabled_selected>Disabled</option>
+                                            <option value='accept_automatically' $score_auto_selected>Accept Automatically</option>
+                                            <option value='require_teacher_verification' $score_verify_selected>Require Teacher Verification</option>
+                                        </select>
+                                        <small class='form-text text-muted'>Used as the default when creating new Homework. Existing Homework is not changed.</small>
                                     </div>
                                 </div>
 
@@ -164,19 +141,8 @@ if($_SERVER['REQUEST_METHOD'] == "POST" ){
                                             <option value='0' $sequential_off_selected>OFF — all sections available</option>
                                             <option value='1' $sequential_on_selected>ON — apply section learning rules</option>
                                         </select>
+                                        <small class='form-text text-muted'>When enabled, students follow the Section prerequisite/unlock rules.</small>
                                     </div>
-                                </div>
-        
-                                <div class='col-12 col-lg-12 p-2'>
-                                <div class='col-12'>
-                                    صورة Course <small class='text-primary'>{Optional}</small>
-                                </div>
-                                <div class='col-12 pt-3'>
-                                    <input type='file' name='course_image' class='form-control' accept='image/*'>
-                                </div>
-                                <div class='col-12 pt-3'>
-                                    <img src='$baseUrl/$course_image' style='width: 100px'>
-                                </div>
                                 </div>
         
         
@@ -187,6 +153,7 @@ if($_SERVER['REQUEST_METHOD'] == "POST" ){
 
                           <input type='hidden' name='course_id' value='$course_id' />
                           <input type='hidden' name='_method' value='UPDATE' />
+                          <input type='hidden' name='mmh_csrf_token' value='" . htmlspecialchars(mmh_admin_csrf_token(), ENT_QUOTES, 'UTF-8') . "' />
 
                           <div class='modal-footer p-2'>
                             <button type='button' class='btn btn-outline-danger' data-bs-dismiss='modal'>Close</button>
@@ -240,16 +207,15 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && (string) ($_POST['_method'] ?? '') 
     $courseId = filter_var($_POST['course_id'] ?? null, FILTER_VALIDATE_INT, ['options' => ['min_range' => 1]]);
     $category = filter_var($_POST['course_category'] ?? null, FILTER_VALIDATE_INT);
     $title = trim((string) ($_POST['course_title'] ?? ''));
-    $titleEn = trim((string) ($_POST['course_title_en'] ?? ''));
     $description = trim((string) ($_POST['course_description'] ?? ''));
-    $price = is_numeric($_POST['course_price'] ?? null) ? (float) $_POST['course_price'] : 0.0;
-    $preDiscount = is_numeric($_POST['preDiscount_course_price'] ?? null) ? (float) $_POST['preDiscount_course_price'] : 0.0;
-    $whatsapp = trim((string) ($_POST['whatsapp_group'] ?? ''));
-    $whatsapp = $whatsapp === '' ? null : $whatsapp;
+    $priceInput = trim((string) ($_POST['course_price'] ?? ''));
+    $previousPriceInput = trim((string) ($_POST['preDiscount_course_price'] ?? ''));
+    $price = is_numeric($priceInput) ? (float) $priceInput : -1.0;
+    $preDiscount = $previousPriceInput === '' ? 0.0 : (is_numeric($previousPriceInput) ? (float) $previousPriceInput : -1.0);
     $sequential = (string) ($_POST['sequential_learning'] ?? '') === '1' ? 1 : 0;
     $scoreMode = mmh_academic_score_mode($_POST['default_homework_score_mode'] ?? 'disabled');
-    if ($courseId === false || $title === '' || $titleEn === '' || $description === '') {
-        exit(json_encode(['status' => 0, 'message' => 'All required fields must be completed']));
+    if ($courseId === false || $category === false || $title === '' || $description === '' || $price < 0 || $preDiscount < 0) {
+        exit(json_encode(['status' => 0, 'message' => 'Check the required fields and enter valid non-negative prices.']));
     }
 
     $imagePath = null;
@@ -262,11 +228,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && (string) ($_POST['_method'] ?? '') 
     }
     $conn = db();
     if ($imagePath !== null && $imagePath !== '') {
-        $stmt = $conn->prepare('UPDATE courses SET course_title = ?, course_title_en = ?, course_description = ?, course_image = ?, course_price = ?, preDiscount_course_price = ?, course_category = ?, whatsapp_group = ?, sequential_learning = ?, default_homework_score_mode = ? WHERE course_id = ?');
-        $stmt->bind_param('ssssddisisi', $title, $titleEn, $description, $imagePath, $price, $preDiscount, $category, $whatsapp, $sequential, $scoreMode, $courseId);
+        $stmt = $conn->prepare('UPDATE courses SET course_title = ?, course_title_en = ?, course_description = ?, course_image = ?, course_price = ?, preDiscount_course_price = ?, course_category = ?, sequential_learning = ?, default_homework_score_mode = ? WHERE course_id = ?');
+        $stmt->bind_param('ssssddiisi', $title, $title, $description, $imagePath, $price, $preDiscount, $category, $sequential, $scoreMode, $courseId);
     } else {
-        $stmt = $conn->prepare('UPDATE courses SET course_title = ?, course_title_en = ?, course_description = ?, course_price = ?, preDiscount_course_price = ?, course_category = ?, whatsapp_group = ?, sequential_learning = ?, default_homework_score_mode = ? WHERE course_id = ?');
-        $stmt->bind_param('sssddisisi', $title, $titleEn, $description, $price, $preDiscount, $category, $whatsapp, $sequential, $scoreMode, $courseId);
+        $stmt = $conn->prepare('UPDATE courses SET course_title = ?, course_title_en = ?, course_description = ?, course_price = ?, preDiscount_course_price = ?, course_category = ?, sequential_learning = ?, default_homework_score_mode = ? WHERE course_id = ?');
+        $stmt->bind_param('sssddiisi', $title, $title, $description, $price, $preDiscount, $category, $sequential, $scoreMode, $courseId);
     }
     $ok = $stmt && $stmt->execute();
     if ($stmt) { $stmt->close(); }
