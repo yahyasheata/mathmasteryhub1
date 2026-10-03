@@ -324,16 +324,9 @@ if ($coures_result && mysqli_num_rows($coures_result) > 0) {
   // provider links from collapsed panels.
   $lesson_panels = [];
   $course_item_count = 0;
-  // The result contains one row for each visible course item (or one empty
-  // course row), so this gives the list a stable, plain-text position label.
-  $course_total_visible_items = max(0, (int) mysqli_num_rows($coures_result));
-  $course_duration_minutes = 0;
-  $course_known_duration_count = 0;
   $course_sequential_learning = 0;
   $course_title = "";
   $course_description = "";
-  $course_teacher = "";
-  $course_image = "";
   $categorie_title = "";
   $category_description = "";
   $first_lesson_anchor = '#course-content';
@@ -341,13 +334,8 @@ if ($coures_result && mysqli_num_rows($coures_result) > 0) {
   while( $courses_data = mysqli_fetch_assoc($coures_result) ){
     $course_title = $courses_data['course_title'];
     $course_description = $courses_data['course_description'];
-    $course_teacher = $courses_data['username'];
-    $course_image = $courses_data['course_image'];
     $course_sequential_learning = isset($courses_data['sequential_learning']) ? (int) $courses_data['sequential_learning'] : 0;
     $has_visible_item = !empty($courses_data['iid']);
-    if ($has_visible_item) {
-      $course_item_count++;
-    }
     $categorie_title = $courses_data['course_category'] ?? '';
     if (!$has_visible_item) {
         continue;
@@ -390,6 +378,9 @@ if ($coures_result && mysqli_num_rows($coures_result) > 0) {
     if ($is_related_model_answer) {
       continue;
     }
+    // Count only lesson rows that are actually rendered. Related Model Answers
+    // folded into Homework are not separate student-facing lessons.
+    $course_item_count++;
     $resource_direct = in_array($resource_action, ['embed', 'redirect', 'recording_external', 'recording_unavailable', 'unavailable', 'homework', 'timed_exam'], true);
     $resource_external = $resource_action === 'redirect' && !empty($resource_resolution['open_in_new_tab']);
     $timed_exam_for_item = $template_type === 'timed_exam'
@@ -413,7 +404,7 @@ if ($coures_result && mysqli_num_rows($coures_result) > 0) {
     $lesson_exam_id = student_course_html($template_data['exam_id'] ?? '');
     $lesson_item_id = student_course_html($courses_data['item_id'] ?? '');
     $lesson_duration = mmh_format_duration_minutes($courses_data['duration_minutes'] ?? null);
-    $lesson_meta_parts = [student_course_html($lesson_type), 'Lesson ' . $course_item_count . ' of ' . $course_total_visible_items];
+    $lesson_meta_parts = [student_course_html($lesson_type)];
     if ($lesson_duration !== '') {
       $lesson_meta_parts[] = student_course_html($lesson_duration);
     }
@@ -522,6 +513,7 @@ if ($coures_result && mysqli_num_rows($coures_result) > 0) {
     }
     $lesson_inventory_by_section[$section_key][] = [
       'item_id' => $lesson_progress_item['item_id'],
+      'title' => (string) ($courses_data['item_title'] ?? ''),
       'anchor' => '#lesson-' . $courses_data['iid'],
       'section_key' => $section_key,
       'section_id' => $lesson_section_id,
@@ -535,8 +527,6 @@ if ($coures_result && mysqli_num_rows($coures_result) > 0) {
       $lesson_duration_minutes = (int) $courses_data['duration_minutes'];
       $course_sections[$section_key]['duration_minutes'] += $lesson_duration_minutes;
       $course_sections[$section_key]['known_duration_count']++;
-      $course_duration_minutes += $lesson_duration_minutes;
-      $course_known_duration_count++;
     }
     $course_sections[$section_key]['lessons'] .= $lesson_html;
   }
@@ -695,29 +685,12 @@ if ($coures_result && mysqli_num_rows($coures_result) > 0) {
   if (isset($courses_stmt)) {
     $courses_stmt->close();
   }
-  if (empty($course_image)) {
-    $course_image = "resources/images/default/cover.png";
-  }
-  if ($course === '') {
-    $course = "
-    <div class='course-empty-state'>
-      <span class='fas fa-info-circle course-empty-icon'></span>
-      <div class='course-empty-title'>
-        No published lessons available now
-      </div>
-    </div>
-    ";
-  }
 }else{
     $course_title = "Course unavailable";
     $course_description = "";
-    $course_teacher = "";
-    $course_image = "resources/images/default/cover.png";
     $categorie_title = "";
     $category_description = "";
     $course_item_count = 0;
-    $course_duration_minutes = 0;
-    $course_known_duration_count = 0;
     $course_sequential_learning = 0;
     $first_lesson_anchor = '#course-content';
     $course = "
@@ -735,8 +708,6 @@ if ($coures_result && mysqli_num_rows($coures_result) > 0) {
 
 $course_title_html = student_course_html($course_title);
 $course_description_html = student_course_html($course_description);
-$course_teacher_html = student_course_html($course_teacher);
-$course_image_html = student_course_html($course_image);
 $category_title_html = student_course_html($categorie_title);
 $course_page_url = $course_id !== ''
   ? rtrim($baseUrl, '/') . '/user/course/' . rawurlencode($course_id)
@@ -760,21 +731,8 @@ $previous_lesson_url_html = student_course_html($previous_lesson_url);
 $next_lesson_url_html = student_course_html($next_lesson_url);
 $selected_lesson_id_html = student_course_html($selected_lesson_id);
 $course_progress_percentage = (int) ($course_progress_summary['percentage'] ?? 0);
-$course_progress_status = 'Progress tracking unavailable';
-$course_remaining_duration_label = 'Remaining duration not available';
-if ($course_access_allowed) {
-  if (!empty($course_progress_summary['available'])) {
-    $course_progress_status = (int) $course_progress_summary['completed_count'] . ' of ' . (int) $course_progress_summary['eligible_count'] . ' course items complete';
-    if ((int) $course_progress_summary['incomplete_count'] === 0) {
-      $course_remaining_duration_label = 'No remaining eligible lesson duration';
-    } elseif ((int) $course_progress_summary['known_remaining_count'] > 0) {
-      $remaining_duration = mmh_format_duration_minutes($course_progress_summary['remaining_minutes']);
-      $course_remaining_duration_label = ((int) $course_progress_summary['unknown_remaining_count'] > 0 ? 'Known remaining duration: ' : 'Remaining duration: ') . $remaining_duration;
-    }
-  } else {
-    $course_progress_status = 'Progress not available';
-  }
-}
+$course_progress_available = $course_access_allowed && !empty($course_progress_summary['available']);
+$has_continue_lesson = $continue_lesson !== null && !empty($continue_lesson['item_id']);
 
 
 ?>
@@ -824,125 +782,58 @@ if ($course_access_allowed) {
 
         <main class="course-learning-main font-2">
             <div class="course-learning-shell">
-                <aside class="course-learning-sidebar" aria-label="Course overview">
-                    <div class="course-overview-card">
-                        <div class="course-cover-wrap">
-                            <img class="course-cover-image" src="<?=$baseUrl?>/<?=$course_image_html;?>" alt="<?=$course_title_html;?>">
-                        </div>
-                        <div class="course-overview-body">
-                            <span class="course-eyebrow">Mathematics Course</span>
-                            <h1 class="course-sidebar-title"><?=$course_title_html;?></h1>
-                            <div class="course-teacher-line">
-                                <span class="fas fa-user-tie" aria-hidden="true"></span>
-                                <span><?=!empty($course_teacher) ? $course_teacher_html : '—';?></span>
-                            </div>
-                            <p class="course-sidebar-description"><?=$course_description_html;?></p>
-
-                            <div class="course-stat-grid" aria-label="Course statistics">
-                                <div class="course-stat-item">
-                                    <span class="fas fa-layer-group" aria-hidden="true"></span>
-                                    <div>
-                                        <strong><?=$course_item_count;?></strong>
-                                        <small>Lessons</small>
-                                    </div>
-                                </div>
-                                <div class="course-stat-item">
-                                    <span class="fas fa-chart-line" aria-hidden="true"></span>
-                                    <div>
-                                        <strong>—</strong>
-                                        <small>Course Level</small>
-                                    </div>
-                                </div>
-                                <div class="course-stat-item">
-                                    <span class="fas fa-calendar-alt" aria-hidden="true"></span>
-                                    <div>
-                                        <strong>—</strong>
-                                        <small>Last Updated</small>
-                                    </div>
-                                </div>
-                                <div class="course-stat-item">
-                                    <span class="fas fa-clock" aria-hidden="true"></span>
-                                    <div>
-                                        <strong><?=mmh_format_duration_minutes($course_duration_minutes) !== '' ? mmh_format_duration_minutes($course_duration_minutes) : '—';?></strong>
-                                        <small><?=$course_known_duration_count > 0 ? ($course_known_duration_count < $course_item_count ? 'Known duration' : 'Total duration') : 'Duration not available';?></small>
-                                    </div>
-                                </div>
-                            </div>
-
-                            <div class="course-sidebar-actions">
-                                <a href="<?=$continue_lesson_url_html;?>" class="course-btn course-btn-primary" aria-label="Continue learning">
-                                    <span class="fas fa-play-circle" aria-hidden="true"></span>
-                                    <span>Continue Learning</span>
-                                </a>
-                                <a href="#course-content" class="course-btn course-btn-secondary">
-                                    <span class="fas fa-list-ul" aria-hidden="true"></span>
-                                    <span>Browse Course Content</span>
-                                </a>
-                            </div>
-                        </div>
-                    </div>
-                </aside>
-
                 <section class="course-learning-content" id="course-content">
                     <div class="course-header-card">
                         <nav class="course-breadcrumb" aria-label="Breadcrumb">
                             <a href="<?=$baseUrl;?>/user/my-courses">My Courses</a>
-                            <span class="fas fa-chevron-right" aria-hidden="true"></span>
-                            <span><?=$course_title_html;?></span>
                         </nav>
                         <div class="course-header-content">
                             <div>
+                                <?php if ($course_item_count > 0): ?>
                                 <span class="course-eyebrow">Course Workspace</span>
+                                <?php endif; ?>
                                 <h2><?=$course_title_html;?></h2>
-                                <p><?=$course_description_html;?></p>
+                                <?php if (trim($course_description) !== ''): ?><p><?=$course_description_html;?></p><?php endif; ?>
                             </div>
+                            <?php if ($has_continue_lesson || $previous_lesson_url !== '' || $next_lesson_url !== ''): ?>
                             <nav class="course-header-actions course-lesson-navigation" aria-label="Lesson navigation">
-                                <a href="<?=$continue_lesson_url_html;?>" class="course-btn course-btn-primary" aria-label="Continue learning">
+                                <?php if ($has_continue_lesson): ?>
+                                <a href="<?=$continue_lesson_url_html;?>" class="course-btn course-btn-primary" aria-label="Continue learning: <?=student_course_html($continue_lesson['title'] ?? 'lesson');?>">
                                     <span class="fas fa-play" aria-hidden="true"></span>
-                                    <span>Continue Learning</span>
+                                    <span>Continue: <?=student_course_html($continue_lesson['title'] ?? 'Learning');?></span>
                                 </a>
+                                <?php endif; ?>
                                 <?php if ($previous_lesson_url !== ''): ?>
                                 <a href="<?=$previous_lesson_url_html;?>" class="course-btn course-btn-secondary" aria-label="Open the previous accessible lesson">
                                     <span class="fas fa-backward" aria-hidden="true"></span>
                                     <span>Previous Lesson</span>
                                 </a>
-                                <?php else: ?>
-                                <span class="course-btn course-btn-secondary course-navigation-disabled" aria-disabled="true">
-                                    <span class="fas fa-backward" aria-hidden="true"></span>
-                                    <span>Previous Lesson</span>
-                                </span>
                                 <?php endif; ?>
                                 <?php if ($next_lesson_url !== ''): ?>
                                 <a href="<?=$next_lesson_url_html;?>" class="course-btn course-btn-secondary" aria-label="Open the next accessible lesson">
                                     <span class="fas fa-forward" aria-hidden="true"></span>
                                     <span>Next Lesson</span>
                                 </a>
-                                <?php else: ?>
-                                <span class="course-btn course-btn-secondary course-navigation-disabled" aria-disabled="true">
-                                    <span class="fas fa-forward" aria-hidden="true"></span>
-                                    <span>Next Lesson</span>
-                                </span>
                                 <?php endif; ?>
                             </nav>
+                            <?php endif; ?>
                         </div>
                     </div>
 
+                    <?php if ($course_progress_available): ?>
                     <section class="course-progress-summary" aria-label="Course progress">
                         <div class="course-progress-summary-heading">
                             <div>
                                 <span class="course-eyebrow">Learning Progress</span>
-                                <strong><?= $course_access_allowed && !empty($course_progress_summary['available']) ? $course_progress_percentage . '%' : '—'; ?></strong>
+                                <strong><?=$course_progress_percentage;?>%</strong>
                             </div>
-                            <span class="course-progress-status"><?=student_course_html($course_progress_status);?></span>
+                            <span class="course-progress-status"><?= (int) $course_progress_summary['completed_count']; ?> of <?= (int) $course_progress_summary['eligible_count']; ?> course items complete</span>
                         </div>
-                        <div class="progress course-progress-track" role="progressbar" aria-label="Learning Journey progress" aria-valuemin="0" aria-valuemax="100" aria-valuenow="<?= $course_access_allowed && !empty($course_progress_summary['available']) ? $course_progress_percentage : 0; ?>">
-                            <div class="progress-bar course-progress-bar" style="width: <?= $course_access_allowed && !empty($course_progress_summary['available']) ? $course_progress_percentage : 0; ?>%"></div>
-                        </div>
-                        <div class="course-progress-summary-footer">
-                            <span class="fas fa-clock" aria-hidden="true"></span>
-                            <span><?=student_course_html($course_remaining_duration_label);?></span>
+                        <div class="progress course-progress-track" role="progressbar" aria-label="Learning Journey progress" aria-valuemin="0" aria-valuemax="100" aria-valuenow="<?=$course_progress_percentage;?>">
+                            <div class="progress-bar course-progress-bar" style="width: <?=$course_progress_percentage;?>%"></div>
                         </div>
                     </section>
+                    <?php endif; ?>
 
                     <?php if ($course_completed): ?>
                     <section class="course-completed-state" role="status" aria-live="polite">
@@ -956,18 +847,25 @@ if ($course_access_allowed) {
 
                     <div id="video-container"></div>
 
+                    <?php if ($course_access_allowed && $course_item_count === 0): ?>
+                    <div class="course-empty-state" role="status">No lessons have been released yet.</div>
+                    <?php elseif ($course_access_allowed): ?>
                     <div class="course-lessons-section">
                         <div class="course-section-heading">
                             <div>
                                 <span class="course-eyebrow">Course Content</span>
                                 <h3>Lessons</h3>
                             </div>
-                            <span class="course-section-count"><?=$course_item_count;?> lessons</span>
                         </div>
                         <div class="course-learning-lesson-list">
                             <?=$course?>
                         </div>
                     </div>
+                    <?php else: ?>
+                    <div class="course-lessons-section">
+                        <div class="course-learning-lesson-list"><?=$course?></div>
+                    </div>
+                    <?php endif; ?>
                 </section>
             </div>
         </main>

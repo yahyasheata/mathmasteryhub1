@@ -14,58 +14,17 @@
 }
 
 .course-learning-page .course-learning-shell {
-  display: grid;
-  grid-template-columns: minmax(240px, 300px) minmax(0, 1fr);
-  gap: clamp(14px, 2vw, 22px);
+  display: block;
   width: min(1320px, 100%);
   margin: 0 auto;
-  align-items: start;
 }
 
-.course-learning-page .course-learning-sidebar {
-  position: sticky;
-  top: 76px;
-  min-width: 0;
-}
-
-.course-learning-page .course-overview-card,
 .course-learning-page .course-header-card,
 .course-learning-page .course-lessons-section {
   background: linear-gradient(180deg, color-mix(in srgb, var(--surface) 98%, transparent), color-mix(in srgb, var(--surface-muted) 98%, transparent));
   border: 1px solid var(--border);
   border-radius: var(--radius-lg);
   box-shadow: var(--shadow-sm);
-}
-
-.course-learning-page .course-overview-card {
-  overflow: hidden;
-}
-
-.course-learning-page .course-cover-wrap {
-  position: relative;
-  aspect-ratio: 16 / 9;
-  background: var(--surface-elevated);
-  overflow: hidden;
-}
-
-.course-learning-page .course-cover-wrap::after {
-  content: "";
-  position: absolute;
-  inset: 0;
-  background: linear-gradient(180deg, transparent 45%, color-mix(in srgb, var(--surface-inset) 78%, transparent));
-  pointer-events: none;
-}
-
-.course-learning-page .course-cover-image {
-  width: 100%;
-  height: 100%;
-  object-fit: cover;
-  display: block;
-  transform: scale(1.01);
-}
-
-.course-learning-page .course-overview-body {
-  padding: 15px;
 }
 
 .course-learning-page .course-eyebrow {
@@ -79,7 +38,6 @@
   margin-bottom: 8px;
 }
 
-.course-learning-page .course-sidebar-title,
 .course-learning-page .course-header-card h2,
 .course-learning-page .course-lessons-section h3 {
   color: var(--text-primary);
@@ -88,24 +46,6 @@
   margin: 0;
 }
 
-.course-learning-page .course-sidebar-title {
-  font-size: clamp(1.3rem, 1.8vw, 1.65rem);
-}
-
-.course-learning-page .course-teacher-line {
-  display: inline-flex;
-  align-items: center;
-  gap: 8px;
-  color: var(--text-secondary);
-  background: color-mix(in srgb, var(--text-inverse) 4%, transparent);
-  border: 1px solid color-mix(in srgb, var(--text-inverse) 6%, transparent);
-  border-radius: var(--radius-md);
-  padding: 6px 9px;
-  margin-top: 12px;
-  font-size: .84rem;
-}
-
-.course-learning-page .course-sidebar-description,
 .course-learning-page .course-header-card p {
   color: var(--text-muted);
   font-size: .94rem;
@@ -113,55 +53,6 @@
   margin: 12px 0 0;
 }
 
-.course-learning-page .course-stat-grid {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 8px;
-  margin-top: 16px;
-}
-
-.course-learning-page .course-stat-item {
-  display: flex;
-  align-items: center;
-  gap: 9px;
-  min-width: 0;
-  padding: 10px;
-  background: color-mix(in srgb, var(--text-inverse) 4%, transparent);
-  border: 1px solid color-mix(in srgb, var(--text-inverse) 6%, transparent);
-  border-radius: var(--radius-md);
-}
-
-.course-learning-page .course-stat-item > span {
-  color: var(--primary);
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  width: 30px;
-  height: 30px;
-  background: var(--primary-soft);
-  border-radius: var(--radius-md);
-  flex: 0 0 30px;
-}
-
-.course-learning-page .course-stat-item strong,
-.course-learning-page .course-stat-item small {
-  display: block;
-  min-width: 0;
-}
-
-.course-learning-page .course-stat-item strong {
-  color: var(--text-primary);
-  font-size: .86rem;
-  line-height: 1.2;
-}
-
-.course-learning-page .course-stat-item small {
-  color: var(--text-muted);
-  font-size: .7rem;
-  margin-top: 3px;
-}
-
-.course-learning-page .course-sidebar-actions,
 .course-learning-page .course-header-actions {
   display: grid;
   gap: 8px;
@@ -232,12 +123,6 @@
   border-color: color-mix(in srgb, var(--primary) 24%, transparent);
 }
 
-.course-learning-page .course-navigation-disabled {
-  cursor: not-allowed;
-  opacity: .48;
-  pointer-events: none;
-}
-
 .course-learning-page .course-learning-content {
   min-width: 0;
 }
@@ -294,17 +179,6 @@
 
 .course-learning-page .course-lessons-section h3 {
   font-size: clamp(1.2rem, 1.8vw, 1.5rem);
-}
-
-.course-learning-page .course-section-count {
-  color: var(--text-secondary);
-  background: color-mix(in srgb, var(--text-inverse) 4%, transparent);
-  border: 1px solid color-mix(in srgb, var(--text-inverse) 8%, transparent);
-  border-radius: 999px;
-  padding: 6px 10px;
-  font-size: .78rem;
-  font-weight: 800;
-  white-space: nowrap;
 }
 
 .course-learning-page .course-learning-lesson-list {
@@ -827,8 +701,7 @@
 }
 
 .course-learning-page .course-header-card,
-.course-learning-page .course-lessons-section,
-.course-learning-page .course-overview-card {
+.course-learning-page .course-lessons-section {
   backdrop-filter: saturate(112%);
 }
 
@@ -841,7 +714,6 @@
 }
 
 .course-learning-page .course-header-card p,
-.course-learning-page .course-sidebar-description,
 .course-learning-page .course-lesson-content {
   line-height: 1.72;
 }
@@ -1046,7 +918,6 @@ html[data-student-theme="dark"] .course-learning-page #app {
     var(--bg-primary);
 }
 
-html[data-student-theme="dark"] .course-learning-page .course-overview-card,
 html[data-student-theme="dark"] .course-learning-page .course-header-card,
 html[data-student-theme="dark"] .course-learning-page .course-lessons-section,
 html[data-student-theme="dark"] .course-learning-page .course-progress-summary {
@@ -1076,12 +947,11 @@ html[data-student-theme="dark"] .course-learning-page .panel.course-lesson-panel
 }
 
 .course-learning-page .course-empty-state {
-  padding: 36px 18px;
-  text-align: center;
+  padding: 12px 2px 18px;
+  text-align: left;
   color: var(--text-muted);
-  background: color-mix(in srgb, var(--text-inverse) 2%, transparent);
-  border: 1px dashed color-mix(in srgb, var(--text-inverse) 12%, transparent);
-  border-radius: var(--radius-lg);
+  font-size: 1rem;
+  line-height: 1.55;
 }
 
 .course-learning-page .course-progress-summary {
@@ -1113,8 +983,7 @@ html[data-student-theme="dark"] .course-learning-page .panel.course-lesson-panel
   line-height: 1.1;
 }
 
-.course-learning-page .course-progress-status,
-.course-learning-page .course-progress-summary-footer {
+.course-learning-page .course-progress-status {
   color: var(--text-muted);
   font-size: .84rem;
 }
@@ -1162,12 +1031,6 @@ html[data-student-theme="dark"] .course-learning-page .panel.course-lesson-panel
   background: linear-gradient(90deg, var(--primary), var(--accent));
   border-radius: inherit;
   transition: width .28s ease;
-}
-
-.course-learning-page .course-progress-summary-footer {
-  align-items: center;
-  display: inline-flex;
-  gap: 7px;
 }
 
 .course-learning-page .course-empty-icon {
@@ -1219,34 +1082,9 @@ html[data-student-theme="dark"] .course-learning-page .panel.course-lesson-panel
   color: var(--danger);
 }
 
-@media (max-width: 1199.98px) {
-  .course-learning-page .course-learning-shell {
-    grid-template-columns: minmax(240px, 300px) minmax(0, 1fr);
-  }
-}
-
 @media (max-width: 991.98px) {
   .course-learning-page .course-learning-main {
     padding-top: 24px;
-  }
-
-  .course-learning-page .course-learning-shell {
-    grid-template-columns: 1fr;
-  }
-
-  .course-learning-page .course-learning-sidebar {
-    position: static;
-  }
-
-  .course-learning-page .course-overview-card {
-    display: grid;
-    grid-template-columns: minmax(220px, .8fr) 1fr;
-    align-items: stretch;
-  }
-
-  .course-learning-page .course-cover-wrap {
-    aspect-ratio: auto;
-    min-height: 100%;
   }
 
   .course-learning-page .course-header-content {
@@ -1264,15 +1102,6 @@ html[data-student-theme="dark"] .course-learning-page .panel.course-lesson-panel
     padding: 14px 10px 26px;
   }
 
-  .course-learning-page .course-overview-card {
-    display: block;
-  }
-
-  .course-learning-page .course-cover-wrap {
-    aspect-ratio: 16 / 9;
-  }
-
-  .course-learning-page .course-stat-grid,
   .course-learning-page .course-header-actions {
     grid-template-columns: 1fr;
   }
@@ -1335,7 +1164,6 @@ html[data-student-theme="dark"] .course-learning-page .panel.course-lesson-panel
     flex-basis: 38px;
   }
 
-  .course-learning-page .course-overview-body,
   .course-learning-page .course-header-card,
   .course-learning-page .course-lessons-section,
   .course-learning-page .course-lesson-content {
