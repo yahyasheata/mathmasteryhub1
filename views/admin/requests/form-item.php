@@ -251,6 +251,20 @@ $requested_template_type = isset($form_item_request_data['template_type']) ? tri
 $template_type = $is_edit ? ($raw_template_type ?: 'custom_html') : ($requested_template_type ?: 'recording');
 $legacy_resource_adapter = null;
 
+// Older Recording items were stored as template_type=video (or only
+// item_type=video). Keep those rows in the same Recording editor when the
+// canonical resolver identifies a supported external Recording or Drive
+// video. Other legacy video content continues through the generic adapter.
+$legacy_video_item = $is_edit
+    && ($raw_template_type === 'video' || ($raw_template_type === '' && (string) ($item['item_type'] ?? '') === 'video'));
+if ($legacy_video_item) {
+    $legacy_video_resolution = mmh_course_resource_resolve($item);
+    if (($legacy_video_resolution['action'] ?? '') === 'recording_external'
+        || (($legacy_video_resolution['action'] ?? '') === 'embed' && ($legacy_video_resolution['embed_kind'] ?? '') === 'google')) {
+        $template_type = 'recording';
+    }
+}
+
 // Translate new Notes requests into structured Resources. This preserves Notes
 // as a first-class teacher concept while using the existing structured Resource
 // implementation internally. Migrated Notes already use template_type=resource
@@ -392,7 +406,7 @@ if ($has_sections) {
 }
 
 $template_cards = [
-    'recording' => ['fas fa-play-circle', 'Recording', 'Paste a SharePoint / Microsoft Stream sharing link.'],
+    'recording' => ['fas fa-play-circle', 'Recording', 'Paste a supported SharePoint, Microsoft Teams, or Google Drive recording link.'],
     'notes' => ['far fa-file-alt', 'Notes', 'Add a structured Notes resource for the LMS viewer.'],
     'classified_assignment' => ['fas fa-clipboard-list', 'Classified Assignment', 'Create one Homework lesson with resources and upload workflow.'],
     'custom_lesson' => ['fas fa-puzzle-piece', 'Custom Lesson', 'Build any flexible lesson with a label, icon, and content.'],
@@ -452,7 +466,7 @@ if ($template_type === 'classified_assignment') {
 $legacy_content = $item['item_description'];
 $notes_content = $template_type === 'notes' ? ($template_data['content'] ?? $item['item_description']) : '';
 $assignment_instructions = $template_type === 'classified_assignment' ? ($template_data['instructions'] ?? $template_data['description'] ?? $assignment_record['assignment_description'] ?? '') : '';
-$recording_url = $template_type === 'recording' ? ($template_data['url'] ?? form_item_first_href($item['item_description'])) : '';
+$recording_url = $template_type === 'recording' ? ($template_data['url'] ?? $template_data['external_url'] ?? form_item_first_href($item['item_description'])) : '';
 $recording_link_status = $template_type === 'recording' ? mmh_course_resource_microsoft_recording_status($recording_url) : ['state' => ''];
 $recording_warning = ($recording_link_status['state'] ?? '') === 'legacy_embed'
     ? "<div class='alert alert-warning mt-2 mb-0'>This is a legacy Microsoft embed link. Replace it with a normal SharePoint / Microsoft Stream sharing link before saving.</div>"

@@ -79,16 +79,54 @@ foreach ([
 
 $itemSaver = file_get_contents(dirname(__DIR__) . '/views/admin/requests/add-item.php');
 $form = file_get_contents(dirname(__DIR__) . '/views/admin/requests/form-item.php');
+$courseContent = file_get_contents(dirname(__DIR__) . '/views/admin/course-content.php');
 $viewer = file_get_contents(dirname(__DIR__) . '/views/user/requests/open-course-resource.php');
 if (!is_string($itemSaver)
     || !str_contains($itemSaver, 'mmh_course_resource_embed_details($url, \'recording\')')
     || !str_contains($itemSaver, "'url' => " . '$url')
+    || strpos($itemSaver, '$built = item_build_template(') === false
+    || strpos($itemSaver, '$built = item_build_template(') > strpos($itemSaver, "if (\$method === 'UPDATE')")
     || !is_string($form)
     || !str_contains($form, 'Paste a supported SharePoint, Microsoft Teams, or Google Drive recording link.')
+    || !str_contains($form, "\$raw_template_type === 'video'")
+    || !str_contains($form, "\$legacy_video_resolution['action'] ?? ''")
+    || !str_contains($form, "\$legacy_video_resolution['embed_kind'] ?? ''")
+    || !str_contains($form, "\$template_type = 'recording'")
+    || !is_string($courseContent)
+    || !str_contains($courseContent, 'Paste a supported SharePoint, Microsoft Teams, or Google Drive recording link.')
     || !is_string($viewer)
     || !str_contains($viewer, "? 'recording'")
     || !str_contains($viewer, 'data-resource-kind="<?= course_resource_escape($stageKind); ?>"')) {
     throw new RuntimeException('Admin Recording storage or shared viewer wiring is incomplete.');
+}
+
+// The edit form must route legacy video-typed recordings through the same
+// Recording editor. Resolve representative source rows exactly as the
+// pre-edit form does, then confirm their canonical playback classification.
+$legacySharePointRecording = mmh_course_resource_resolve_core([
+    'template_type' => 'video', 'item_type' => 'video', 'item_title' => 'Copied Recording',
+    'template_data' => json_encode(['url' => $share]), 'item_description' => '',
+]);
+$legacyDriveRecording = mmh_course_resource_resolve_core([
+    'template_type' => 'video', 'item_type' => 'video', 'item_title' => 'Copied Recording',
+    'template_data' => json_encode(['url' => $driveRecordingUrl]), 'item_description' => '',
+]);
+if (($legacySharePointRecording['action'] ?? '') !== 'recording_external'
+    || ($legacyDriveRecording['action'] ?? '') !== 'embed'
+    || ($legacyDriveRecording['embed_kind'] ?? '') !== 'google'
+    || ($legacyDriveRecording['url'] ?? '') !== $driveRecordingUrl) {
+    throw new RuntimeException('Legacy copied Recording edit classification no longer matches its canonical resolver behavior.');
+}
+
+// Recording URL validation/building is shared before the POST-vs-UPDATE
+// persistence branch. An Edit submission therefore stores the original Drive
+// URL in template_data and leaves preview derivation to the resolver.
+if (!str_contains($itemSaver, "case 'recording':")
+    || !str_contains($itemSaver, "mmh_course_resource_safe_url(\$url)")
+    || str_contains($itemSaver, "'url' => " . '$drivePreview')
+    || ($driveRecording['url'] ?? '') !== $driveRecordingUrl
+    || ($driveRecording['embed_url'] ?? '') !== 'https://drive.google.com/file/d/abc123_ABC-9/preview') {
+    throw new RuntimeException('Recording Edit does not reuse the shared URL validator/storage and canonical Drive preview resolver.');
 }
 
 $route = file_get_contents(dirname(__DIR__) . '/views/user/requests/open-course-resource.php');

@@ -154,7 +154,7 @@ $admin_base = rtrim((string) $baseUrl, '/') . '/admin/';
                     <button type="button" class="btn-close" data-manager-action="close-picker" aria-label="Close"></button>
                 </div>
                 <div class="course-manager-template-grid">
-                    <button type="button" class="course-manager-template" data-template="recording"><i class="fas fa-play-circle ds-icon" aria-hidden="true"></i><span>Recording</span><small>Paste a SharePoint recording link.</small></button>
+                    <button type="button" class="course-manager-template" data-template="recording"><i class="fas fa-play-circle ds-icon" aria-hidden="true"></i><span>Recording</span><small>Paste a supported SharePoint, Microsoft Teams, or Google Drive recording link.</small></button>
                     <button type="button" class="course-manager-template" data-template="notes"><i class="far fa-file-alt ds-icon" aria-hidden="true"></i><span>Notes</span><small>Add a structured Notes resource for the LMS viewer.</small></button>
                     <button type="button" class="course-manager-template" data-template="classified_assignment"><i class="fas fa-clipboard-list ds-icon" aria-hidden="true"></i><span>Assignment</span><small>Create homework and manage submissions.</small></button>
                     <button type="button" class="course-manager-template" data-template="timed_exam"><i class="fas fa-stopwatch ds-icon" aria-hidden="true"></i><span>Timed Exam</span><small>Fixed Window exam with a protected paper and secure submissions.</small></button>
