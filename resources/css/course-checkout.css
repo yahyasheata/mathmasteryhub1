@@ -39,8 +39,8 @@
 .course-payment-whatsapp, .course-payment-online { align-items: center; border-radius: var(--radius-sm); display: flex; font-size: .84rem; font-weight: 800; gap: .5rem; justify-content: center; margin-top: .75rem; min-height: 42px; padding: .6rem .75rem; text-decoration: none; width: 100%; }
 .course-payment-whatsapp { background: #159447; color: #fff; }
 .course-payment-whatsapp:hover { background: #0f7838; color: #fff; }
-.course-payment-online { background: var(--primary); border: 0; color: var(--text-inverse); cursor: pointer; font: inherit; }
-.course-payment-online:hover { background: var(--primary-hover); color: var(--text-inverse); }
+.course-payment-online { background: var(--primary-action); border: 0; color: var(--primary-foreground); cursor: pointer; font: inherit; }
+.course-payment-online:hover { background: var(--primary-action-hover); color: var(--primary-foreground); }
 .course-payment-online:disabled { cursor: wait; opacity: .65; }
 .course-payment-status, .course-payment-unavailable { color: var(--text-muted); font-size: .75rem; line-height: 1.5; margin: .55rem 0 0; }
 .course-checkout-login-note { color: var(--text-secondary); font-size: .78rem; line-height: 1.55; margin: .15rem .2rem 0; }

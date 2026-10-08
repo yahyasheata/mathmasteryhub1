@@ -43,26 +43,6 @@ if ($themeStmt) {
     document.documentElement.classList.toggle('dark', <?=$isDarkMode == 1 ? 'true' : 'false'?>);
 </script>
 <link rel="stylesheet" href="<?=mmh_site_public_url('resources/css/design-system.css')?>" data-design-system="mathhub" />
-<?php if ($isDarkMode == 1) { ?>
-<style type="text/css">
-    body.dash {
-        color-scheme: dark;
-        --bg-primary: #0f1718;
-        --bg-secondary: #121f21;
-        --surface: #172426;
-        --surface-elevated: #1d2d30;
-        --surface-hover: #243a3d;
-        --surface-muted: #142022;
-        --surface-inset: #0b1314;
-        --text-primary: #f8f5ef;
-        --text-secondary: #d8dedc;
-        --text-muted: #9eaaa8;
-        --border: rgba(216, 222, 220, .13);
-        --border-strong: rgba(216, 222, 220, .22);
-        --divider: color-mix(in srgb, var(--text-muted) 28%, transparent);
-    }
-</style>
-<?php } ?>
 <?=$adminMetaTags."\n"?>
     <?=$adminKeywords."\n"?>
 

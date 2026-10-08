@@ -27,8 +27,8 @@ body.free-learning-page > .free-learning-main { flex: 0 0 auto; }
 .free-learning-filters input:focus,
 .free-learning-filters select:focus,
 .free-learning-pagination a:focus-visible { outline: 3px solid color-mix(in srgb, var(--primary) 45%, transparent); outline-offset: 2px; }
-.free-learning-button.primary { color: var(--text-inverse); background: var(--primary); box-shadow: var(--shadow-sm); }
-.free-learning-button.primary:hover { background: var(--primary-hover); box-shadow: var(--shadow-md); }
+.free-learning-button.primary { color: var(--primary-foreground); background: var(--primary-action); box-shadow: var(--shadow-xs); }
+.free-learning-button.primary:hover { background: var(--primary-action-hover); box-shadow: var(--shadow-sm); }
 .free-learning-button.secondary { color: var(--secondary); border-color: color-mix(in srgb, var(--secondary) 28%, var(--border)); background: var(--secondary-soft); }
 .free-learning-button.ghost { color: var(--text-secondary); border-color: var(--border); background: var(--surface); }
 .free-learning-hero-note { min-height: 210px; padding: clamp(1.25rem, 3vw, 1.75rem); display: grid; align-content: center; gap: .7rem; border: 1px solid color-mix(in srgb, var(--primary) 28%, var(--border)); border-radius: var(--radius-xl); color: var(--text-secondary); background: color-mix(in srgb, var(--surface-elevated, var(--surface)) 84%, transparent); box-shadow: var(--shadow-md); }
@@ -60,8 +60,8 @@ body.free-learning-page > .free-learning-main { flex: 0 0 auto; }
 .free-learning-card-meta { display: flex; gap: .55rem; flex-wrap: wrap; margin-top: .7rem; color: var(--text-muted); font-size: .78rem; }
 .free-learning-card-meta span { display: inline-flex; gap: .28rem; align-items: center; }
 .free-learning-card-actions { display: flex; align-items: center; gap: .5rem; width: 100%; margin-top: auto; padding-top: .9rem; }
-.free-learning-card-open { display: inline-flex; align-items: center; min-height: 34px; padding: .46rem .68rem; border-radius: var(--radius-sm); color: var(--text-inverse); background: var(--primary); font-size: .82rem; font-weight: 800; text-decoration: none; }
-.free-learning-card-open:hover { color: var(--text-inverse); background: var(--primary-hover); text-decoration: none; }
+.free-learning-card-open { display: inline-flex; align-items: center; min-height: 34px; padding: .46rem .68rem; border-radius: var(--radius-sm); color: var(--primary-foreground); background: var(--primary-action); font-size: .82rem; font-weight: 800; text-decoration: none; }
+.free-learning-card-open:hover { color: var(--primary-foreground); background: var(--primary-action-hover); text-decoration: none; }
 .free-learning-save-placeholder { min-height: 34px; padding: .36rem .2rem; border: 0; color: var(--text-muted); background: transparent; font: inherit; font-size: .77rem; cursor: not-allowed; }
 .free-learning-share { width: 34px; height: 34px; margin-left: auto; display: grid; place-items: center; border: 1px solid var(--border); border-radius: var(--radius-sm); color: var(--text-secondary); background: var(--surface); cursor: pointer; }
 .free-learning-share:hover { color: var(--secondary); border-color: var(--secondary); }
@@ -96,7 +96,7 @@ body.free-learning-page > .free-learning-main { flex: 0 0 auto; }
 .free-learning-results-heading a { color: var(--secondary); font-weight: 800; text-decoration: none; }
 .free-learning-pagination { display: flex; justify-content: center; gap: .38rem; margin: 2rem 0 0; }
 .free-learning-pagination a { width: 36px; height: 36px; display: grid; place-items: center; border: 1px solid var(--border); border-radius: var(--radius-sm); color: var(--text-secondary); background: var(--surface); font-weight: 800; text-decoration: none; }
-.free-learning-pagination a.active { border-color: var(--primary); color: var(--text-inverse); background: var(--primary); }
+.free-learning-pagination a.active { border-color: var(--primary-action); color: var(--primary-foreground); background: var(--primary-action); }
 .free-learning-resource-hero { padding: 2rem 0; }
 .free-learning-resource-heading { display: flex; gap: 1.2rem; align-items: center; }
 .free-learning-resource-heading > img,

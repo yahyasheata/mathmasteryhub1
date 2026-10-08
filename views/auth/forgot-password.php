@@ -167,16 +167,16 @@ $authSupportWhatsAppUrl = mmh_site_settings_whatsapp_url($site_settings);
       width: 100%;
       min-height: 3.15rem;
       padding: .8rem 1.1rem;
-      border: 1px solid var(--primary);
+      border: 1px solid var(--primary-action);
       border-radius: var(--radius-sm);
-      background: var(--primary);
-      color: var(--text-inverse);
+      background: var(--primary-action);
+      color: var(--primary-foreground);
       cursor: pointer;
       font: inherit;
       font-weight: 800;
       transition: background var(--transition), border-color var(--transition), box-shadow var(--transition), transform var(--transition-fast);
     }
-    .password-reset-submit:hover { border-color: var(--primary-hover); background: var(--primary-hover); box-shadow: var(--shadow-sm); }
+    .password-reset-submit:hover { border-color: var(--primary-action-hover); background: var(--primary-action-hover); color: var(--primary-foreground); box-shadow: var(--shadow-xs); }
     .password-reset-submit:focus-visible { outline: 3px solid var(--primary-ring); outline-offset: 3px; }
     .password-reset-submit:active { transform: translateY(1px); }
     .password-reset-support { margin: 1.35rem 0 0; color: var(--text-muted); font-size: .78rem; line-height: 1.5; text-align: center; }

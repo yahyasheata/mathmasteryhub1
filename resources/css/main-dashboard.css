@@ -617,8 +617,8 @@ body.dash .was-validated :is(.form-control, .form-select):valid {
 }
 
 body.dash select[multiple] option:checked {
-    color: #fff;
-    background: var(--primary);
+    color: var(--primary-foreground);
+    background: var(--primary-action);
 }
 
 body.dash :is(.form-control, .form-select):disabled,
@@ -661,8 +661,8 @@ body.dash .form-check-input {
 }
 
 body.dash .form-check-input:checked {
-    background-color: var(--primary);
-    border-color: var(--primary);
+    background-color: var(--primary-action);
+    border-color: var(--primary-action);
 }
 
 body.dash .form-check-input:focus {

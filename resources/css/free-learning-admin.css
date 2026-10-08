@@ -240,7 +240,7 @@
 .free-learning-inline-details button { color: var(--danger); }
 .free-learning-pagination { display: flex; justify-content: center; gap: .35rem; margin-top: 1rem; }
 .free-learning-pagination a { width: 34px; height: 34px; display:grid; place-items:center; border:1px solid var(--border); border-radius:var(--radius-sm); color:var(--text-secondary); text-decoration:none; font-weight:800; }
-.free-learning-pagination a.active { color:var(--text-inverse); background:var(--primary); border-color:var(--primary); }
+.free-learning-pagination a.active { color:var(--primary-foreground); background:var(--primary-action); border-color:var(--primary-action); }
 .free-learning-maintenance summary { color: var(--text-primary); font-weight: 800; cursor:pointer; }
 @media (max-width: 900px) { .free-learning-submit-bar { align-items: flex-start; flex-direction: column; } .free-learning-table { min-width: 980px; } }
 @media (max-width: 640px) { .free-learning-form-section { padding:.85rem; } .free-learning-thumb-preview { min-height:110px; } .free-learning-chip-actions { width:100%; margin-left:0; } .free-learning-collection-chip { align-items:flex-start; flex-wrap:wrap; } }

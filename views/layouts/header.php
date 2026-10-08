@@ -38,7 +38,7 @@
             --font-2: currentColor;
             --border-color: var(--border);
             --main-color: var(--primary);
-            --main-color-rgb: 241, 90, 34;
+            --main-color-rgb: var(--primary-rgb);
             --main-color-flexable: var(--primary-soft);
             --scroll-bar-color: var(--border);
         }
@@ -49,7 +49,7 @@
             --font-2: currentColor;
             --border-color: var(--border);
             --main-color: var(--primary);
-            --main-color-rgb: 241, 90, 34;
+            --main-color-rgb: var(--primary-rgb);
             --main-color-flexable: var(--surface-elevated);
             --scroll-bar-color: var(--border);
         }

@@ -57,7 +57,7 @@
             --font-2: var(--text-secondary);
             --border-color: var(--border);
             --main-color: var(--primary);
-            --main-color-rgb: 241, 90, 34;
+            --main-color-rgb: var(--primary-rgb);
             --main-color-flexable: var(--primary);
             --scroll-bar-color: var(--border-strong);
         }
@@ -69,7 +69,7 @@
             --font-2: var(--text-secondary);
             --border-color: var(--border);
             --main-color: var(--primary);
-            --main-color-rgb: 241, 90, 34;
+            --main-color-rgb: var(--primary-rgb);
             --main-color-flexable: var(--surface-muted);
             --scroll-bar-color: var(--border-strong);
         }

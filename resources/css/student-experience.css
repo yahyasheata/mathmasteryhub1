@@ -1262,9 +1262,9 @@ html[data-student-theme] body.student-dashboard-page .student-dashboard-btn {
 }
 
 html[data-student-theme] body.student-dashboard-page .student-dashboard-btn.primary {
-  color: var(--text-inverse) !important;
-  background: var(--primary);
-  box-shadow: 0 10px 20px color-mix(in srgb, var(--primary) 20%, transparent);
+  color: var(--primary-foreground) !important;
+  background: var(--primary-action);
+  box-shadow: 0 4px 12px color-mix(in srgb, var(--primary-action) 16%, transparent);
 }
 
 html[data-student-theme] body.student-dashboard-page .student-dashboard-btn.secondary {
@@ -1405,9 +1405,10 @@ html[data-student-theme] body.student-dashboard-page .live-session-join-button {
 }
 
 html[data-student-theme] body.student-dashboard-page .live-session-join-button.primary {
-  background: linear-gradient(135deg, var(--primary), var(--primary-hover));
-  border-color: color-mix(in srgb, var(--primary-hover) 55%, var(--primary));
-  box-shadow: 0 14px 28px color-mix(in srgb, var(--primary) 24%, transparent);
+  color: var(--primary-foreground);
+  background: var(--primary-action);
+  border-color: var(--primary-action);
+  box-shadow: 0 4px 12px color-mix(in srgb, var(--primary-action) 16%, transparent);
 }
 
 html[data-student-theme] body.student-dashboard-page .live-session-join-button.is-disabled,

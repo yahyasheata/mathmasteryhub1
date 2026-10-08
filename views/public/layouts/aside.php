@@ -206,9 +206,9 @@ function public_nav_html($value) { return htmlspecialchars((string)$value, ENT_Q
     border: 1px solid var(--border);
   }
   .public-nav-button.primary {
-    background: var(--primary);
-    color: var(--text-inverse);
-    border-color: var(--primary);
+    background: var(--primary-action);
+    color: var(--primary-foreground);
+    border-color: var(--primary-action);
   }
   .public-nav-button.secondary {
     color: var(--text-secondary);

@@ -36,21 +36,21 @@ $result = mysqli_query($conn, $query);
         }
 
         .btn-info {
-            color: var(--text-inverse) !important;
-            background-color: var(--info) !important;
-            border-color: var(--info) !important;
+            color: var(--info-foreground) !important;
+            background-color: var(--info-action) !important;
+            border-color: var(--info-action) !important;
         }
 
         .btn-info:hover,
         .btn-info:focus {
-            background-color: var(--primary-hover) !important;
-            border-color: var(--primary-hover) !important;
-            color: var(--text-inverse) !important;
+            background-color: var(--primary-action-hover) !important;
+            border-color: var(--primary-action-hover) !important;
+            color: var(--primary-foreground) !important;
         }
 
         .bg-info {
-            background-color: var(--info) !important;
-            color: var(--text-inverse) !important;
+            background-color: var(--info-action) !important;
+            color: var(--info-foreground) !important;
         }
     </style>
 </head>

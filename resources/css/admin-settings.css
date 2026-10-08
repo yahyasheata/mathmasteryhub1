@@ -15,7 +15,7 @@ body.dash .admin-settings-layout{ display:grid; grid-template-columns:220px minm
 body.dash .admin-settings-nav{ position:sticky; top:76px; display:grid; gap:.28rem; padding:.55rem; border:1px solid var(--border); border-radius:var(--radius-lg); background:var(--surface); box-shadow:var(--shadow-sm); }
 body.dash .admin-settings-nav-item{ min-height:40px; display:flex; align-items:center; gap:.65rem; width:100%; padding:.55rem .7rem; border:0; border-radius:var(--radius-md); color:var(--text-secondary); background:transparent; font:inherit; font-size:.88rem; font-weight:750; text-align:left; cursor:pointer; }
 body.dash .admin-settings-nav-item:hover{ color:var(--text-primary); background:var(--surface-hover); }
-body.dash .admin-settings-nav-item.is-active{ color:var(--text-inverse); background:var(--primary); box-shadow:0 5px 12px color-mix(in srgb, var(--primary) 27%, transparent); }
+body.dash .admin-settings-nav-item.is-active{ color:var(--primary-foreground); background:var(--primary-action); box-shadow:0 3px 8px color-mix(in srgb,var(--primary-action) 18%,transparent); }
 body.dash .admin-settings-content{ min-width:0; }
 body.dash .admin-settings-panel{ display:none; animation:admin-settings-in 160ms ease both; }
 body.dash .admin-settings-panel.is-active{ display:grid; gap:1rem; }

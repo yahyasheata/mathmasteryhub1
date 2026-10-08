@@ -207,16 +207,18 @@
 }
 
 .course-learning-page .course-btn-primary {
-  color: var(--text-inverse);
-  background: linear-gradient(135deg, var(--primary), var(--secondary));
-  border: 1px solid color-mix(in srgb, var(--text-inverse) 8%, transparent);
-  box-shadow: 0 12px 24px color-mix(in srgb, var(--primary) 18%, transparent);
+  color: var(--primary-foreground);
+  background: var(--primary-action);
+  border: 1px solid var(--primary-action);
+  box-shadow: 0 4px 12px color-mix(in srgb, var(--primary-action) 16%, transparent);
 }
 
 .course-learning-page .course-btn-primary:hover,
 .course-learning-page .course-btn-primary:focus {
-  color: var(--text-inverse);
-  box-shadow: 0 16px 30px color-mix(in srgb, var(--primary) 26%, transparent);
+  color: var(--primary-foreground);
+  background: var(--primary-action-hover);
+  border-color: var(--primary-action-hover);
+  box-shadow: 0 5px 14px color-mix(in srgb, var(--primary-action) 18%, transparent);
 }
 
 .course-learning-page .course-btn-secondary {

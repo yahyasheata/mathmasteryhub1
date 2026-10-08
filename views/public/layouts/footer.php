@@ -24,7 +24,7 @@ $footerSocialLinks = array_filter($footerSocialLinks, static fn(array $meta, str
   .public-footer-links a:hover, .public-footer-links a:focus-visible { color: var(--primary); text-decoration: none; }
   .public-footer-social nav { display: flex; flex-wrap: wrap; gap: .5rem; }
   .public-footer-social a { width: 38px; height: 38px; display: grid; place-items: center; border: 1px solid var(--border); border-radius: 50%; color: var(--text-secondary); background: var(--surface-muted); text-decoration: none; transition: color 150ms ease, background 150ms ease, border-color 150ms ease, transform 150ms ease; }
-  .public-footer-social a:hover { transform: translateY(-1px); border-color: var(--primary); color: var(--text-inverse); background: var(--primary); }
+  .public-footer-social a:hover { transform: translateY(-1px); border-color: var(--primary-action); color: var(--primary-foreground); background: var(--primary-action); }
   .public-footer-social a:focus-visible { outline: 3px solid color-mix(in srgb, var(--primary) 45%, transparent); outline-offset: 2px; }
   .public-footer-bottom { margin-top: clamp(2rem, 5vw, 3.25rem); padding-top: 1.15rem; border-top: 1px solid var(--border); text-align: center; }
   .public-footer-bottom p { margin: 0; color: var(--text-muted); font-size: .82rem; }

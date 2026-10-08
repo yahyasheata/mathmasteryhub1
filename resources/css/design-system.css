@@ -8,46 +8,63 @@
   color-scheme: light;
 
   /* Brand */
-  --primary: #F15A22;
-  --primary-hover: #F58120;
+  --primary: #C64717;
+  --primary-hover: #B8421A;
+  --primary-rgb: 198, 71, 23;
+  --primary-action: #F15A22;
+  --primary-action-hover: #E95B22;
+  --primary-foreground: #112426;
   --primary-soft: color-mix(in srgb, var(--primary) 12%, transparent);
   --primary-ring: color-mix(in srgb, var(--primary) 26%, transparent);
-  --secondary: #008183;
-  --secondary-hover: #209EA1;
+  --secondary: #08797B;
+  --secondary-hover: #06696B;
+  --secondary-rgb: 8, 121, 123;
+  --secondary-action: #08797B;
+  --secondary-foreground: #ffffff;
   --secondary-soft: color-mix(in srgb, var(--secondary) 12%, transparent);
-  --accent: #FBAB33;
+  --accent: #956000;
   --accent-hover: color-mix(in srgb, var(--accent) 72%, var(--primary-hover));
   --accent-soft: color-mix(in srgb, var(--accent) 14%, transparent);
 
   /* Feedback */
-  --success: var(--secondary);
-  --success-soft: var(--secondary-soft);
-  --warning: var(--accent);
-  --warning-soft: var(--accent-soft);
-  --danger: var(--primary);
-  --danger-soft: var(--primary-soft);
-  --info: #006061;
-  --info-soft: color-mix(in srgb, var(--info) 14%, transparent);
+  --success: #176B5B;
+  --success-action: #176B5B;
+  --success-foreground: #ffffff;
+  --success-soft: color-mix(in srgb, var(--success) 11%, var(--surface));
+  --warning: #885500;
+  --warning-action: #F2BD55;
+  --warning-foreground: #253638;
+  --warning-soft: color-mix(in srgb, var(--warning) 11%, var(--surface));
+  --danger: #B3362F;
+  --danger-action: #B3362F;
+  --danger-foreground: #ffffff;
+  --danger-soft: color-mix(in srgb, var(--danger) 10%, var(--surface));
+  --info: #155D6C;
+  --info-action: #155D6C;
+  --info-foreground: #ffffff;
+  --info-soft: color-mix(in srgb, var(--info) 10%, var(--surface));
 
   /* Surfaces */
-  --bg-primary: color-mix(in srgb, var(--text-muted) 5%, white);
-  --bg-secondary: color-mix(in srgb, var(--text-muted) 9%, white);
-  --surface: #ffffff;
+  --bg-primary: #F3F5F3;
+  --bg-secondary: #EAEEEB;
+  --surface: #FCFDFB;
   --surface-elevated: #ffffff;
-  --surface-hover: color-mix(in srgb, var(--text-muted) 6%, white);
-  --surface-muted: color-mix(in srgb, var(--text-muted) 10%, white);
-  --surface-inset: color-mix(in srgb, var(--text-muted) 7%, white);
+  --surface-hover: #F0F5F2;
+  --surface-muted: #E9EFEC;
+  --surface-inset: #F6F8F6;
+  --disabled-bg: #E7ECE9;
+  --disabled-text: #687877;
 
   /* Text */
-  --text-primary: color-mix(in srgb, var(--text-muted) 72%, black);
-  --text-secondary: color-mix(in srgb, var(--text-muted) 82%, white);
-  --text-muted: #666768;
+  --text-primary: #203638;
+  --text-secondary: #43585A;
+  --text-muted: #596B6C;
   --text-inverse: #ffffff;
 
   /* Lines */
-  --border: color-mix(in srgb, var(--text-muted) 22%, white);
-  --border-strong: color-mix(in srgb, var(--text-muted) 38%, white);
-  --divider: color-mix(in srgb, var(--text-muted) 30%, transparent);
+  --border: #D5DEDA;
+  --border-strong: #B3C2BE;
+  --divider: color-mix(in srgb, var(--text-muted) 24%, transparent);
 
   /* Shadows */
   --shadow-xs: 0 1px 2px color-mix(in srgb, var(--text-muted) 10%, transparent);
@@ -112,18 +129,18 @@
   --icon-button-lg: 44px;
 
   /* Bootstrap compatibility: map existing framework variables to the shared brand tokens. */
-  --bs-primary: var(--primary);
+  --bs-primary: var(--primary-action);
   --bs-primary-rgb: 241, 90, 34;
-  --bs-secondary: var(--secondary);
-  --bs-secondary-rgb: 0, 129, 131;
-  --bs-success: var(--success);
-  --bs-success-rgb: 0, 129, 131;
-  --bs-info: var(--info);
-  --bs-info-rgb: 0, 96, 97;
-  --bs-warning: var(--warning);
-  --bs-warning-rgb: 251, 171, 51;
-  --bs-danger: var(--danger);
-  --bs-danger-rgb: 241, 90, 34;
+  --bs-secondary: var(--secondary-action);
+  --bs-secondary-rgb: 8, 121, 123;
+  --bs-success: var(--success-action);
+  --bs-success-rgb: 23, 107, 91;
+  --bs-info: var(--info-action);
+  --bs-info-rgb: 21, 93, 108;
+  --bs-warning: var(--warning-action);
+  --bs-warning-rgb: 242, 189, 85;
+  --bs-danger: var(--danger-action);
+  --bs-danger-rgb: 179, 54, 47;
   --bs-light: var(--surface-muted);
   --bs-dark: var(--info);
   --bs-body-bg: var(--bg-primary);
@@ -143,32 +160,70 @@ html[data-bs-theme="dark"],
 html[data-student-theme="dark"],
 body.night {
   color-scheme: dark;
-  --bg-primary: #11191b;
-  --bg-secondary: #162224;
-  --surface: #1b292c;
-  --surface-elevated: #223437;
-  --surface-hover: #2a4144;
-  --surface-muted: #172326;
-  --surface-inset: #0d1516;
-  --text-primary: #fbf8f2;
-  --text-secondary: #dce4e1;
-  --text-muted: #aab7b4;
+  --bg-primary: #111A1C;
+  --bg-secondary: #172325;
+  --surface: #1B2A2C;
+  --surface-elevated: #243638;
+  --surface-hover: #2B4244;
+  --surface-muted: #1A282A;
+  --surface-inset: #0D1719;
+  --disabled-bg: #273638;
+  --disabled-text: #A0AEAA;
+  --primary: #FF9468;
+  --primary-hover: #FFAD84;
+  --primary-rgb: 255, 148, 104;
+  --primary-action: #F15A22;
+  --primary-action-hover: #FF7A3D;
+  --primary-foreground: #112426;
+  --secondary: #43B6B4;
+  --secondary-hover: #70CBC7;
+  --secondary-rgb: 67, 182, 180;
+  --secondary-action: #08797B;
+  --secondary-foreground: #ffffff;
+  --accent: #F2B553;
+  --success: #65C4A4;
+  --success-action: #176B5B;
+  --success-foreground: #ffffff;
+  --warning: #F0C56B;
+  --warning-action: #F2BD55;
+  --warning-foreground: #253638;
+  --danger: #FF8980;
+  --danger-action: #B3362F;
+  --danger-foreground: #ffffff;
+  --info: #78C7D0;
+  --info-action: #155D6C;
+  --info-foreground: #ffffff;
+  --text-primary: #F6F3EB;
+  --text-secondary: #D5DFDB;
+  --text-muted: #B0BFBB;
   --text-inverse: #ffffff;
-  --border: rgba(220, 228, 225, .14);
-  --border-strong: rgba(220, 228, 225, .24);
+  --border: rgba(213, 223, 219, .16);
+  --border-strong: rgba(213, 223, 219, .28);
   --divider: color-mix(in srgb, var(--text-muted) 26%, transparent);
   --shadow-xs: 0 1px 2px rgba(0, 0, 0, .24);
   --shadow-sm: 0 8px 24px rgba(0, 0, 0, .24);
   --shadow-md: 0 18px 48px rgba(0, 0, 0, .32);
   --shadow-lg: 0 34px 82px rgba(0, 0, 0, .40);
-  --primary-soft: rgba(241, 90, 34, .18);
-  --primary-ring: rgba(241, 90, 34, .34);
-  --secondary-soft: rgba(32, 158, 161, .17);
-  --accent-soft: rgba(251, 171, 51, .17);
-  --success-soft: var(--secondary-soft);
-  --warning-soft: var(--accent-soft);
-  --danger-soft: var(--primary-soft);
-  --info-soft: rgba(32, 158, 161, .12);
+  --primary-soft: rgba(241, 90, 34, .16);
+  --primary-ring: rgba(241, 90, 34, .32);
+  --secondary-soft: rgba(67, 182, 180, .15);
+  --accent-soft: rgba(242, 181, 83, .16);
+  --success-soft: rgba(101, 196, 164, .14);
+  --warning-soft: rgba(240, 197, 107, .14);
+  --danger-soft: rgba(255, 137, 128, .14);
+  --info-soft: rgba(120, 199, 208, .14);
+  --bs-primary: var(--primary-action);
+  --bs-primary-rgb: 241, 90, 34;
+  --bs-secondary: var(--secondary-action);
+  --bs-secondary-rgb: 8, 121, 123;
+  --bs-success: var(--success-action);
+  --bs-success-rgb: 23, 107, 91;
+  --bs-info: var(--info-action);
+  --bs-info-rgb: 21, 93, 108;
+  --bs-warning: var(--warning-action);
+  --bs-warning-rgb: 242, 189, 85;
+  --bs-danger: var(--danger-action);
+  --bs-danger-rgb: 179, 54, 47;
 }
 
 @media (prefers-color-scheme: dark) {
@@ -505,23 +560,24 @@ a:focus-visible {
 .btn.disabled,
 button:disabled {
   cursor: not-allowed;
-  opacity: .58;
+  opacity: 1;
   transform: none;
 }
 
 .btn-primary,
 .course-btn-primary,
 .bg-primary {
-  background: var(--primary) !important;
-  border-color: var(--primary) !important;
-  color: var(--text-inverse) !important;
+  background: var(--primary-action) !important;
+  border-color: var(--primary-action) !important;
+  color: var(--primary-foreground) !important;
 }
 
 .btn-primary:hover,
 .course-btn-primary:hover,
 .bg-primary:hover {
-  background: var(--primary-hover) !important;
-  border-color: var(--primary-hover) !important;
+  background: var(--primary-action-hover) !important;
+  border-color: var(--primary-action-hover) !important;
+  color: var(--primary-foreground) !important;
 }
 
 .btn-secondary,
@@ -568,8 +624,9 @@ button:disabled {
 }
 
 .btn-danger {
-  background: var(--danger) !important;
-  color: var(--text-inverse) !important;
+  background: var(--danger-action) !important;
+  border-color: var(--danger-action) !important;
+  color: var(--danger-foreground) !important;
 }
 
 .btn-outline-danger {
@@ -588,8 +645,9 @@ button:disabled {
 }
 
 .btn-success {
-  background: var(--success) !important;
-  color: var(--text-inverse) !important;
+  background: var(--success-action) !important;
+  border-color: var(--success-action) !important;
+  color: var(--success-foreground) !important;
 }
 
 .btn-outline-success {
@@ -627,7 +685,7 @@ textarea.form-control {
 textarea::placeholder,
 input::placeholder {
   color: var(--text-muted) !important;
-  opacity: .8;
+  opacity: 1;
 }
 
 .form-control:focus,
@@ -649,8 +707,8 @@ textarea.form-control:focus,
 }
 
 .form-check-input:checked {
-  background-color: var(--primary);
-  border-color: var(--primary);
+  background-color: var(--primary-action);
+  border-color: var(--primary-action);
 }
 
 .form-check-input:focus {
@@ -715,9 +773,9 @@ table.dataTable.display > tbody > tr:hover {
 
 .page-item.active .page-link,
 .dataTables_wrapper .dataTables_paginate .paginate_button.current {
-  background: var(--primary) !important;
-  border-color: var(--primary) !important;
-  color: var(--text-inverse) !important;
+  background: var(--primary-action) !important;
+  border-color: var(--primary-action) !important;
+  color: var(--primary-foreground) !important;
 }
 
 /* Badges */
@@ -1189,9 +1247,9 @@ hr {
 .main-box-wedit [style*="background: var(--main-color"],
 .icon-circle,
 .avatar-circle {
-  background: linear-gradient(135deg, var(--primary), var(--secondary)) !important;
-  color: var(--text-inverse) !important;
-  box-shadow: var(--shadow-sm);
+  background: var(--primary-soft) !important;
+  color: var(--primary) !important;
+  box-shadow: none;
 }
 
 .main-box-wedit h6,
@@ -1259,14 +1317,14 @@ body.font-tajawal .rounded-xl {
 
 body.font-tajawal .bg-primary,
 body.font-tajawal .hover\:bg-primary\/90:hover {
-  background-color: var(--primary) !important;
-  color: var(--text-inverse) !important;
+  background-color: var(--primary-action) !important;
+  color: var(--primary-foreground) !important;
 }
 
 body.font-tajawal .bg-secondary,
 body.font-tajawal .hover\:bg-secondary\/90:hover {
-  background-color: var(--secondary) !important;
-  color: var(--text-inverse) !important;
+  background-color: var(--secondary-action) !important;
+  color: var(--secondary-foreground) !important;
 }
 
 body.font-tajawal .text-primary,
@@ -1307,6 +1365,19 @@ input[type="file"].form-control,
 .form-control[readonly] {
   background: var(--surface-muted) !important;
   color: var(--text-muted) !important;
+  border-color: var(--border-strong) !important;
+}
+
+input:disabled,
+select:disabled,
+textarea:disabled,
+button:disabled,
+.btn:disabled,
+.course-btn:disabled {
+  color: var(--disabled-text) !important;
+  background-color: var(--disabled-bg) !important;
+  border-color: var(--border) !important;
+  opacity: 1;
 }
 
 .select2-dropdown,
@@ -1348,6 +1419,14 @@ table.dataTable tbody td {
 .table tbody tr:hover td,
 table.dataTable tbody tr:hover td {
   color: var(--text-primary) !important;
+}
+
+.table-active > *,
+table.dataTable tr.selected > *,
+table.dataTable tr.selected:hover > * {
+  background-color: var(--surface-hover) !important;
+  color: var(--text-primary) !important;
+  box-shadow: inset 0 0 0 9999px var(--surface-hover) !important;
 }
 
 .dataTables_wrapper .dataTables_info,
@@ -1408,8 +1487,9 @@ body.font-tajawal button.bg-secondary {
 }
 
 .btn-info {
-  background: var(--info) !important;
-  color: var(--text-inverse) !important;
+  background: var(--info-action) !important;
+  border-color: var(--info-action) !important;
+  color: var(--info-foreground) !important;
 }
 
 .btn-outline-info {
@@ -1508,7 +1588,7 @@ body.font-tajawal button.bg-secondary {
 
 /* Modals, alerts, empty states, and notifications */
 .modal-backdrop.show {
-  background-color: color-mix(in srgb, var(--info) 72%, transparent);
+  background-color: rgba(7, 17, 19, .58);
 }
 
 .btn-close {
@@ -1519,6 +1599,14 @@ body.font-tajawal button.bg-secondary {
 .btn-close:hover {
   background-color: var(--surface-hover);
   opacity: 1;
+}
+
+html.dark .btn-close,
+html[data-theme="dark"] .btn-close,
+html[data-bs-theme="dark"] .btn-close,
+html[data-student-theme="dark"] .btn-close,
+body.night .btn-close {
+  filter: invert(1) grayscale(100%);
 }
 
 .alert h1,
@@ -1923,15 +2011,15 @@ body.font-tajawal .rounded-lg.shadow-lg {
 
 /* Buttons */
 .btn-warning {
-  background: var(--warning) !important;
-  border-color: var(--warning) !important;
-  color: var(--text-inverse) !important;
+  background: var(--warning-action) !important;
+  border-color: var(--warning-action) !important;
+  color: var(--warning-foreground) !important;
 }
 
 .btn-info {
-  background: var(--info) !important;
-  border-color: var(--info) !important;
-  color: var(--text-inverse) !important;
+  background: var(--info-action) !important;
+  border-color: var(--info-action) !important;
+  color: var(--info-foreground) !important;
 }
 
 .btn-light,
@@ -2124,7 +2212,7 @@ table.dataTable.display > tbody > tr.odd > * {
 
 .modal-backdrop.show,
 .swal2-backdrop-show {
-  background: color-mix(in srgb, var(--info) 78%, transparent) !important;
+  background: rgba(7, 17, 19, .58) !important;
   backdrop-filter: blur(3px);
 }
 
@@ -2176,8 +2264,8 @@ table.dataTable.display > tbody > tr.odd > * {
 .notification-count,
 .unread-count,
 .badge-counter {
-  background: var(--danger) !important;
-  color: var(--text-inverse) !important;
+  background: var(--danger-action) !important;
+  color: var(--danger-foreground) !important;
   border: 2px solid var(--surface);
 }
 
@@ -2333,7 +2421,7 @@ body.font-tajawal i[class*="fa-"] {
 .ds-bg-warning { background: var(--warning-soft) !important; color: var(--warning) !important; }
 .ds-bg-danger { background: var(--danger-soft) !important; color: var(--danger) !important; }
 .ds-bg-info { background: var(--info-soft) !important; color: var(--info) !important; }
-.ds-gradient-primary { background: linear-gradient(135deg, var(--primary), var(--secondary)) !important; color: var(--text-inverse) !important; }
+.ds-gradient-primary { background: var(--primary-action) !important; color: var(--primary-foreground) !important; }
 .ds-shadow-sm { box-shadow: var(--shadow-sm) !important; }
 .ds-shadow-md { box-shadow: var(--shadow-md) !important; }
 .ds-rounded-sm { border-radius: var(--radius-sm) !important; }

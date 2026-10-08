@@ -212,7 +212,7 @@
   transition: transform var(--transition-fast), background var(--transition-fast), border-color var(--transition-fast), color var(--transition-fast);
 }
 .past-papers-btn:hover { transform: translateY(-1px); text-decoration: none; }
-.past-papers-btn.primary { background: var(--primary); color: var(--text-inverse); }
+.past-papers-btn.primary { background: var(--primary-action); color: var(--primary-foreground); }
 .past-papers-btn.secondary { background: var(--secondary-soft); color: var(--secondary); border-color: color-mix(in srgb, var(--secondary) 25%, var(--border)); }
 .past-papers-btn.ghost { color: var(--text-secondary); border-color: var(--border); background: transparent; }
 
@@ -463,7 +463,7 @@
 .past-papers-list-action,
 .past-papers-list-dash { align-items: center; border: 1px solid var(--border); border-radius: .4rem; color: var(--text-muted); display: inline-flex; font-size: .72rem; font-weight: 900; justify-content: center; line-height: 1; min-height: 28px; min-width: 32px; padding: .25rem .42rem; text-decoration: none; }
 .past-papers-list-action:not(.is-locked) { background: color-mix(in srgb, var(--secondary) 10%, var(--surface)); border-color: color-mix(in srgb, var(--secondary) 25%, var(--border)); color: var(--secondary); }
-.past-papers-list-action:not(.is-locked):hover { background: var(--secondary); color: var(--text-inverse); text-decoration: none; }
+.past-papers-list-action:not(.is-locked):hover { background: var(--secondary-action); color: var(--secondary-foreground); text-decoration: none; }
 .past-papers-list-action.is-locked { cursor: help; opacity: .68; }
 .past-papers-list-dash { background: transparent; border-color: transparent; min-width: 22px; padding: 0; }
 .past-papers-list-other-actions { display: flex; flex-wrap: wrap; gap: .25rem; min-width: 120px; }
@@ -554,8 +554,8 @@
 .archive-filter-chip select { appearance: none; background: transparent; border: 0; color: var(--archive-ink); cursor: pointer; font: 800 .71rem/1 inherit; max-width: 9rem; outline: 0; padding: 0 1.1rem 0 0; text-overflow: ellipsis; }
 .archive-command-actions { align-items: center; display: flex; gap: .35rem; }
 .archive-apply-button, .archive-reset-button { align-items: center; border-radius: .55rem; display: inline-flex; font: 800 .73rem/1 inherit; justify-content: center; min-height: 2.55rem; padding: 0 .75rem; text-decoration: none; transition: transform 150ms ease, box-shadow 150ms ease, background 150ms ease; }
-.archive-apply-button { background: var(--primary); border: 1px solid var(--primary); color: var(--text-inverse); }
-.archive-apply-button:hover { background: var(--primary-hover); box-shadow: 0 7px 16px color-mix(in srgb, var(--primary) 28%, transparent); transform: translateY(-1px); }
+.archive-apply-button { background: var(--primary-action); border: 1px solid var(--primary-action); color: var(--primary-foreground); }
+.archive-apply-button:hover { background: var(--primary-action-hover); border-color: var(--primary-action-hover); box-shadow: 0 4px 12px color-mix(in srgb, var(--primary-action) 18%, transparent); transform: translateY(-1px); }
 .archive-reset-button { border: 1px solid transparent; color: var(--archive-muted); }
 .archive-reset-button:hover { background: var(--archive-surface-quiet); color: var(--archive-ink); }
 .archive-apply-button:active, .exam-resource-button:active { transform: translateY(0) scale(.97); }
@@ -584,7 +584,7 @@
 .exam-paper-resources { align-items: center; display: flex; flex-wrap: wrap; gap: .32rem; justify-content: flex-end; }
 .exam-resource-button { align-items: center; background: color-mix(in srgb, var(--secondary) 8%, var(--archive-surface)); border: 1px solid color-mix(in srgb, var(--secondary) 23%, var(--archive-line)); border-radius: .45rem; color: var(--secondary); display: inline-flex; font-size: .66rem; font-weight: 850; gap: .3rem; justify-content: center; line-height: 1; min-height: 1.95rem; min-width: 2.15rem; padding: .3rem .45rem; text-decoration: none; transition: border-color 150ms ease, box-shadow 150ms ease, transform 150ms ease, background 150ms ease, color 150ms ease; }
 .exam-resource-button > i { font-size: .67rem; }
-.exam-resource-button:hover { background: var(--secondary); border-color: var(--secondary); box-shadow: 0 6px 14px color-mix(in srgb, var(--secondary) 25%, transparent); color: var(--text-inverse); text-decoration: none; transform: translateY(-1px); }
+.exam-resource-button:hover { background: var(--secondary-action); border-color: var(--secondary-action); box-shadow: 0 3px 9px color-mix(in srgb, var(--secondary-action) 16%, transparent); color: var(--secondary-foreground); text-decoration: none; transform: translateY(-1px); }
 .exam-resource-button.is-unavailable { background: transparent; border-color: transparent; color: var(--archive-muted); cursor: help; opacity: .58; }
 .exam-resource-button.is-unavailable:hover { box-shadow: none; transform: none; }
 .exam-paper-mobile-feed { display: none; }
@@ -756,7 +756,7 @@
 .archive-syllabus-tabs small { color: var(--archive-muted); font-size: .62rem; font-weight: 700; }
 .archive-paper-tabs { align-items: center; display: flex; gap: .42rem; margin: 0 0 .72rem; overflow-x: auto; padding-bottom: .12rem; scrollbar-width: thin; }
 .archive-paper-tabs a { border-radius: 999px; min-height: 2.15rem; }
-.archive-paper-tabs a.is-active { background: var(--primary); border-color: var(--primary); box-shadow: 0 6px 16px color-mix(in srgb, var(--primary) 24%, transparent); color: var(--text-inverse); }
+.archive-paper-tabs a.is-active { background: var(--primary-action); border-color: var(--primary-action); box-shadow: 0 3px 9px color-mix(in srgb, var(--primary-action) 16%, transparent); color: var(--primary-foreground); }
 .archive-paper-tabs small { background: color-mix(in srgb, currentColor 13%, transparent); border-radius: 999px; font-size: .59rem; min-width: 1.1rem; padding: .12rem .25rem; text-align: center; }
 .archive-refine-bar { grid-template-columns: repeat(3, max-content) minmax(190px, 1fr) auto; margin-bottom: .72rem; }
 .archive-refine-bar .archive-search-control { grid-column: auto; }

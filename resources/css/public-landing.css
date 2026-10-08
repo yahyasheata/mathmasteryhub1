@@ -76,19 +76,19 @@
 }
 
 .public-landing .landing-button-primary {
-  background: var(--primary);
-  color: var(--text-inverse);
-  box-shadow: 0 10px 24px color-mix(in srgb, var(--primary) 18%, transparent);
+  background: var(--primary-action);
+  color: var(--primary-foreground);
+  box-shadow: 0 4px 12px color-mix(in srgb, var(--primary-action) 16%, transparent);
 }
 
 .public-landing .landing-button-primary span,
 .public-landing .landing-button-primary i {
-  color: var(--text-inverse);
+  color: var(--primary-foreground);
 }
 
 .public-landing .landing-button-primary:hover {
-  background: var(--primary-hover);
-  color: var(--text-inverse);
+  background: var(--primary-action-hover);
+  color: var(--primary-foreground);
 }
 
 .landing-button-secondary {
