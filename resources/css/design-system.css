@@ -300,7 +300,7 @@ html :is(input, select, textarea):disabled { background: var(--disabled-bg); col
   color: #B56A00;
   transition: transform var(--transition);
 }
-.mmh-theme-switch__icon { display: block; width: 16px; height: 16px; font-size: 15px; line-height: 1; }
+.mmh-theme-switch__icon { display: block; width: 16px; min-width: 16px; max-width: 16px; height: 16px; min-height: 16px; max-height: 16px; flex: 0 0 16px; font-size: 15px; line-height: 1; }
 .mmh-theme-icon-moon { display: none; }
 .dark .mmh-theme-icon-sun { display: none; }
 .dark .mmh-theme-icon-moon { display: block; }

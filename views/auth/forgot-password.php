@@ -191,7 +191,7 @@ $authSupportWhatsAppUrl = mmh_site_settings_whatsapp_url($site_settings);
           <img class="password-reset-logo password-reset-logo--dark" src="<?= htmlspecialchars($authDarkLogoUrl, ENT_QUOTES, 'UTF-8') ?>" alt="<?= htmlspecialchars($site_name, ENT_QUOTES, 'UTF-8') ?>">
         </a>
         <button class="password-reset-theme mmh-theme-switch" id="password-reset-theme" data-mmh-theme-toggle type="button" aria-label="Switch theme" aria-pressed="false">
-          <span class="mmh-theme-switch__knob" aria-hidden="true"><i class="fas fa-sun mmh-theme-switch__icon"></i></span>
+          <span class="mmh-theme-switch__knob" aria-hidden="true"><svg class="mmh-theme-switch__icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><g class="mmh-theme-icon-sun" fill="none" stroke="currentColor" stroke-linecap="round" stroke-width="1.8"><circle cx="12" cy="12" r="3.5"></circle><path d="M12 2.5v2.2M12 19.3v2.2M4.7 4.7l1.55 1.55m11.5 11.5 1.55 1.55M2.5 12h2.2m14.6 0h2.2M4.7 19.3l1.55-1.55m11.5-11.5L19.3 4.7"></path></g><path class="mmh-theme-icon-moon" d="M19.3 14.2A7.8 7.8 0 0 1 9.8 4.7a7.9 7.9 0 1 0 9.5 9.5Z" fill="currentColor"></path></svg></span>
         </button>
       </div>
 

@@ -263,9 +263,7 @@ function public_nav_html($value) { return htmlspecialchars((string)$value, ENT_Q
     color: var(--primary);
     background: var(--surface-hover);
   }
-  .public-theme-toggle.mmh-theme-switch { width:84px; min-width:84px; height:42px; min-height:42px; justify-content:flex-start; padding:4px; border:0; border-radius:999px; background:#AFCFC8; color:var(--primary-foreground); }
   .public-theme-toggle.mmh-theme-switch:hover { filter:brightness(.97); }
-  .dark .public-theme-toggle.mmh-theme-switch { background:#193A34; color:#F6AB32; }
   .public-mobile-menu {
     display: none;
     position: absolute;

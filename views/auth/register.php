@@ -116,13 +116,13 @@ foreach ($governorates as $governorate ) {
                 <nav class="hidden md:flex items-center gap-6">
                     <a href="#home" class='ds-text-secondary hover:text-primary font-medium transition duration-200'>Home</a>
                     <button id="theme-toggle" type="button" class="mmh-theme-switch" data-mmh-theme-toggle aria-label="Switch theme" aria-pressed="false">
-                        <span class="mmh-theme-switch__knob" aria-hidden="true"><i class="fas fa-sun mmh-theme-switch__icon"></i></span>
+                        <span class="mmh-theme-switch__knob" aria-hidden="true"><svg class="mmh-theme-switch__icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><g class="mmh-theme-icon-sun" fill="none" stroke="currentColor" stroke-linecap="round" stroke-width="1.8"><circle cx="12" cy="12" r="3.5"></circle><path d="M12 2.5v2.2M12 19.3v2.2M4.7 4.7l1.55 1.55m11.5 11.5 1.55 1.55M2.5 12h2.2m14.6 0h2.2M4.7 19.3l1.55-1.55m11.5-11.5L19.3 4.7"></path></g><path class="mmh-theme-icon-moon" d="M19.3 14.2A7.8 7.8 0 0 1 9.8 4.7a7.9 7.9 0 1 0 9.5 9.5Z" fill="currentColor"></path></svg></span>
                     </button>
                     <a href="<?=$authBaseUrl?>/login" class='bg-primary ds-text-inverse px-5 py-2 rounded-lg hover:bg-primary/90 transition duration-200'>Login</a>
                 </nav>
                 <div class="flex items-center gap-4 md:hidden">
                     <button id="theme-toggle-mobile" type="button" class="mmh-theme-switch" data-mmh-theme-toggle aria-label="Switch theme" aria-pressed="false">
-                        <span class="mmh-theme-switch__knob" aria-hidden="true"><i class="fas fa-sun mmh-theme-switch__icon"></i></span>
+                        <span class="mmh-theme-switch__knob" aria-hidden="true"><svg class="mmh-theme-switch__icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><g class="mmh-theme-icon-sun" fill="none" stroke="currentColor" stroke-linecap="round" stroke-width="1.8"><circle cx="12" cy="12" r="3.5"></circle><path d="M12 2.5v2.2M12 19.3v2.2M4.7 4.7l1.55 1.55m11.5 11.5 1.55 1.55M2.5 12h2.2m14.6 0h2.2M4.7 19.3l1.55-1.55m11.5-11.5L19.3 4.7"></path></g><path class="mmh-theme-icon-moon" d="M19.3 14.2A7.8 7.8 0 0 1 9.8 4.7a7.9 7.9 0 1 0 9.5 9.5Z" fill="currentColor"></path></svg></span>
                     </button>
                     <button id="menu-toggle" class='flex items-center ds-text-secondary hover:text-primary focus:outline-none'>
                         <i class="fas fa-bars text-xl"></i>
