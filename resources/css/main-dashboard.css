@@ -386,7 +386,7 @@ pre{
 }
 
 .dash *:not(.fileuploader):not([class^="fileuploader-icon-"]):not([class^="fa"]):not(.cairo):not([class^="vj"]):not([class^="tie-"]) {
-    font-family: 'DinNext',sans-serif!important;
+    font-family: var(--font-sans, "DM Sans", sans-serif) !important;
     direction: ltr;
 }
 .sub-item{
@@ -446,12 +446,12 @@ body.dash > .col-12.d-flex {
 
 .top-nav,
 .main-content.in-active .top-nav {
-    position: fixed !important;
-    top: 0;
+    position: relative;
+    top: auto;
     height: 55px;
-    width: calc(100% - var(--admin-sidebar-width)) !important;
-    left: var(--admin-sidebar-width) !important;
-    right: auto !important;
+    width: 100%;
+    left: auto;
+    right: auto;
 }
 
 .main-content.active .top-nav {
@@ -460,12 +460,13 @@ body.dash > .col-12.d-flex {
     right: auto !important;
 }
 
-/* Keep the Admin top bar aligned with the fixed sidebar/content shell.
-   Pages reserve its existing 55px slot, so this does not change content flow. */
+/* Keep the Admin top bar in document flow; the fixed sidebar remains separate. */
 body.dash .main-content > .admin-top-nav {
-    position: fixed !important;
-    top: 0 !important;
-    z-index: 1050;
+    position: relative;
+    top: auto;
+    z-index: 5;
+    width: 100%;
+    flex: 0 0 55px;
     border-radius: 0 !important;
 }
 

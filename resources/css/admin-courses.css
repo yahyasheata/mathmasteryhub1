@@ -4,9 +4,9 @@ body.dash.admin-courses-page .admin-course-list {
   gap: 1rem;
   padding: clamp(1rem, 2vw, 1.5rem);
   background: var(--surface);
-  border: 1px solid var(--border);
+  border: 1px solid var(--border-strong);
   border-radius: var(--radius-lg);
-  box-shadow: var(--shadow-sm);
+  box-shadow: var(--shadow-xs);
 }
 
 body.dash.admin-courses-page .admin-course-list-toolbar,
@@ -46,7 +46,7 @@ body.dash.admin-courses-page .admin-course-list-eyebrow {
 body.dash.admin-courses-page .admin-course-filters {
   padding: .75rem;
   background: var(--surface-muted);
-  border: 1px solid var(--border);
+  border: 1px solid var(--border-strong);
   border-radius: var(--radius-md);
 }
 
@@ -79,7 +79,7 @@ body.dash.admin-courses-page .admin-course-filters .form-select { flex: 0 1 9rem
 
 body.dash.admin-courses-page .admin-course-table-wrap {
   overflow: auto;
-  border: 1px solid var(--border);
+  border: 1px solid var(--border-strong);
   border-radius: var(--radius-md);
 }
 
@@ -89,7 +89,7 @@ body.dash.admin-courses-page .admin-course-table {
   margin: 0;
   border-collapse: collapse;
   table-layout: fixed;
-  background: var(--surface);
+  background: var(--surface-elevated);
 }
 
 /* One table layout governs headers and rows. The course summary stays inside

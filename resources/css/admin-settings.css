@@ -1,7 +1,7 @@
 /* Admin Website Settings: page-scoped presentation over the shared design system. */
 body.dash.admin-settings-page{ --settings-width: 1280px; }
 body.dash .admin-settings-main{ min-height: 100vh; overflow: visible !important; }
-body.dash .admin-settings-shell{ width: min(var(--settings-width), calc(100% - 32px)); margin: 0 auto; padding: calc(55px + 2rem) 0 5.5rem; }
+body.dash .admin-settings-shell{ width: min(var(--settings-width), calc(100% - 32px)); margin: 0 auto; padding: 2rem 0 5.5rem; }
 body.dash .admin-settings-header{ display:flex; align-items:flex-end; justify-content:space-between; gap:1.5rem; margin-bottom:1.35rem; }
 body.dash .admin-settings-eyebrow{ margin:0 0 .35rem; color:var(--primary); font-size:.78rem; font-weight:800; letter-spacing:.08em; text-transform:uppercase; }
 body.dash .admin-settings-header h1{ margin:0; color:var(--text-primary); font-size:clamp(1.55rem, 3vw, 2.2rem); font-weight:850; }
@@ -84,3 +84,7 @@ body.dash .admin-settings-savebar .btn{ min-width:156px; }
 @media (max-width: 980px){ body.dash .admin-settings-layout{ grid-template-columns:1fr; } body.dash .admin-settings-nav{ position:static; grid-template-columns:repeat(5,minmax(0,1fr)); overflow-x:auto; } body.dash .admin-settings-nav-item{ justify-content:center; white-space:nowrap; } body.dash .admin-settings-savebar{ grid-column:auto; } }
 @media (max-width: 720px){ body.dash .admin-settings-shell{ width:min(100% - 20px,var(--settings-width)); padding-top:calc(55px + 1.1rem); } body.dash .admin-settings-header{ align-items:flex-start; flex-direction:column; } body.dash .admin-settings-header-meta{ justify-items:start; } body.dash .admin-settings-nav{ display:flex; padding:.4rem; white-space:nowrap; } body.dash .admin-settings-nav-item{ width:auto; flex:0 0 auto; } body.dash .admin-settings-grid.two,body.dash .asset-grid,body.dash .admin-settings-status-grid{ grid-template-columns:1fr; } body.dash .admin-settings-asset{ grid-template-columns:78px minmax(0,1fr); } body.dash .admin-settings-asset-preview{ width:78px; height:64px; } body.dash .admin-settings-savebar{ align-items:flex-start; flex-direction:column; } body.dash .admin-settings-savebar .btn{ width:100%; } }
 @media (prefers-reduced-motion: reduce){ body.dash .admin-settings-panel{ animation:none; } }
+
+/* The Admin bar now participates in document flow, so content no longer reserves a fixed-height slot. */
+body.dash .admin-settings-shell { padding-top: 2rem; }
+@media (max-width: 720px) { body.dash .admin-settings-shell { padding-top: 1.1rem; } }

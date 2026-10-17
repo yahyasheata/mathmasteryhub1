@@ -167,6 +167,10 @@ html:has(.course-manager-page) .admin-top-nav { overflow-x: hidden; }
   .course-manager-assignment-row .course-manager-assignment-link { justify-content: center; min-height: 36px; }
 }
 
+/* The top navigation is in flow now; avoid retaining its former fixed-bar offset. */
+.course-manager-page { margin-top: 0; }
+.course-manager-bulk-bar { top: 12px; }
+
 /* Admin-only student-view preview. Kept in the Course Manager stylesheet so
    all content types share the same shell and visual rhythm. */
 .course-content-preview-page { max-width: 1320px; }

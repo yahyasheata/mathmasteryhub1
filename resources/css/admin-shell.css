@@ -15,7 +15,8 @@ body.dash .admin-sidebar {
   min-height: 100vh;
   flex-direction: column;
   border-right: 1px solid var(--border);
-  box-shadow: 8px 0 28px color-mix(in srgb, var(--text-primary) 5%, transparent);
+  border-radius: 0 !important;
+  box-shadow: none;
   transition: transform .2s ease, box-shadow .2s ease;
 }
 
@@ -61,10 +62,12 @@ body.dash .admin-sidebar {
 .admin-nav-logout { color:var(--danger); }
 .admin-nav-logout:hover, .admin-nav-logout:focus-visible { color:var(--danger); background:color-mix(in srgb,var(--danger) 10%,var(--surface)); }
 
-body.dash .admin-top-nav { min-height:55px; border:0; border-bottom:1px solid var(--border); border-radius:0 !important; margin:0; box-shadow:none; }
+body.dash .admin-top-nav { min-height:55px; height:55px; border:0; border-bottom:1px solid var(--border); border-radius:0 !important; margin:0; box-shadow:none; }
 body.dash .admin-top-nav .admin-sidebar-toggle { border:0; border-inline-end:1px solid var(--border); color:var(--text-secondary); background:transparent; }
 body.dash .admin-top-nav .admin-sidebar-toggle:hover, body.dash .admin-top-nav .admin-sidebar-toggle:focus-visible { color:var(--primary); background:var(--surface-hover); outline:none; }
 body.dash .admin-top-nav img { object-fit:cover; }
+/* Legacy admin pages reserved a 55px gap for the formerly fixed bar. */
+body.dash .main-content > .admin-top-nav + .col-12 { margin-top:0 !important; }
 body.dash .main-content { min-width:0; }
 body.dash .main-content > :is(.col-12, main) { min-width:0; }
 body.dash .main-box, body.dash .admin-dashboard-card, body.dash .card { overflow:hidden; }
@@ -148,8 +151,8 @@ body.dash :is(a,button,input,select,textarea):focus-visible { outline:3px solid 
   body.dash .aside { width:var(--admin-sidebar-width) !important; }
   body.dash .main-content, body.dash .main-content.in-active { width:calc(100% - var(--admin-sidebar-width)); max-width:calc(100% - var(--admin-sidebar-width)); margin-left:var(--admin-sidebar-width) !important; }
   body.dash .main-content.active { width:100% !important; max-width:100%; margin-left:0 !important; }
-  body.dash .main-content.in-active .top-nav { width:calc(100% - var(--admin-sidebar-width)) !important; left:var(--admin-sidebar-width) !important; }
-  body.dash .main-content.active .top-nav { width:100% !important; left:0 !important; }
+  body.dash .main-content.in-active .top-nav { width:100% !important; left:auto !important; }
+  body.dash .main-content.active .top-nav { width:100% !important; left:auto !important; }
   body.dash.admin-sidebar-collapsed .admin-sidebar { transform:translateX(-100%); }
   body.dash.admin-sidebar-collapsed .main-content { width:100% !important; max-width:100%; margin-left:0 !important; }
 }
@@ -158,7 +161,7 @@ body.dash :is(a,button,input,select,textarea):focus-visible { outline:3px solid 
   body.dash.admin-sidebar-mobile-open .admin-sidebar { transform:translateX(0); box-shadow:12px 0 36px rgba(0,0,0,.2); }
   body.dash.admin-sidebar-mobile-open::after { position:fixed; inset:0; z-index:1090; display:block; background:rgba(0,0,0,.38); content:""; }
   body.dash .main-content, body.dash .main-content.in-active, body.dash .main-content.active { width:100% !important; max-width:100%; margin-left:0 !important; }
-  body.dash .main-content .top-nav, body.dash .main-content.in-active .top-nav, body.dash .main-content.active .top-nav { width:100% !important; left:0 !important; }
+  body.dash .main-content .top-nav, body.dash .main-content.in-active .top-nav, body.dash .main-content.active .top-nav { width:100% !important; left:auto !important; }
   body.dash .admin-sidebar-nav { padding-inline:.65rem; }
 }
 @media (prefers-reduced-motion:reduce) { .admin-sidebar, .admin-nav-chevron, .admin-nav-link, .admin-nav-group-toggle { transition:none; } }

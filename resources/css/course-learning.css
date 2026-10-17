@@ -302,7 +302,7 @@
   color: var(--text-secondary);
   background: color-mix(in srgb, var(--text-inverse) 4%, transparent);
   border: 1px solid color-mix(in srgb, var(--text-inverse) 8%, transparent);
-  border-radius: 999px;
+  border-radius: var(--radius-sm);
   padding: 6px 10px;
   font-size: .78rem;
   font-weight: 800;
@@ -317,8 +317,8 @@
 .course-learning-page .student-course-section {
   background: color-mix(in srgb, var(--text-inverse) 2%, transparent);
   border: 1px solid color-mix(in srgb, var(--text-inverse) 8%, transparent);
-  border-radius: var(--radius-xl);
-  box-shadow: 0 14px 28px color-mix(in srgb, var(--text-primary) 16%, transparent);
+  border-radius: var(--radius-md);
+  box-shadow: none;
   overflow: hidden;
   transition: transform .24s ease, box-shadow .24s ease, border-color .24s ease, background .24s ease;
 }
@@ -339,7 +339,7 @@
   width: 100%;
   padding: clamp(11px, 1.6vw, 15px);
   color: var(--text-primary);
-  background: linear-gradient(90deg, color-mix(in srgb, var(--text-inverse) 4%, transparent), color-mix(in srgb, var(--text-inverse) 2%, transparent));
+  background: var(--surface);
   border: 0;
   cursor: pointer;
   text-align: left;
@@ -348,7 +348,7 @@
 
 .course-learning-page .student-course-section-toggle:hover,
 .course-learning-page .student-course-section-toggle:focus {
-  background: linear-gradient(90deg, color-mix(in srgb, var(--primary) 10%, transparent), color-mix(in srgb, var(--secondary) 6%, transparent));
+  background: var(--surface-hover);
 }
 
 .course-learning-page .student-course-section-toggle:focus-visible {
@@ -407,10 +407,10 @@
   width: max-content;
   max-width: 100%;
   min-height: 22px;
-  color: var(--primary);
-  background: var(--primary-soft);
-  border: 1px solid color-mix(in srgb, var(--primary) 20%, transparent);
-  border-radius: 999px;
+  color: var(--text-secondary);
+  background: var(--surface-muted);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
   padding: 4px 9px;
   font-size: .74rem;
   font-weight: 850;
@@ -426,9 +426,9 @@
 
 .course-learning-page .student-course-section-count {
   color: var(--text-secondary);
-  background: color-mix(in srgb, var(--text-inverse) 4%, transparent);
-  border: 1px solid color-mix(in srgb, var(--text-inverse) 8%, transparent);
-  border-radius: 999px;
+  background: var(--surface-muted);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
   padding: 6px 10px;
   font-size: .78rem;
   font-weight: 800;
@@ -445,68 +445,12 @@
   transform: rotate(180deg);
 }
 
-.course-learning-page .student-course-section.section-type-week .student-course-section-icon,
-.course-learning-page .student-course-section.section-type-week .student-course-section-type {
-  color: var(--info);
-  background: color-mix(in srgb, var(--info) 13%, transparent);
-  border-color: color-mix(in srgb, var(--info) 22%, transparent);
-}
-
-.course-learning-page .student-course-section.section-type-unit .student-course-section-icon,
-.course-learning-page .student-course-section.section-type-unit .student-course-section-type,
-.course-learning-page .student-course-section.section-type-chapter .student-course-section-icon,
-.course-learning-page .student-course-section.section-type-chapter .student-course-section-type,
-.course-learning-page .student-course-section.section-type-module .student-course-section-icon,
-.course-learning-page .student-course-section.section-type-module .student-course-section-type {
-  color: var(--text-muted);
-  background: color-mix(in srgb, var(--text-muted) 13%, transparent);
-  border-color: color-mix(in srgb, var(--text-muted) 22%, transparent);
-}
-
-.course-learning-page .student-course-section.section-type-revision .student-course-section-icon,
-.course-learning-page .student-course-section.section-type-revision .student-course-section-type {
-  color: var(--warning);
-  background: color-mix(in srgb, var(--warning) 12%, transparent);
-  border-color: color-mix(in srgb, var(--warning) 22%, transparent);
-}
-
-.course-learning-page .student-course-section.section-type-practice .student-course-section-icon,
-.course-learning-page .student-course-section.section-type-practice .student-course-section-type {
-  color: var(--secondary);
-  background: var(--secondary-soft);
-  border-color: color-mix(in srgb, var(--secondary) 24%, transparent);
-}
-
-.course-learning-page .student-course-section.section-type-resources .student-course-section-icon,
-.course-learning-page .student-course-section.section-type-resources .student-course-section-type,
-.course-learning-page .student-course-section.section-type-general .student-course-section-icon,
-.course-learning-page .student-course-section.section-type-general .student-course-section-type {
-  color: var(--text-muted);
-  background: color-mix(in srgb, var(--text-muted) 12%, transparent);
-  border-color: color-mix(in srgb, var(--text-muted) 20%, transparent);
-}
-
-.course-learning-page .student-course-section.section-type-live_session .student-course-section-icon,
-.course-learning-page .student-course-section.section-type-live_session .student-course-section-type,
-.course-learning-page .student-course-section.section-type-office_hours .student-course-section-icon,
-.course-learning-page .student-course-section.section-type-office_hours .student-course-section-type {
-  color: var(--info);
-  background: color-mix(in srgb, var(--info) 12%, transparent);
-  border-color: color-mix(in srgb, var(--info) 22%, transparent);
-}
-
-.course-learning-page .student-course-section.section-type-bonus .student-course-section-icon,
-.course-learning-page .student-course-section.section-type-bonus .student-course-section-type {
-  color: var(--warning);
-  background: color-mix(in srgb, var(--warning) 13%, transparent);
-  border-color: color-mix(in srgb, var(--warning) 24%, transparent);
-}
-
-.course-learning-page .student-course-section.section-type-custom .student-course-section-icon,
-.course-learning-page .student-course-section.section-type-custom .student-course-section-type {
-  color: var(--accent);
-  background: color-mix(in srgb, var(--accent) 12%, transparent);
-  border-color: color-mix(in srgb, var(--accent) 24%, transparent);
+/* Section type labels stay neutral; the name itself carries the category. */
+.course-learning-page .student-course-section-icon,
+.course-learning-page .student-course-section-type {
+  color: var(--text-secondary);
+  background: var(--surface-muted);
+  border-color: var(--border);
 }
 
 .course-learning-page .student-course-section-body {
@@ -858,23 +802,25 @@
 }
 
 .course-learning-page .student-course-section {
-  background: color-mix(in srgb, var(--surface) 94%, transparent);
-  box-shadow: var(--shadow-xs);
+  background: var(--surface);
+  border-color: var(--border);
+  border-radius: var(--radius-md);
+  box-shadow: none;
 }
 
 .course-learning-page .student-course-section:not(.is-open) {
-  border-color: color-mix(in srgb, var(--text-muted) 12%, transparent);
+  border-color: var(--border);
   box-shadow: none;
 }
 
 .course-learning-page .student-course-section.is-open {
-  background: linear-gradient(180deg, var(--surface-elevated), color-mix(in srgb, var(--surface) 88%, var(--secondary) 12%));
-  border-color: color-mix(in srgb, var(--primary) 34%, var(--border));
-  box-shadow: var(--shadow-md);
+  background: var(--surface);
+  border-color: var(--border-strong);
+  box-shadow: none;
 }
 
 .course-learning-page .student-course-section.is-open .student-course-section-toggle {
-  background: linear-gradient(90deg, color-mix(in srgb, var(--primary) 11%, transparent), color-mix(in srgb, var(--secondary) 8%, transparent));
+  background: var(--surface-muted);
 }
 
 .course-learning-page .student-course-section:not(.is-open) .student-course-section-toggle {
@@ -905,13 +851,16 @@
 }
 
 .course-learning-page .course-lesson-card {
-  background: color-mix(in srgb, var(--surface-elevated) 86%, transparent);
-  border-color: color-mix(in srgb, var(--text-muted) 13%, transparent);
+  background: var(--surface-elevated);
+  border-color: var(--border);
+  border-radius: var(--radius-sm);
+  box-shadow: none;
 }
 
 .course-learning-page .course-lesson-card:hover,
 .course-learning-page .course-lesson-card:focus-within {
-  box-shadow: var(--shadow-sm);
+  box-shadow: none;
+  border-color: var(--border-strong);
 }
 
 .course-learning-page .accordion.course-lesson-trigger {
@@ -1042,31 +991,33 @@
 }
 
 html[data-student-theme="dark"] .course-learning-page #app {
-  background:
-    radial-gradient(circle at top left, color-mix(in srgb, var(--primary) 10%, transparent), transparent 34rem),
-    radial-gradient(circle at top right, color-mix(in srgb, var(--secondary-hover) 8%, transparent), transparent 30rem),
-    var(--bg-primary);
+  background: var(--bg-primary);
 }
 
 html[data-student-theme="dark"] .course-learning-page .course-overview-card,
 html[data-student-theme="dark"] .course-learning-page .course-header-card,
 html[data-student-theme="dark"] .course-learning-page .course-lessons-section,
 html[data-student-theme="dark"] .course-learning-page .course-progress-summary {
-  background: linear-gradient(180deg, color-mix(in srgb, var(--surface-elevated) 86%, transparent), color-mix(in srgb, var(--surface) 96%, transparent));
-  border-color: color-mix(in srgb, var(--text-muted) 18%, transparent);
+  background: var(--surface);
+  border-color: var(--border);
 }
 
 html[data-student-theme="dark"] .course-learning-page .student-course-section:not(.is-open) {
-  background: color-mix(in srgb, var(--surface) 84%, transparent);
+  background: var(--surface);
 }
 
 html[data-student-theme="dark"] .course-learning-page .student-course-section.is-open {
-  background: linear-gradient(180deg, color-mix(in srgb, var(--surface-elevated) 94%, var(--secondary) 6%), var(--surface));
-  border-color: color-mix(in srgb, var(--primary-hover) 30%, var(--border));
+  background: var(--surface);
+  border-color: var(--border-strong);
+}
+
+html[data-student-theme="dark"] .course-learning-page .student-course-section.is-open .student-course-section-toggle {
+  background: var(--surface-muted);
 }
 
 html[data-student-theme="dark"] .course-learning-page .course-lesson-card {
-  background: color-mix(in srgb, var(--surface-elevated) 88%, transparent);
+  background: var(--surface-elevated);
+  border-color: var(--border);
 }
 
 html[data-student-theme="dark"] .course-learning-page .course-lesson-card[data-active-lesson='1'] .course-lesson-title {
@@ -2156,7 +2107,7 @@ body.theme-light .course-learning-page .student-course-section.is-locked .studen
 .course-homework-status, .course-homework-due { display: inline-flex; align-items: center; gap: 6px; }
 .course-homework-status { padding: 4px 9px; border: 1px solid var(--border); border-radius: 999px; font-weight: 700; }
 .course-homework-status .fa-circle { font-size: .5rem; }
-.course-homework-status.is-pending { color: var(--text-secondary); }.course-homework-status.is-submitted { color: var(--success); }.course-homework-status.is-late,.course-homework-status.is-overdue { color: var(--warning); }.course-homework-status.is-legacy-late { color: var(--accent); border-color: color-mix(in srgb, var(--accent) 45%, var(--border)); }.course-homework-status.is-graded { color: var(--secondary); }
+.course-homework-status.is-pending { color: var(--text-secondary); }.course-homework-status.is-submitted { color: var(--success); }.course-homework-status.is-late { color: var(--warning); }.course-homework-status.is-overdue { color: var(--danger); background: var(--danger-soft); border-color: color-mix(in srgb, var(--danger) 30%, var(--border)); }.course-homework-status.is-legacy-late { color: var(--accent); border-color: color-mix(in srgb, var(--accent) 45%, var(--border)); }.course-homework-status.is-graded { color: var(--secondary); }
 .course-homework-imported-badge { display: inline-flex; align-items: center; margin-inline-start: .45rem; padding: .18rem .45rem; border: 1px solid color-mix(in srgb, var(--secondary) 40%, var(--border)); border-radius: 999px; color: var(--secondary); font-size: .74rem; font-weight: 700; white-space: nowrap; }
 .assignment-progress-imported { display: inline-flex; align-items: center; margin-inline-start: .45rem; padding: .16rem .42rem; border: 1px solid color-mix(in srgb, var(--secondary) 40%, var(--border)); border-radius: 6px !important; color: var(--secondary); font-size: .72rem; font-weight: 700; white-space: nowrap; }
 .course-homework-heading .course-resource-viewer-return { margin-left: auto; }
