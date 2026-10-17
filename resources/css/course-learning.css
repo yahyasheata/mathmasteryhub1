@@ -1073,6 +1073,18 @@ html[data-student-theme="dark"] .course-learning-page .panel.course-lesson-panel
   font-size: .84rem;
 }
 
+.course-learning-page .course-live-session-details {
+  color: var(--text-secondary);
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px 16px;
+  min-width: 0;
+}
+
+.course-learning-page .course-live-session-join {
+  justify-self: start;
+}
+
 .course-learning-page .course-completed-state {
   align-items: center;
   background: color-mix(in srgb, var(--success) 11%, var(--surface-elevated));

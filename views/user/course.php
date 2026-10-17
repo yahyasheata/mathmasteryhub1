@@ -14,6 +14,7 @@ require_once 'inc/CourseResourceResolver.php';
 require_once 'inc/CourseHomeworkRenderer.php';
 require_once 'inc/TimedExam.php';
 require_once 'inc/StudentResourceGateway.php';
+require_once 'inc/LiveSessions.php';
 $pageName = "course";
 $username = $_SESSION['username'] ?? '';
 $conn = db();
@@ -65,6 +66,20 @@ if ($username !== '' && $requested_course_id !== '') {
         } else {
             $course_access_message = 'You are not enrolled in this course.';
         }
+    }
+}
+
+$course_upcoming_session = null;
+$course_upcoming_join_state = null;
+if ($course_access_allowed && $user_id !== null) {
+    $course_sessions = mmh_live_occurrences($conn, $course_id, 0, 45, (int) $user_id);
+    foreach ($course_sessions as $course_session) {
+        if (!in_array((string) ($course_session['status'] ?? ''), ['scheduled', 'rescheduled'], true)) continue;
+        $startsAt = mmh_live_occurrence_timestamp($course_session, 'scheduled_start_at');
+        if ($startsAt === false || $startsAt <= time()) continue;
+        $course_upcoming_session = $course_session;
+        $course_upcoming_join_state = mmh_live_join_state($course_session);
+        break;
     }
 }
 
@@ -931,6 +946,31 @@ if ($course_access_allowed) {
                             </nav>
                         </div>
                     </div>
+
+                    <?php if ($course_upcoming_session): ?>
+                    <?php $course_session_end = $course_upcoming_session; $course_session_end['scheduled_start_at'] = $course_upcoming_session['scheduled_end_at']; ?>
+                    <section class="course-progress-summary course-live-session-summary" aria-labelledby="course-live-session-heading">
+                        <div class="course-progress-summary-heading">
+                            <div>
+                                <span class="course-eyebrow">Next on your timetable</span>
+                                <strong id="course-live-session-heading">Upcoming Live Session</strong>
+                                <span class="course-progress-status"><?=student_course_html($course_upcoming_session['schedule_title'] ?: $course_upcoming_session['course_title']);?></span>
+                            </div>
+                            <span class="course-progress-status"><?=student_course_html(ucfirst((string) $course_upcoming_session['status']));?></span>
+                        </div>
+                        <div class="course-live-session-details">
+                            <span><strong><?=student_course_html($course_upcoming_session['course_title']);?></strong></span>
+                            <span><?=student_course_html(mmh_live_display_time($course_upcoming_session, 'l, j F'));?> · <?=student_course_html(mmh_live_display_time($course_upcoming_session, 'g:i A'));?>–<?=student_course_html(mmh_live_display_time($course_session_end, 'g:i A'));?> <?=student_course_html($course_upcoming_session['timezone']);?></span>
+                        </div>
+                        <?php if (!empty($course_upcoming_join_state['active'])): ?>
+                            <a class="course-btn course-btn-primary course-live-session-join" href="<?=student_course_html(rtrim((string) $baseUrl, '/') . '/user/live-session/join/' . rawurlencode((string) $course_upcoming_session['occurrence_id']));?>">
+                                <span class="fas fa-video" aria-hidden="true"></span><span><?=student_course_html($course_upcoming_join_state['label']);?></span>
+                            </a>
+                        <?php else: ?>
+                            <span class="course-progress-status" role="status"><?=student_course_html($course_upcoming_join_state['label'] ?? 'Join details unavailable');?></span>
+                        <?php endif; ?>
+                    </section>
+                    <?php endif; ?>
 
                     <section class="course-progress-summary" aria-label="Course progress">
                         <div class="course-progress-summary-heading">

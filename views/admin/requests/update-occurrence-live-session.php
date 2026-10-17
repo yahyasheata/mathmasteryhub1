@@ -9,6 +9,14 @@ if ($_SERVER['REQUEST_METHOD'] !== 'POST' || !isset($_SESSION['admin'])) {
 $conn = db();
 mmh_live_ensure_schema($conn);
 $occurrenceId = trim((string) ($_POST['occurrence_id'] ?? ''));
+if (array_key_exists('target_course_id', $_POST)) {
+    [$reassigned, $reassignmentMessage] = mmh_live_reassign_occurrence_course(
+        $conn,
+        $occurrenceId,
+        trim((string) ($_POST['target_course_id'] ?? ''))
+    );
+    mmh_live_response($reassigned, $reassignmentMessage, [], $reassigned ? 200 : 422);
+}
 $status = trim((string) ($_POST['status'] ?? 'scheduled'));
 $allowed = ['scheduled', 'live', 'completed', 'cancelled', 'rescheduled'];
 if ($occurrenceId === '' || !in_array($status, $allowed, true)) {

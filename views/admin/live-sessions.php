@@ -177,7 +177,29 @@ function live_admin_html($value)
                                         <tbody>
                                         <?php if ($occurrences): foreach (array_slice($occurrences, 0, 25) as $occurrence): ?>
                                             <tr>
-                                                <td><?=live_admin_html($occurrence['course_title'])?><br><small class="ds-text-muted"><?=live_admin_html($occurrence['schedule_title'] ?: 'Live session')?></small></td>
+                                                <td><?=live_admin_html($occurrence['course_title'])?><br><small class="ds-text-muted">Recurring slot: <?=live_admin_html($occurrence['schedule_course_title'] ?? $occurrence['course_title'])?> · <?=live_admin_html($occurrence['schedule_title'] ?: 'Live session')?></small>
+                                                    <?php
+                                                        $scheduleGroup = (string) ($occurrence['schedule_group_key'] ?? '');
+                                                        $canChoosePaper = in_array($scheduleGroup, ['cambridge_a_level', 'edexcel_a_level'], true)
+                                                            && in_array((string) $occurrence['status'], ['scheduled', 'rescheduled'], true)
+                                                            && strtotime((string) $occurrence['scheduled_start_at'] . ' UTC') > time();
+                                                    ?>
+                                                    <?php if ($canChoosePaper): ?>
+                                                        <form action="<?=live_admin_html($liveRequestBase)?>/update-occurrence" method="POST" class="live-admin-ajax d-flex flex-wrap gap-2 align-items-end mt-2">
+                                                            <input type="hidden" name="occurrence_id" value="<?=live_admin_html($occurrence['occurrence_id'])?>">
+                                                            <div>
+                                                                <label class="form-label small mb-1" for="paper-<?=live_admin_html($occurrence['occurrence_id'])?>">Teaching Course / Paper</label>
+                                                                <select id="paper-<?=live_admin_html($occurrence['occurrence_id'])?>" name="target_course_id" class="form-control form-control-sm" required>
+                                                                    <?php foreach ($courses as $course): ?>
+                                                                        <?php if ((string) ($course['my_courses_group_key'] ?? '') !== $scheduleGroup || !in_array((string) ($course['course_state'] ?? ''), ['public', 'private'], true) || !empty($course['archived_at'])) continue; ?>
+                                                                        <option value="<?=live_admin_html($course['course_id'])?>" <?=((string) $course['course_id'] === (string) $occurrence['course_id'] ? 'selected' : '')?>><?=live_admin_html($course['course_title'])?></option>
+                                                                    <?php endforeach; ?>
+                                                                </select>
+                                                            </div>
+                                                            <button class="btn btn-outline-primary btn-sm" type="submit">Save Paper</button>
+                                                        </form>
+                                                    <?php endif; ?>
+                                                </td>
                                                 <td><?=live_admin_html(mmh_live_display_time($occurrence))?><br><small class="ds-text-muted"><?=live_admin_html($occurrence['timezone'])?></small></td>
                                                 <td><span class="badge text-bg-light"><?=live_admin_html(ucwords(str_replace('_', ' ', $occurrence['status'])))?></span></td>
                                                 <td style="min-width: 330px">

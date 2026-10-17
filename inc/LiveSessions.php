@@ -197,7 +197,7 @@ if (!function_exists('mmh_live_course_options')) {
     {
         mmh_live_ensure_schema($conn);
         $rows = [];
-        $result = $conn->query('SELECT course_id, course_title FROM courses ORDER BY course_title ASC, id ASC');
+        $result = $conn->query("SELECT course_id, course_title, course_state, archived_at, my_courses_group_key FROM courses ORDER BY course_title ASC, id ASC");
         if ($result) {
             while ($row = $result->fetch_assoc()) {
                 $rows[] = $row;
@@ -394,11 +394,11 @@ if (!function_exists('mmh_live_occurrences')) {
         $to = gmdate('Y-m-d H:i:s', strtotime('+' . (int) $toDays . ' days'));
         $params = [];
         $types = '';
-        $sql = 'SELECT o.*, s.title AS schedule_title, s.academic_period, c.course_title';
+        $sql = 'SELECT o.*, s.title AS schedule_title, s.academic_period, s.course_id AS schedule_course_id, s.enabled AS schedule_enabled, base.course_title AS schedule_course_title, base.my_courses_group_key AS schedule_group_key, c.course_title';
         if ($onlyEnrolledUserId !== null) {
             $sql .= ', a.status AS attendance_status, a.first_join_clicked_at, a.last_join_clicked_at, a.confirmed_source';
         }
-        $sql .= ' FROM live_session_occurrences AS o INNER JOIN course_live_schedules AS s ON s.schedule_id = o.schedule_id INNER JOIN courses AS c ON c.course_id = o.course_id';
+        $sql .= ' FROM live_session_occurrences AS o INNER JOIN course_live_schedules AS s ON s.schedule_id = o.schedule_id INNER JOIN courses AS base ON base.course_id = s.course_id INNER JOIN courses AS c ON c.course_id = o.course_id';
         if ($onlyEnrolledUserId !== null) {
             $sql .= ' INNER JOIN (SELECT DISTINCT course_id FROM course_logs WHERE user_id = ?) AS cl ON cl.course_id = o.course_id';
             $types .= 'i';
@@ -504,7 +504,7 @@ if (!function_exists('mmh_live_occurrence')) {
     function mmh_live_occurrence(mysqli $conn, $occurrenceId)
     {
         mmh_live_ensure_schema($conn);
-        $stmt = $conn->prepare('SELECT o.*, s.title AS schedule_title, c.course_title FROM live_session_occurrences AS o INNER JOIN course_live_schedules AS s ON s.schedule_id = o.schedule_id INNER JOIN courses AS c ON c.course_id = o.course_id WHERE o.occurrence_id = ? LIMIT 1');
+        $stmt = $conn->prepare('SELECT o.*, s.title AS schedule_title, s.enabled AS schedule_enabled, s.course_id AS schedule_course_id, base.course_title AS schedule_course_title, base.my_courses_group_key AS schedule_group_key, c.course_title FROM live_session_occurrences AS o INNER JOIN course_live_schedules AS s ON s.schedule_id = o.schedule_id INNER JOIN courses AS base ON base.course_id = s.course_id INNER JOIN courses AS c ON c.course_id = o.course_id WHERE o.occurrence_id = ? LIMIT 1');
         if (!$stmt) {
             return null;
         }
@@ -513,6 +513,76 @@ if (!function_exists('mmh_live_occurrence')) {
         $row = $stmt->get_result()->fetch_assoc();
         $stmt->close();
         return $row ?: null;
+    }
+}
+
+if (!function_exists('mmh_live_reassign_occurrence_course')) {
+    /** Reassign one safe future occurrence without changing its schedule or history. */
+    function mmh_live_reassign_occurrence_course(mysqli $conn, $occurrenceId, $targetCourseId)
+    {
+        $occurrenceId = trim((string) $occurrenceId);
+        $targetCourseId = trim((string) $targetCourseId);
+        if ($occurrenceId === '' || $targetCourseId === '') {
+            return [false, 'Choose a valid occurrence and Course.'];
+        }
+
+        try {
+            $conn->begin_transaction();
+            $stmt = $conn->prepare("SELECT o.occurrence_id, o.course_id, o.schedule_id, o.scheduled_start_at, o.status, o.actual_start_at, s.course_id AS schedule_course_id, (o.scheduled_start_at > UTC_TIMESTAMP()) AS is_future FROM live_session_occurrences o INNER JOIN course_live_schedules s ON s.schedule_id = o.schedule_id WHERE o.occurrence_id = ? FOR UPDATE");
+            if (!$stmt) throw new RuntimeException('Unable to check the session occurrence.');
+            $stmt->bind_param('s', $occurrenceId);
+            $stmt->execute();
+            $occurrence = $stmt->get_result()->fetch_assoc();
+            $stmt->close();
+            if (!$occurrence) throw new RuntimeException('Occurrence or recurring schedule not found.');
+            if (!(int) $occurrence['is_future'] || !empty($occurrence['actual_start_at']) || !in_array(strtolower((string) $occurrence['status']), ['scheduled', 'rescheduled'], true)) {
+                throw new RuntimeException('Only a not-yet-started future session can be reassigned.');
+            }
+
+            $courseStmt = $conn->prepare("SELECT course_id, course_state, archived_at, my_courses_group_key FROM courses WHERE course_id IN (?, ?) FOR UPDATE");
+            if (!$courseStmt) throw new RuntimeException('Unable to check Course availability.');
+            $scheduleCourseId = (string) $occurrence['schedule_course_id'];
+            $courseStmt->bind_param('ss', $scheduleCourseId, $targetCourseId);
+            $courseStmt->execute();
+            $courseRows = $courseStmt->get_result()->fetch_all(MYSQLI_ASSOC);
+            $courseStmt->close();
+            $courseById = [];
+            foreach ($courseRows as $course) $courseById[(string) $course['course_id']] = $course;
+            $baseCourse = $courseById[$scheduleCourseId] ?? null;
+            $targetCourse = $courseById[$targetCourseId] ?? null;
+            if (!$baseCourse || !$targetCourse || !in_array((string) $targetCourse['course_state'], ['public', 'private'], true) || !empty($targetCourse['archived_at'])) {
+                throw new RuntimeException('The selected Course is unavailable.');
+            }
+            $group = (string) ($baseCourse['my_courses_group_key'] ?? '');
+            if (!in_array($group, ['cambridge_a_level', 'edexcel_a_level'], true) || (string) ($targetCourse['my_courses_group_key'] ?? '') !== $group) {
+                throw new RuntimeException('Choose a Paper in the same Cambridge or Edexcel A-Level group as the recurring slot.');
+            }
+
+            $hasHistory = false;
+            foreach ([['live_session_join_events', 'occurrence_id'], ['live_session_attendance', 'occurrence_id'], ['course_sections', 'release_occurrence_id']] as [$historyTable, $historyColumn]) {
+                $check = $conn->prepare("SELECT 1 FROM `{$historyTable}` WHERE `{$historyColumn}` = ? LIMIT 1 FOR UPDATE");
+                if (!$check) throw new RuntimeException('Unable to check session history and Course Section references.');
+                $check->bind_param('s', $occurrenceId);
+                $check->execute();
+                $hasHistory = $check->get_result()->num_rows > 0;
+                $check->close();
+                if ($hasHistory) break;
+            }
+            if ($hasHistory) throw new RuntimeException('This occurrence has join, attendance, or Course Section history and cannot be reassigned.');
+
+            $update = $conn->prepare('UPDATE live_session_occurrences SET course_id = ? WHERE occurrence_id = ? AND scheduled_start_at > UTC_TIMESTAMP() AND actual_start_at IS NULL AND status IN (\'scheduled\', \'rescheduled\')');
+            if (!$update) throw new RuntimeException('Unable to prepare the Course reassignment.');
+            $update->bind_param('ss', $targetCourseId, $occurrenceId);
+            $update->execute();
+            $changed = $update->affected_rows;
+            $update->close();
+            if ($changed < 1 && (string) $occurrence['course_id'] !== $targetCourseId) throw new RuntimeException('The occurrence changed and could not be reassigned. Refresh and try again.');
+            $conn->commit();
+            return [true, 'Teaching Course updated for this occurrence.'];
+        } catch (Throwable $exception) {
+            $conn->rollback();
+            return [false, $exception->getMessage()];
+        }
     }
 }
 
@@ -620,40 +690,68 @@ if (!function_exists('mmh_live_record_join')) {
     {
         mmh_live_ensure_schema($conn);
         $userId = (int) $userId;
-        $occurrenceId = (string) $occurrence['occurrence_id'];
-        $courseId = (string) $occurrence['course_id'];
-        $stmt = $conn->prepare('SELECT clicked_at FROM live_session_join_events WHERE user_id = ? AND occurrence_id = ? AND clicked_at >= DATE_SUB(NOW(), INTERVAL 2 MINUTE) ORDER BY clicked_at DESC LIMIT 1');
-        if ($stmt) {
-            $stmt->bind_param('is', $userId, $occurrenceId);
+        $occurrenceId = (string) ($occurrence['occurrence_id'] ?? '');
+        if ($occurrenceId === '') return false;
+        try {
+            $conn->begin_transaction();
+            $stmt = $conn->prepare('SELECT o.*, s.enabled AS schedule_enabled FROM live_session_occurrences o INNER JOIN course_live_schedules s ON s.schedule_id = o.schedule_id WHERE o.occurrence_id = ? FOR UPDATE');
+            if (!$stmt) throw new RuntimeException('Unable to verify the live session.');
+            $stmt->bind_param('s', $occurrenceId);
             $stmt->execute();
-            $recent = $stmt->get_result()->fetch_assoc();
+            $currentOccurrence = $stmt->get_result()->fetch_assoc();
             $stmt->close();
-            if ($recent) {
-                return true;
+            if (!$currentOccurrence || (string) $currentOccurrence['course_id'] !== (string) ($occurrence['course_id'] ?? '')) {
+                throw new RuntimeException('The live session Course changed. Refresh the page and try again.');
             }
-        }
-        $minutes = null;
-        $start = mmh_live_occurrence_timestamp($occurrence, 'scheduled_start_at');
-        if ($start !== false) {
-            $minutes = (int) floor((time() - $start) / 60);
-        }
-        $agent = strtolower((string) ($_SERVER['HTTP_USER_AGENT'] ?? ''));
-        $ua = str_contains($agent, 'mobile') ? 'mobile' : 'desktop';
-        $stmt = $conn->prepare('INSERT INTO live_session_join_events (user_id, course_id, occurrence_id, minutes_from_start, source, user_agent_category) VALUES (?, ?, ?, ?, ?, ?)');
-        if (!$stmt) {
+            $enrollment = $conn->prepare('SELECT 1 FROM course_logs WHERE user_id = ? AND course_id = ? LIMIT 1 FOR UPDATE');
+            if (!$enrollment) throw new RuntimeException('Unable to verify Course enrollment.');
+            $enrollment->bind_param('is', $userId, $currentOccurrence['course_id']);
+            $enrollment->execute();
+            $isEnrolled = $enrollment->get_result()->num_rows > 0;
+            $enrollment->close();
+            if (!$isEnrolled) throw new RuntimeException('You are not enrolled in this Course.');
+            $currentStart = mmh_live_occurrence_timestamp($currentOccurrence, 'scheduled_start_at');
+            if ($currentStart !== false && $currentStart > time() && (int) $currentOccurrence['schedule_enabled'] !== 1) {
+                throw new RuntimeException('This live session is unavailable.');
+            }
+            if (empty(mmh_live_join_state($currentOccurrence)['active'])) {
+                throw new RuntimeException('This live session is outside its join window or unavailable.');
+            }
+
+            $courseId = (string) $currentOccurrence['course_id'];
+            $stmt = $conn->prepare('SELECT clicked_at FROM live_session_join_events WHERE user_id = ? AND occurrence_id = ? AND clicked_at >= DATE_SUB(NOW(), INTERVAL 2 MINUTE) ORDER BY clicked_at DESC LIMIT 1');
+            if ($stmt) {
+                $stmt->bind_param('is', $userId, $occurrenceId);
+                $stmt->execute();
+                $recent = $stmt->get_result()->fetch_assoc();
+                $stmt->close();
+                if ($recent) {
+                    $conn->commit();
+                    return true;
+                }
+            }
+            $minutes = null;
+            $start = mmh_live_occurrence_timestamp($currentOccurrence, 'scheduled_start_at');
+            if ($start !== false) $minutes = (int) floor((time() - $start) / 60);
+            $agent = strtolower((string) ($_SERVER['HTTP_USER_AGENT'] ?? ''));
+            $ua = str_contains($agent, 'mobile') ? 'mobile' : 'desktop';
+            $stmt = $conn->prepare('INSERT INTO live_session_join_events (user_id, course_id, occurrence_id, minutes_from_start, source, user_agent_category) VALUES (?, ?, ?, ?, ?, ?)');
+            if (!$stmt) throw new RuntimeException('Unable to record the join event.');
+            $stmt->bind_param('ississ', $userId, $courseId, $occurrenceId, $minutes, $source, $ua);
+            if (!$stmt->execute()) throw new RuntimeException('Unable to record the join event.');
+            $stmt->close();
+
+            $stmt = $conn->prepare("INSERT INTO live_session_attendance (user_id, course_id, occurrence_id, status, first_join_clicked_at, last_join_clicked_at, confirmed_source) VALUES (?, ?, ?, 'unknown', NOW(), NOW(), 'none') ON DUPLICATE KEY UPDATE first_join_clicked_at = COALESCE(first_join_clicked_at, NOW()), last_join_clicked_at = NOW()");
+            if (!$stmt) throw new RuntimeException('Unable to update join evidence.');
+            $stmt->bind_param('iss', $userId, $courseId, $occurrenceId);
+            if (!$stmt->execute()) throw new RuntimeException('Unable to update join evidence.');
+            $stmt->close();
+            $conn->commit();
+            return true;
+        } catch (Throwable $exception) {
+            $conn->rollback();
             return false;
         }
-        $stmt->bind_param('ississ', $userId, $courseId, $occurrenceId, $minutes, $source, $ua);
-        $ok = $stmt->execute();
-        $stmt->close();
-
-        $stmt = $conn->prepare("INSERT INTO live_session_attendance (user_id, course_id, occurrence_id, status, first_join_clicked_at, last_join_clicked_at, confirmed_source) VALUES (?, ?, ?, 'unknown', NOW(), NOW(), 'none') ON DUPLICATE KEY UPDATE first_join_clicked_at = COALESCE(first_join_clicked_at, NOW()), last_join_clicked_at = NOW()");
-        if ($stmt) {
-            $stmt->bind_param('iss', $userId, $courseId, $occurrenceId);
-            $stmt->execute();
-            $stmt->close();
-        }
-        return (bool) $ok;
     }
 }
 
@@ -790,19 +888,34 @@ if (!function_exists('mmh_live_save_attendance')) {
         $allowed = ['unknown', 'present_live', 'late', 'absent', 'excused', 'recording_completed', 'manually_confirmed'];
         $status = in_array($status, $allowed, true) ? $status : 'unknown';
         $source = $status === 'unknown' ? 'none' : 'manual';
-        $stmt = $conn->prepare('INSERT INTO live_session_attendance (user_id, course_id, occurrence_id, status, confirmed_source, teacher_note, confirmed_by, confirmed_at) VALUES (?, ?, ?, ?, ?, ?, ?, NOW()) ON DUPLICATE KEY UPDATE status = VALUES(status), confirmed_source = VALUES(confirmed_source), teacher_note = VALUES(teacher_note), confirmed_by = VALUES(confirmed_by), confirmed_at = NOW()');
-        if (!$stmt) {
+        $occurrenceId = (string) ($occurrence['occurrence_id'] ?? '');
+        if ($occurrenceId === '') return false;
+        try {
+            $conn->begin_transaction();
+            $lock = $conn->prepare('SELECT course_id FROM live_session_occurrences WHERE occurrence_id = ? FOR UPDATE');
+            if (!$lock) throw new RuntimeException('Unable to verify the attendance occurrence.');
+            $lock->bind_param('s', $occurrenceId);
+            $lock->execute();
+            $current = $lock->get_result()->fetch_assoc();
+            $lock->close();
+            if (!$current || (string) $current['course_id'] !== (string) ($occurrence['course_id'] ?? '')) throw new RuntimeException('The assigned Course changed; refresh the attendance page.');
+
+            $stmt = $conn->prepare('INSERT INTO live_session_attendance (user_id, course_id, occurrence_id, status, confirmed_source, teacher_note, confirmed_by, confirmed_at) VALUES (?, ?, ?, ?, ?, ?, ?, NOW()) ON DUPLICATE KEY UPDATE status = VALUES(status), confirmed_source = VALUES(confirmed_source), teacher_note = VALUES(teacher_note), confirmed_by = VALUES(confirmed_by), confirmed_at = NOW()');
+            if (!$stmt) throw new RuntimeException('Unable to prepare the attendance update.');
+            $courseId = (string) $current['course_id'];
+            $userId = (int) $userId;
+            $adminId = $adminId !== null ? (int) $adminId : null;
+            $note = trim((string) $note);
+            $stmt->bind_param('isssssi', $userId, $courseId, $occurrenceId, $status, $source, $note, $adminId);
+            $ok = $stmt->execute();
+            $stmt->close();
+            if (!$ok) throw new RuntimeException('Unable to save attendance.');
+            $conn->commit();
+            return true;
+        } catch (Throwable $exception) {
+            $conn->rollback();
             return false;
         }
-        $courseId = (string) $occurrence['course_id'];
-        $occurrenceId = (string) $occurrence['occurrence_id'];
-        $userId = (int) $userId;
-        $adminId = $adminId !== null ? (int) $adminId : null;
-        $note = trim((string) $note);
-        $stmt->bind_param('isssssi', $userId, $courseId, $occurrenceId, $status, $source, $note, $adminId);
-        $ok = $stmt->execute();
-        $stmt->close();
-        return (bool) $ok;
     }
 }
 ?>

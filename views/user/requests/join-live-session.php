@@ -23,6 +23,13 @@ if (!$occurrence || in_array($occurrence['status'], ['cancelled', 'deleted'], tr
     exit;
 }
 
+$occurrenceStart = mmh_live_occurrence_timestamp($occurrence, 'scheduled_start_at');
+if ($occurrenceStart !== false && $occurrenceStart > time() && (int) ($occurrence['schedule_enabled'] ?? 0) !== 1) {
+    http_response_code(403);
+    echo 'This live session is unavailable.';
+    exit;
+}
+
 if (!student_course_access_enrolled($conn, $studentId, $occurrence['course_id'])) {
     http_response_code(403);
     echo 'You are not enrolled in this course.';
@@ -44,7 +51,11 @@ if ($target === null) {
     exit;
 }
 
-mmh_live_record_join($conn, $studentId, $occurrence, 'student_join_endpoint');
+if (!mmh_live_record_join($conn, $studentId, $occurrence, 'student_join_endpoint')) {
+    http_response_code(409);
+    echo 'The live session changed or is unavailable. Refresh and try again.';
+    exit;
+}
 mmh_log_event($conn, $studentId, 'live_session_join_clicked', [
     'course_id' => $occurrence['course_id'],
     'meta' => [
