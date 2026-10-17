@@ -3,6 +3,7 @@ require_once 'connection/config.php';
 require_once 'inc/learning_schema.php';
 require_once 'inc/AcademicMetadata.php';
 require_once 'inc/CourseSectionAvailability.php';
+require_once 'inc/EnrollmentService.php';
 
 header('Content-Type: application/json; charset=utf-8');
 
@@ -94,6 +95,70 @@ function add_section_normalize_datetime($value)
     return $time ? date('Y-m-d H:i:s', $time) : null;
 }
 
+function add_section_activation_blocker(mysqli $conn, string $courseId, string $changedSectionId, string $targetUnit): string
+{
+    $stmt = $conn->prepare("SELECT COUNT(*) AS total FROM course_logs WHERE course_id = ? AND (unit_access IS NULL OR unit_access NOT IN ('unit1', 'unit2', 'both'))");
+    if (!$stmt) return 'Student Unit access could not be verified.';
+    $stmt->bind_param('s', $courseId); $stmt->execute();
+    $unclassified = (int) (($stmt->get_result()->fetch_assoc()['total'] ?? 0)); $stmt->close();
+    if ($unclassified > 0) return $unclassified . ' enrolled student' . ($unclassified === 1 ? ' is' : 's are') . ' still unclassified. Assign Unit Access to every student before restricting a Section.';
+
+    $items = $conn->prepare("SELECT i.item_id FROM course_items i LEFT JOIN course_sections s ON s.course_id = i.course_id AND s.section_id = i.section_id
+        WHERE i.course_id = ? AND (i.archived_at IS NULL OR i.archived_at = '') AND (i.status IS NULL OR i.status = '' OR i.status = 'published')
+          AND (i.section_id IS NULL OR i.section_id = '' OR s.section_id IS NULL) LIMIT 1");
+    if (!$items) return 'Course Item section integrity could not be verified.';
+    $items->bind_param('s', $courseId); $items->execute();
+    $ambiguousItem = (bool) $items->get_result()->fetch_assoc(); $items->close();
+    if ($ambiguousItem) return 'This Course has a published item without a valid Section. Attach or review it before enabling Unit access.';
+
+    $mismatch = $conn->prepare("SELECT i.item_id FROM course_items i INNER JOIN assignments a ON a.assignment_id = i.assignment_id AND a.course_id = i.course_id
+        WHERE i.course_id = ? AND COALESCE(a.section_id, '') <> '' AND COALESCE(a.section_id, '') <> COALESCE(i.section_id, '') LIMIT 1");
+    if (!$mismatch) return 'Homework Section links could not be verified.';
+    $mismatch->bind_param('s', $courseId); $mismatch->execute();
+    $hasMismatch = (bool) $mismatch->get_result()->fetch_assoc(); $mismatch->close();
+    if ($hasMismatch) return 'A Homework Section does not match its canonical Course Item. Resolve the Section link before enabling Unit access.';
+
+    $sections = $conn->prepare('SELECT section_id, access_unit, unlock_mode, completion_rule, unlock_homework_id FROM course_sections WHERE course_id = ?');
+    if (!$sections) return 'Section dependencies could not be verified.';
+    $sections->bind_param('s', $courseId); $sections->execute();
+    $sectionRows = $sections->get_result()->fetch_all(MYSQLI_ASSOC); $sections->close();
+    $sectionUnits = [];
+    foreach ($sectionRows as $row) $sectionUnits[(string) $row['section_id']] = (string) $row['access_unit'];
+    if ($changedSectionId !== '') $sectionUnits[$changedSectionId] = $targetUnit;
+
+    foreach ($sectionRows as $row) {
+        $mode = (string) ($row['unlock_mode'] ?? '');
+        $rule = (string) ($row['completion_rule'] ?? '');
+        $assignmentId = trim((string) ($row['unlock_homework_id'] ?? ''));
+        if ($assignmentId === '' || !in_array($mode, ['after_homework_submission', 'after_homework_approval'], true) && !in_array($rule, ['homework_submitted', 'homework_approved'], true)) continue;
+        $dependency = $conn->prepare('SELECT i.section_id, a.section_id AS assignment_section FROM course_items i INNER JOIN assignments a ON a.assignment_id = i.assignment_id AND a.course_id = i.course_id WHERE i.course_id = ? AND a.assignment_id = ? AND (i.archived_at IS NULL OR i.archived_at = \'\') AND (i.status IS NULL OR i.status = \'\' OR i.status = \'published\')');
+        if (!$dependency) return 'Homework dependencies could not be verified.';
+        $dependency->bind_param('ss', $courseId, $assignmentId); $dependency->execute();
+        $matches = $dependency->get_result()->fetch_all(MYSQLI_ASSOC); $dependency->close();
+        if (count($matches) !== 1) return 'A Section depends on Homework without one unambiguous canonical Course Item.';
+        $itemSection = trim((string) ($matches[0]['section_id'] ?? ''));
+        $assignmentSection = trim((string) ($matches[0]['assignment_section'] ?? ''));
+        if ($itemSection === '' || !isset($sectionUnits[$itemSection]) || ($assignmentSection !== '' && $assignmentSection !== $itemSection)) return 'A Section depends on Homework with an ambiguous Section link.';
+        $sourceUnit = $changedSectionId !== '' && (string) ($row['section_id'] ?? '') === $changedSectionId ? $targetUnit : (string) ($row['access_unit'] ?? 'shared');
+        if ($sourceUnit === 'shared' && in_array($sectionUnits[$itemSection], ['unit1', 'unit2'], true)
+            || $sourceUnit === 'unit1' && $sectionUnits[$itemSection] === 'unit2'
+            || $sourceUnit === 'unit2' && $sectionUnits[$itemSection] === 'unit1') {
+            return 'A Section depends on Homework assigned to a different Unit. Resolve that dependency before enabling Unit access.';
+        }
+    }
+
+    $localFile = $conn->prepare("SELECT i.item_id FROM course_items i LEFT JOIN course_sections s ON s.course_id = i.course_id AND s.section_id = i.section_id
+        LEFT JOIN assignments a ON a.course_id = i.course_id AND a.assignment_id = i.assignment_id
+        WHERE i.course_id = ? AND ((s.access_unit IN ('unit1', 'unit2')) OR i.section_id = ?)
+          AND (CONCAT(COALESCE(i.template_data,''), ' ', COALESCE(i.item_description,''), ' ', COALESCE(i.metadata,''), ' ', COALESCE(a.file_path,'')) LIKE '%uploads/%') LIMIT 1");
+    if (!$localFile) return 'Local resource access could not be verified.';
+    $localFile->bind_param('ss', $courseId, $changedSectionId); $localFile->execute();
+    $hasLocalFile = (bool) $localFile->get_result()->fetch_assoc(); $localFile->close();
+    if ($hasLocalFile) return 'A restricted Section contains a locally hosted file that can bypass the LMS authorization route. Protect or replace that resource before enabling Unit access.';
+
+    return '';
+}
+
 function add_section_generate_id(mysqli $conn, $course_id)
 {
     do {
@@ -124,6 +189,24 @@ if (add_section_post('course_id') === '' || add_section_post('title') === '') {
 $conn = db();
 mmh_ensure_learning_schema($conn);
 $course_id = add_section_post('course_id');
+$unitAccessSchema = mmh_enrollment_course_unit_state($conn, $course_id);
+if ($unitAccessSchema === null) add_section_response(false, 'Section Access could not be verified.');
+$access_unit = isset($_POST['access_unit']) ? trim((string) $_POST['access_unit']) : null;
+if ($access_unit !== null && !in_array($access_unit, ['shared', 'unit1', 'unit2'], true)) {
+    add_section_response(false, 'Invalid Section Access. Choose Shared, Unit 1, or Unit 2.');
+}
+$section_id_for_access = add_section_post('section_id');
+if (empty($unitAccessSchema['ready'])) {
+    if ($access_unit !== null && $access_unit !== 'shared') add_section_response(false, 'Unit access is not ready yet. Please try again shortly.');
+    $access_unit = 'shared';
+} elseif ($access_unit === null && $method === 'UPDATE') {
+    $accessLookup = $conn->prepare('SELECT access_unit FROM course_sections WHERE section_id = ? AND course_id = ? LIMIT 1');
+    if (!$accessLookup) add_section_response(false, 'Section Access could not be verified.');
+    $accessLookup->bind_param('ss', $section_id_for_access, $course_id); $accessLookup->execute();
+    $access_unit = $accessLookup->get_result()->fetch_assoc()['access_unit'] ?? null; $accessLookup->close();
+    if (!in_array($access_unit, ['shared', 'unit1', 'unit2'], true)) add_section_response(false, 'Invalid stored Section Access. Review the Section before saving.');
+}
+$access_unit ??= 'shared';
 $title = add_section_post('title');
 $section_type = add_section_normalize_type(add_section_post('section_type', 'lecture'));
 $custom_type = $section_type === 'custom' ? add_section_post('custom_type') : '';
@@ -210,21 +293,45 @@ if (!$course_exists) {
 }
 
 try {
+    $section_id = $method === 'UPDATE' ? add_section_post('section_id') : add_section_generate_id($conn, $course_id);
+    $unitActivationTransaction = false;
+    if ($access_unit !== 'shared') {
+        if (empty($unitAccessSchema['ready'])) add_section_response(false, 'Unit access is not ready yet. Please try again shortly.');
+        if (!$conn->begin_transaction()) add_section_response(false, 'Unit access could not be activated. Please try again.');
+        $unitActivationTransaction = true;
+        $courseLock = $conn->prepare('SELECT course_id FROM courses WHERE course_id = ? LIMIT 1 FOR UPDATE');
+        if (!$courseLock) { $conn->rollback(); add_section_response(false, 'Course access could not be locked for safe Section activation.'); }
+        $courseLock->bind_param('s', $course_id); $courseLock->execute();
+        $lockedCourseExists = (bool) $courseLock->get_result()->fetch_assoc(); $courseLock->close();
+        if (!$lockedCourseExists) { $conn->rollback(); add_section_response(false, 'Course not found.'); }
+        $activationBlocker = add_section_activation_blocker($conn, $course_id, $section_id, $access_unit);
+        if ($activationBlocker !== '') { $conn->rollback(); add_section_response(false, $activationBlocker); }
+    }
     if ($method === 'UPDATE') {
-        $section_id = add_section_post('section_id');
         if ($section_id === '' || $section_id === '__general__') {
+            if ($unitActivationTransaction) $conn->rollback();
             add_section_response(false, 'General cannot be edited as a database section.');
         }
 
-        $stmt = $conn->prepare('UPDATE course_sections SET section_type = ?, custom_type = ?, icon = ?, title = ?, description = ?, metadata = ?, sort_order = ?, status = ?, unlock_mode = ?, completion_rule = ?, unlock_at = ?, unlock_timezone = ?, unlock_homework_id = ?, manual_unlocked = ?, release_mode = ?, release_override = ?, release_at = ?, release_timezone = ?, release_occurrence_id = ?, release_delay_minutes = ?, release_updated_at = NOW() WHERE section_id = ? AND course_id = ? LIMIT 1');
+        $updateSql = !empty($unitAccessSchema['ready'])
+            ? 'UPDATE course_sections SET section_type = ?, custom_type = ?, icon = ?, title = ?, description = ?, metadata = ?, sort_order = ?, status = ?, access_unit = ?, unlock_mode = ?, completion_rule = ?, unlock_at = ?, unlock_timezone = ?, unlock_homework_id = ?, manual_unlocked = ?, release_mode = ?, release_override = ?, release_at = ?, release_timezone = ?, release_occurrence_id = ?, release_delay_minutes = ?, release_updated_at = NOW() WHERE section_id = ? AND course_id = ? LIMIT 1'
+            : 'UPDATE course_sections SET section_type = ?, custom_type = ?, icon = ?, title = ?, description = ?, metadata = ?, sort_order = ?, status = ?, unlock_mode = ?, completion_rule = ?, unlock_at = ?, unlock_timezone = ?, unlock_homework_id = ?, manual_unlocked = ?, release_mode = ?, release_override = ?, release_at = ?, release_timezone = ?, release_occurrence_id = ?, release_delay_minutes = ?, release_updated_at = NOW() WHERE section_id = ? AND course_id = ? LIMIT 1';
+        $stmt = $conn->prepare($updateSql);
         if (!$stmt) {
+            if ($unitActivationTransaction) $conn->rollback();
             add_section_response(false, 'Unable to prepare section update.', ['reason' => $conn->error]);
         }
-        $stmt->bind_param('ssssssissssssisssssiss', $section_type, $custom_type, $icon, $title, $description, $section_metadata_json, $sort_order, $status, $unlock_mode, $completion_rule, $unlock_at, $unlock_timezone, $unlock_homework_id, $manual_unlocked, $release_mode, $release_override, $release_at, $release_timezone, $release_occurrence_id, $release_delay_minutes, $section_id, $course_id);
+        if (!empty($unitAccessSchema['ready'])) {
+            $stmt->bind_param('ssssssisssssssisssssiss', $section_type, $custom_type, $icon, $title, $description, $section_metadata_json, $sort_order, $status, $access_unit, $unlock_mode, $completion_rule, $unlock_at, $unlock_timezone, $unlock_homework_id, $manual_unlocked, $release_mode, $release_override, $release_at, $release_timezone, $release_occurrence_id, $release_delay_minutes, $section_id, $course_id);
+        } else {
+            $stmt->bind_param('ssssssissssssisssssiss', $section_type, $custom_type, $icon, $title, $description, $section_metadata_json, $sort_order, $status, $unlock_mode, $completion_rule, $unlock_at, $unlock_timezone, $unlock_homework_id, $manual_unlocked, $release_mode, $release_override, $release_at, $release_timezone, $release_occurrence_id, $release_delay_minutes, $section_id, $course_id);
+        }
         if (!$stmt->execute()) {
+            if ($unitActivationTransaction) $conn->rollback();
             add_section_response(false, 'Unexpected server error while updating the section.', ['reason' => $stmt->error ?: $conn->error]);
         }
         $stmt->close();
+        if ($unitActivationTransaction && !$conn->commit()) add_section_response(false, 'Section access could not be saved. Please try again.');
 
         add_section_response(true, 'Section updated successfully.', [
             'course_id' => $course_id,
@@ -232,16 +339,25 @@ try {
         ]);
     }
 
-    $section_id = add_section_generate_id($conn, $course_id);
-    $stmt = $conn->prepare('INSERT INTO course_sections (section_id, course_id, section_type, custom_type, icon, title, description, metadata, sort_order, status, unlock_mode, completion_rule, unlock_at, unlock_timezone, unlock_homework_id, manual_unlocked, release_mode, release_override, release_at, release_timezone, release_occurrence_id, release_delay_minutes, release_updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NOW())');
+    $insertSql = !empty($unitAccessSchema['ready'])
+        ? 'INSERT INTO course_sections (section_id, course_id, section_type, custom_type, icon, title, description, metadata, sort_order, status, access_unit, unlock_mode, completion_rule, unlock_at, unlock_timezone, unlock_homework_id, manual_unlocked, release_mode, release_override, release_at, release_timezone, release_occurrence_id, release_delay_minutes, release_updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NOW())'
+        : 'INSERT INTO course_sections (section_id, course_id, section_type, custom_type, icon, title, description, metadata, sort_order, status, unlock_mode, completion_rule, unlock_at, unlock_timezone, unlock_homework_id, manual_unlocked, release_mode, release_override, release_at, release_timezone, release_occurrence_id, release_delay_minutes, release_updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NOW())';
+    $stmt = $conn->prepare($insertSql);
     if (!$stmt) {
+        if ($unitActivationTransaction) $conn->rollback();
         add_section_response(false, 'Unable to prepare section creation.', ['reason' => $conn->error]);
     }
-    $stmt->bind_param('ssssssssissssssisssssi', $section_id, $course_id, $section_type, $custom_type, $icon, $title, $description, $section_metadata_json, $sort_order, $status, $unlock_mode, $completion_rule, $unlock_at, $unlock_timezone, $unlock_homework_id, $manual_unlocked, $release_mode, $release_override, $release_at, $release_timezone, $release_occurrence_id, $release_delay_minutes);
+    if (!empty($unitAccessSchema['ready'])) {
+        $stmt->bind_param('ssssssssisssssssisssssi', $section_id, $course_id, $section_type, $custom_type, $icon, $title, $description, $section_metadata_json, $sort_order, $status, $access_unit, $unlock_mode, $completion_rule, $unlock_at, $unlock_timezone, $unlock_homework_id, $manual_unlocked, $release_mode, $release_override, $release_at, $release_timezone, $release_occurrence_id, $release_delay_minutes);
+    } else {
+        $stmt->bind_param('ssssssssissssssisssssi', $section_id, $course_id, $section_type, $custom_type, $icon, $title, $description, $section_metadata_json, $sort_order, $status, $unlock_mode, $completion_rule, $unlock_at, $unlock_timezone, $unlock_homework_id, $manual_unlocked, $release_mode, $release_override, $release_at, $release_timezone, $release_occurrence_id, $release_delay_minutes);
+    }
     if (!$stmt->execute()) {
+        if ($unitActivationTransaction) $conn->rollback();
         add_section_response(false, 'Unexpected server error while creating the section.', ['reason' => $stmt->error ?: $conn->error]);
     }
     $stmt->close();
+    if ($unitActivationTransaction && !$conn->commit()) add_section_response(false, 'Section access could not be saved. Please try again.');
 
     add_section_response(true, 'Section created successfully.', [
         'course_id' => $course_id,

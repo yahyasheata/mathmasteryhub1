@@ -290,7 +290,8 @@ if ($course_access_allowed) {
   mmh_track_daily_visit($conn, $user_id);
   mmh_log_event($conn, $user_id, 'course_opened', ['course_id' => $course_id]);
 
-  $courses_stmt = $conn->prepare("SELECT courses.*, course_items.*, course_items.id AS iid, course_logs.*, course_sections.section_id AS section_sid, course_sections.title AS section_title, course_sections.description AS section_description, course_sections.sort_order AS section_sort_order, course_sections.status AS section_status, course_sections.section_type AS section_type, course_sections.custom_type AS section_custom_type, course_sections.icon AS section_icon, course_sections.unlock_mode AS section_unlock_mode, course_sections.completion_rule AS section_completion_rule, course_sections.unlock_at AS section_unlock_at, course_sections.unlock_timezone AS section_unlock_timezone, course_sections.unlock_homework_id AS section_unlock_homework_id, course_sections.manual_unlocked AS section_manual_unlocked, course_sections.release_mode AS section_release_mode, course_sections.release_override AS section_release_override, course_sections.release_at AS section_release_at, course_sections.release_timezone AS section_release_timezone, course_sections.release_occurrence_id AS section_release_occurrence_id, course_sections.release_delay_minutes AS section_release_delay_minutes, course_sections.metadata AS section_metadata
+  $sectionAccessSelect = student_course_access_unit_schema_ready($conn) ? 'course_sections.access_unit' : "'shared' AS section_access_unit";
+  $courses_stmt = $conn->prepare("SELECT courses.*, course_items.*, course_items.id AS iid, course_logs.*, course_sections.section_id AS section_sid, {$sectionAccessSelect}, course_sections.title AS section_title, course_sections.description AS section_description, course_sections.sort_order AS section_sort_order, course_sections.status AS section_status, course_sections.section_type AS section_type, course_sections.custom_type AS section_custom_type, course_sections.icon AS section_icon, course_sections.unlock_mode AS section_unlock_mode, course_sections.completion_rule AS section_completion_rule, course_sections.unlock_at AS section_unlock_at, course_sections.unlock_timezone AS section_unlock_timezone, course_sections.unlock_homework_id AS section_unlock_homework_id, course_sections.manual_unlocked AS section_manual_unlocked, course_sections.release_mode AS section_release_mode, course_sections.release_override AS section_release_override, course_sections.release_at AS section_release_at, course_sections.release_timezone AS section_release_timezone, course_sections.release_occurrence_id AS section_release_occurrence_id, course_sections.release_delay_minutes AS section_release_delay_minutes, course_sections.metadata AS section_metadata
       FROM courses
       INNER JOIN course_logs ON courses.course_id = course_logs.course_id
       LEFT JOIN course_items ON courses.course_id = course_items.course_id
@@ -326,7 +327,7 @@ if ($coures_result && mysqli_num_rows($coures_result) > 0) {
   $course_item_count = 0;
   // The result contains one row for each visible course item (or one empty
   // course row), so this gives the list a stable, plain-text position label.
-  $course_total_visible_items = max(0, (int) mysqli_num_rows($coures_result));
+  $course_total_visible_items = 0;
   $course_duration_minutes = 0;
   $course_known_duration_count = 0;
   $course_sequential_learning = 0;
@@ -339,6 +340,10 @@ if ($coures_result && mysqli_num_rows($coures_result) > 0) {
   $first_lesson_anchor = '#course-content';
   $previous_homework_item = null;
   while( $courses_data = mysqli_fetch_assoc($coures_result) ){
+    if (!empty($courses_data['iid']) && !student_course_access_unit_allowed($courses_data['section_access_unit'] ?? 'shared', $courses_data['unit_access'] ?? null)) {
+      continue;
+    }
+    if (!empty($courses_data['iid'])) $course_total_visible_items++;
     $course_title = $courses_data['course_title'];
     $course_description = $courses_data['course_description'];
     $course_teacher = $courses_data['username'];

@@ -193,12 +193,13 @@ if (!function_exists('mmh_timed_exam_load')) {
     function mmh_timed_exam_load(mysqli $conn, string $courseId, int $examId, bool $includeDraft = false): ?array
     {
         if ($examId <= 0 || !mmh_timed_exam_table_available($conn)) return null;
-        $sql = 'SELECT e.*, i.item_title, i.item_description, i.section_id, i.status AS item_status,
-                    s.title AS section_title, s.sort_order AS section_sort_order
+        $unitColumn = function_exists('student_course_access_unit_schema_ready') && student_course_access_unit_schema_ready($conn) ? 's.access_unit' : "'shared'";
+        $sql = "SELECT e.*, i.item_title, i.item_description, i.section_id, i.status AS item_status,
+                    s.title AS section_title, s.sort_order AS section_sort_order, {$unitColumn} AS section_access_unit
                 FROM timed_exams e
                 INNER JOIN course_items i ON i.item_id = e.item_id AND i.course_id = e.course_id
                 LEFT JOIN course_sections s ON s.course_id = i.course_id AND s.section_id = i.section_id
-                WHERE e.id = ? AND e.course_id = ? AND e.deleted_at IS NULL';
+                WHERE e.id = ? AND e.course_id = ? AND e.deleted_at IS NULL";
         if (!$includeDraft) $sql .= " AND e.status = 'published' AND (i.status IS NULL OR i.status = '' OR i.status = 'published')";
         $sql .= ' LIMIT 1';
         $stmt = $conn->prepare($sql);
@@ -829,6 +830,14 @@ if (!function_exists('mmh_timed_exam_student_context')) {
                 'preview' => true,
             ];
         }
+        $unitAccess = student_course_access_unit_entitlement($conn, $studentId, (string) ($exam['course_id'] ?? ''));
+        if (!student_course_access_unit_allowed($exam['section_access_unit'] ?? 'shared', $unitAccess)) {
+            return [
+                'exam' => $exam, 'attempt' => null, 'latest_version' => null,
+                'state' => ['key' => 'unavailable', 'label' => 'Unavailable', 'remaining_seconds' => 0, 'window' => mmh_timed_exam_window($exam)],
+                'upload_version_limit' => 0, 'upload_version_count' => 0, 'upload_versions_remaining' => 0,
+            ];
+        }
         $scope = mmh_timed_exam_attempt_scope($exam);
         $attempt = mmh_timed_exam_student_attempt($conn, $studentId, (int) $exam['id'], false, $scope);
         $state = mmh_timed_exam_state($exam, $attempt);
@@ -1362,11 +1371,14 @@ if (!function_exists('mmh_timed_exam_course_states')) {
         $attemptOrder = $includeRecoveryCompletion
             ? " ORDER BY CASE WHEN a2.state IN ('submitted','auto_submitted','graded') THEN 0 ELSE 1 END, a2.id DESC LIMIT 1"
             : ' ORDER BY a2.id DESC LIMIT 1';
-        $stmt = $conn->prepare('SELECT e.*, a.id AS attempt_id, a.state AS attempt_state, a.submitted_at_utc, a.is_late, a.grade, a.feedback, a.results_released_at_utc AS attempt_results_released_at_utc FROM timed_exams e LEFT JOIN timed_exam_attempts a ON a.id = (SELECT a2.id FROM timed_exam_attempts a2 WHERE a2.timed_exam_id = e.id AND a2.student_id = ?' . $scopeFilter . $attemptOrder . ') WHERE e.course_id = ? AND e.deleted_at IS NULL AND e.status = \'published\'');
+        $unitColumn = function_exists('student_course_access_unit_schema_ready') && student_course_access_unit_schema_ready($conn) ? "COALESCE(s.access_unit, 'shared')" : "'shared'";
+        $stmt = $conn->prepare('SELECT e.*, ' . $unitColumn . ' AS section_access_unit, a.id AS attempt_id, a.state AS attempt_state, a.submitted_at_utc, a.is_late, a.grade, a.feedback, a.results_released_at_utc AS attempt_results_released_at_utc FROM timed_exams e INNER JOIN course_items i ON i.course_id = e.course_id AND i.item_id = e.item_id LEFT JOIN course_sections s ON s.course_id = i.course_id AND s.section_id = i.section_id LEFT JOIN timed_exam_attempts a ON a.id = (SELECT a2.id FROM timed_exam_attempts a2 WHERE a2.timed_exam_id = e.id AND a2.student_id = ?' . $scopeFilter . $attemptOrder . ') WHERE e.course_id = ? AND e.deleted_at IS NULL AND e.status = \'published\'');
         if (!$stmt) return [];
         $stmt->bind_param('is', $studentId, $courseId); $stmt->execute(); $rows = $stmt->get_result()->fetch_all(MYSQLI_ASSOC); $stmt->close();
         $map = [];
+        $unitAccess = function_exists('student_course_access_unit_entitlement') ? student_course_access_unit_entitlement($conn, $studentId, $courseId) : null;
         foreach ($rows as $row) {
+            if (!function_exists('student_course_access_unit_allowed') || !student_course_access_unit_allowed($row['section_access_unit'] ?? 'shared', $unitAccess)) continue;
             $attempt = $row['attempt_id'] ? ['id' => (int) $row['attempt_id'], 'student_id' => $studentId, 'state' => $row['attempt_state'], 'results_released_at_utc' => $row['attempt_results_released_at_utc'] ?? null] : null;
             $state = mmh_timed_exam_state($row, $attempt);
             if (($state['key'] ?? '') === 'expired') {

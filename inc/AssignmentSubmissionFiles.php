@@ -28,14 +28,14 @@ if (!function_exists('mmh_assignment_submission_file_serve')) {
             if (!$studentId || (int) $file['student_id'] !== (int) $studentId || !$course || !$assignment) {
                 http_response_code(403); exit('This file is not available.');
             }
-            $sectionId = student_course_access_normalize_section_id($file['section_id'] ?? '');
+            $itemContext = mmh_assignment_identity_item_for_assignment($conn, (string) ($file['course_id'] ?? ''), (string) ($file['assignment_id'] ?? ''), true);
+            $item = is_array($itemContext['item'] ?? null) ? student_course_access_item($conn, $file['course_id'], $itemContext['item']['item_id'] ?? '') : null;
+            if (($itemContext['status'] ?? '') !== 'FOUND' || !$item || !student_course_access_assignment_matches_item($conn, $assignment, $item)) { http_response_code(403); exit('This file is not available.'); }
+            $sectionId = student_course_access_normalize_section_id($item['section_id'] ?? '');
             if ($sectionId !== '') {
                 $sectionState = student_course_access_section_state($conn, $course, $sectionId, $studentId);
                 if (!$sectionState || !empty($sectionState['state']['locked'])) { http_response_code(403); exit('This file is not available.'); }
             }
-            $itemContext = mmh_assignment_identity_item_for_assignment($conn, (string) ($file['course_id'] ?? ''), (string) ($file['assignment_id'] ?? ''), true);
-            $item = is_array($itemContext['item'] ?? null) ? student_course_access_item($conn, $file['course_id'], $itemContext['item']['item_id'] ?? '') : null;
-            if (($itemContext['status'] ?? '') !== 'FOUND' || !$item || !student_course_access_assignment_matches_item($conn, $assignment, $item)) { http_response_code(403); exit('This file is not available.'); }
         } elseif (empty($_SESSION['admin'])) {
             http_response_code(403); exit('Administrator access is required.');
         }

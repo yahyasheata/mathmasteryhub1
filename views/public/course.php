@@ -5,6 +5,7 @@ require_once 'inc/functions.php';
 require_once 'inc/learning_schema.php';
 require_once 'inc/PastPapers.php';
 require_once 'inc/PublicCourse.php';
+require_once 'inc/StudentCourseAccess.php';
 require_once 'views/partials/past-papers-list.php';
 header('Cache-Control: private, no-store, no-cache, must-revalidate, max-age=0');
 header('Pragma: no-cache');
@@ -35,6 +36,8 @@ if ($username !== '') {
   $publicUserId = (int) ($publicUser->user_id ?? 0);
   $publicCourseEnrolled = mmh_public_course_enrolled($conn, $publicUserId, $canonicalCourseId);
 }
+$publicUnitAccess = $isAdminPreview ? 'both' : ($publicCourseEnrolled ? student_course_access_unit_entitlement($conn, $publicUserId, $canonicalCourseId) : null);
+$hasUnitSectionColumn = mmh_column_exists($conn, 'course_sections', 'access_unit');
 if (!$isAdminPreview && mmh_course_state($resolved_course) === 'draft') {
   http_response_code(404);
   include 'views/404.php';
@@ -72,6 +75,7 @@ if ($has_structured_preview) {
       course_sections.title AS preview_section_title,
       course_sections.description AS preview_section_description,
       course_sections.section_type AS preview_section_type,
+      " . ($hasUnitSectionColumn ? 'course_sections.access_unit' : "'shared'") . " AS preview_section_access_unit,
       course_sections.sort_order AS preview_section_sort_order
       FROM courses
       LEFT JOIN categories ON courses.course_category = categories.id
@@ -98,6 +102,7 @@ if ($has_structured_preview) {
       NULL AS preview_section_title,
       NULL AS preview_section_description,
       NULL AS preview_section_type,
+      'shared' AS preview_section_access_unit,
       NULL AS preview_section_sort_order
       FROM courses
       LEFT JOIN categories ON courses.course_category = categories.id
@@ -182,6 +187,9 @@ if(mysqli_num_rows($coures_result) > 0){
     }
 
     if(!empty($courses_data['iid'])) {
+      if (!$isAdminPreview && !student_course_access_unit_allowed($courses_data['preview_section_access_unit'] ?? 'shared', $publicUnitAccess)) {
+        continue;
+      }
       $has_items = true;
       [$item_label, $item_icon, $item_class] = public_course_preview_lesson_meta($courses_data);
       $section_key = !empty($courses_data['section_id']) ? (string)$courses_data['section_id'] : '__general__';

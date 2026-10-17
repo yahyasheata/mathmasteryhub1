@@ -65,9 +65,10 @@ function mmh_learning_journey_load_evidence(mysqli $conn, int $userId, string $c
     return $map;
 }
 
-function mmh_learning_journey_visible_items(mysqli $conn, string $courseId): array
+function mmh_learning_journey_visible_items(mysqli $conn, string $courseId, int $userId): array
 {
-    $stmt = $conn->prepare("SELECT i.item_id, i.item_title, i.item_description, i.section_id, i.item_type, i.template_type, i.template_data, i.assignment_id, i.duration_minutes, i.sort_order, i.page_order, s.title AS section_title, s.sort_order AS section_sort_order
+    $unitColumn = student_course_access_unit_schema_ready($conn) ? 's.access_unit' : "'shared'";
+    $stmt = $conn->prepare("SELECT i.item_id, i.item_title, i.item_description, i.section_id, i.item_type, i.template_type, i.template_data, i.assignment_id, i.duration_minutes, i.sort_order, i.page_order, s.title AS section_title, s.sort_order AS section_sort_order, {$unitColumn} AS section_access_unit
         FROM course_items i LEFT JOIN course_sections s ON s.course_id = i.course_id AND s.section_id = i.section_id
         WHERE i.course_id = ? AND " . student_course_access_active_item_sql('i') . "
           AND (i.section_id IS NULL OR i.section_id = '' OR s.status IS NULL OR s.status = '' OR s.status = 'published')
@@ -77,6 +78,8 @@ function mmh_learning_journey_visible_items(mysqli $conn, string $courseId): arr
     $stmt->execute();
     $items = $stmt->get_result()->fetch_all(MYSQLI_ASSOC);
     $stmt->close();
+    $unitAccess = student_course_access_unit_entitlement($conn, $userId, $courseId);
+    $items = array_values(array_filter($items, static fn(array $item): bool => student_course_access_unit_allowed($item['section_access_unit'] ?? 'shared', $unitAccess)));
     foreach ($items as &$item) {
         $identity = mmh_assignment_identity_for_item($conn, $item, true);
         // Replace rather than conditionally overlay: orphaned/ambiguous
@@ -116,7 +119,7 @@ function mmh_learning_journey_attendance(mysqli $conn, int $userId, string $cour
 
 function mmh_learning_journey_item_records(mysqli $conn, int $userId, string $courseId): array
 {
-    $items = mmh_learning_journey_visible_items($conn, $courseId);
+    $items = mmh_learning_journey_visible_items($conn, $courseId, $userId);
     $progress = student_course_progress_load($conn, $userId, $courseId);
     $assignments = mmh_assignment_progress_load_course($conn, $userId, $courseId);
     // An explicitly configured Recovery window still represents genuine exam

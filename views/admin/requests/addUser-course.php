@@ -128,19 +128,27 @@ function add_user_course_transaction_exists(mysqli $conn, $course_id, $user_id)
     return $exists;
 }
 
-function add_user_course_create_course_log(mysqli $conn, array $course, $user_id)
+ function add_user_course_create_course_log(mysqli $conn, array $course, $user_id, ?string $unitAccess = null)
 {
     if (add_user_course_log_exists($conn, $course['course_id'], $user_id)) {
         return ['status' => 1, 'message' => 'Student is already enrolled.'];
     }
-    $ok = mmh_enrollment_ensure($conn, (int) $user_id, (string) $course['course_id'], (string) $course['course_title']);
+    $ok = mmh_enrollment_ensure($conn, (int) $user_id, (string) $course['course_id'], (string) $course['course_title'], null, true, $unitAccess);
     return $ok
         ? ['status' => 1, 'message' => 'Student enrolled successfully.']
         : ['status' => 0, 'message' => 'Error', 'reason' => 'Enrollment could not be created for this course.'];
 }
 
-function add_user_course_enroll_student(mysqli $conn, array $course, $user_id)
+function add_user_course_enroll_student(mysqli $conn, array $course, $user_id, ?string $unitAccess = null)
 {
+    $unitState = mmh_enrollment_course_unit_state($conn, (string) $course['course_id']);
+    if ($unitState === null) return ['status' => 0, 'message' => 'Error', 'reason' => 'Course Unit Access could not be verified.'];
+    if (!empty($unitState['candidate']) && !mmh_enrollment_unit_access_valid($unitAccess)) {
+        return ['status' => 0, 'message' => 'Error', 'reason' => 'Choose Unit 1, Unit 2, or Both Units for this modular Course.'];
+    }
+    if ($unitAccess !== null && !mmh_enrollment_unit_access_valid($unitAccess)) {
+        return ['status' => 0, 'message' => 'Error', 'reason' => 'Invalid Unit Access. Choose Unit 1, Unit 2, or Both Units.'];
+    }
     if (add_user_course_log_exists($conn, $course['course_id'], $user_id)) {
         return ['status' => 1, 'message' => 'Student is already enrolled.'];
     }
@@ -148,11 +156,11 @@ function add_user_course_enroll_student(mysqli $conn, array $course, $user_id)
     // Manual admin enrollment into a Private course is not a purchase. Keep
     // the course private and write only the canonical enrollment relationship.
     if (strtolower((string) ($course['course_state'] ?? '')) === 'private') {
-        return add_user_course_create_course_log($conn, $course, $user_id);
+        return add_user_course_create_course_log($conn, $course, $user_id, $unitAccess);
     }
 
     if (add_user_course_transaction_exists($conn, $course['course_id'], $user_id)) {
-        return add_user_course_create_course_log($conn, $course, $user_id);
+        return add_user_course_create_course_log($conn, $course, $user_id, $unitAccess);
     }
 
     $amountToAdd = (int) ($course['course_price'] ?? 0);
@@ -163,7 +171,7 @@ function add_user_course_enroll_student(mysqli $conn, array $course, $user_id)
 
     require_once 'inc/TransactionLog.php';
     $transactionLogHandler = new TransactionLog($conn);
-    $result = $transactionLogHandler->saveCourseLog((int) $user_id, (int) $course['course_id']);
+    $result = $transactionLogHandler->saveCourseLog((int) $user_id, (int) $course['course_id'], $unitAccess);
 
     if (add_user_course_log_exists($conn, $course['course_id'], $user_id)) {
         return ['status' => 1, 'message' => $result['message'] ?? 'Student enrolled successfully.'];
@@ -179,7 +187,12 @@ if($_SERVER['REQUEST_METHOD'] == "POST" ){
             $conn = db();
 
             $course_id = $_POST['course_id'];
+            $course = add_user_course_fetch_course($conn, (string) $course_id);
             $section_options = add_user_course_section_options(db(), $course_id);
+            $unitState = $course ? mmh_enrollment_course_unit_state($conn, (string) $course['course_id']) : null;
+            $unitAccessOptions = !empty($unitState['candidate'])
+                ? "<div class='col-12 col-lg-6 p-2'><label class='col-12' for='enrollment-unit-access'>Unit Access</label><div class='col-12 pt-3'><select class='form-control' id='enrollment-unit-access' name='unit_access' required><option value='' selected disabled>Select Unit Access</option><option value='unit1'>Unit 1</option><option value='unit2'>Unit 2</option><option value='both'>Both Units</option></select><small class='text-muted'>This modular Course requires an explicit Unit entitlement.</small></div></div>"
+                : '';
     
             // $query = "SELECT * FROM courses WHERE course_id='$course_id' ";
             $query = "SELECT * FROM users WHERE role='user' ";
@@ -219,6 +232,8 @@ if($_SERVER['REQUEST_METHOD'] == "POST" ){
                                                 </select>
                                                 </div>
                                         </div>
+
+                                        $unitAccessOptions
 
                                         <div class='col-12 col-lg-6 p-2'>
                                                 <div class='col-12'>
@@ -321,12 +336,13 @@ if($_SERVER['REQUEST_METHOD'] == "POST" ){
 
             $course = add_user_course_fetch_course($conn, $course_id);
             $student = add_user_course_fetch_student($conn, $user_id);
+            $unitAccess = isset($_POST['unit_access']) ? trim((string) $_POST['unit_access']) : null;
             if (!$course) {
                 echo json_encode(['status' => 0, 'message' => 'Error', 'reason' => 'Selected course was not found.']);
             } elseif (!$student || (string) ($student['status'] ?? '') !== '1') {
                 echo json_encode(['status' => 0, 'message' => 'Error', 'reason' => 'Selected student is not active.']);
             }else{
-                $result = add_user_course_enroll_student($conn, $course, $user_id);
+                $result = add_user_course_enroll_student($conn, $course, $user_id, $unitAccess !== '' ? $unitAccess : null);
                 if(!isset($result['status']) || $result['status'] != 1){
                     echo json_encode([
                         'status' => 0,

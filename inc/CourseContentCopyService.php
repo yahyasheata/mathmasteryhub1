@@ -217,7 +217,7 @@ final class CourseContentCopyService
             $newSort = self::nextOrder($conn, 'course_sections', 'sort_order', 'course_id', $destinationCourseId);
             $warnings = [];
             $sectionValues = self::sectionValues($source, $destinationCourseId, $newSectionId, $newSort, $warnings);
-            self::insertRow($conn, 'course_sections', $sectionValues);
+            self::insertKnownColumns($conn, 'course_sections', $sectionValues);
 
             $maps = ['sections' => [(string) $sourceSectionId => $newSectionId], 'items' => [], 'assignments' => [], 'assignment_refs' => []];
             $itemIds = [];
@@ -420,6 +420,7 @@ final class CourseContentCopyService
             'metadata' => self::jsonSanitize($source['metadata'] ?? null, $warnings),
             'sort_order' => $sort,
             'status' => $forceDraft ? 'draft' : (string) ($source['status'] ?? 'draft'),
+            'access_unit' => in_array((string) ($source['access_unit'] ?? 'shared'), ['shared', 'unit1', 'unit2'], true) ? (string) ($source['access_unit'] ?? 'shared') : 'shared',
             'unlock_mode' => 'always',
             'completion_rule' => (string) ($source['completion_rule'] ?? 'manual_completion'),
             'unlock_at' => null,

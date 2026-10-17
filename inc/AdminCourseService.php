@@ -1,6 +1,7 @@
 <?php
 /** Canonical admin mutations for course ownership and visibility. */
 require_once __DIR__ . '/AssignmentIdentity.php';
+require_once __DIR__ . '/EnrollmentService.php';
 if (!function_exists('mmh_admin_course_archive')) {
     function mmh_admin_course_archive(mysqli $conn, int $courseId): void
     {
@@ -176,8 +177,11 @@ if (!function_exists('mmh_admin_course_reorder_items')) {
     {
         $courseId = trim($courseId); if ($courseId === '') throw new InvalidArgumentException('Course ID is missing.');
         $sectionMap = [];
-        $sectionCheck = $conn->prepare('SELECT section_id FROM course_sections WHERE course_id = ?');
-        if ($sectionCheck) { $sectionCheck->bind_param('s', $courseId); $sectionCheck->execute(); foreach ($sectionCheck->get_result()->fetch_all(MYSQLI_ASSOC) as $row) $sectionMap[(string) $row['section_id']] = true; $sectionCheck->close(); }
+        $unitState = mmh_enrollment_course_unit_state($conn, $courseId);
+        if ($unitState === null) throw new RuntimeException('Course Section access could not be verified.');
+        $sectionSql = !empty($unitState['ready']) ? 'SELECT section_id, access_unit FROM course_sections WHERE course_id = ?' : "SELECT section_id, 'shared' AS access_unit FROM course_sections WHERE course_id = ?";
+        $sectionCheck = $conn->prepare($sectionSql);
+        if ($sectionCheck) { $sectionCheck->bind_param('s', $courseId); $sectionCheck->execute(); foreach ($sectionCheck->get_result()->fetch_all(MYSQLI_ASSOC) as $row) $sectionMap[(string) $row['section_id']] = (string) ($row['access_unit'] ?? 'shared'); $sectionCheck->close(); }
         $stmt = $conn->prepare('UPDATE course_items SET section_id = ?, page_order = ?, sort_order = ? WHERE id = ? AND course_id = ?');
         $orderOnly = $conn->prepare('UPDATE course_items SET page_order = ?, sort_order = ? WHERE id = ? AND course_id = ?');
         if (!$stmt || !$orderOnly) throw new RuntimeException('Lesson order could not be prepared.');
@@ -188,6 +192,27 @@ if (!function_exists('mmh_admin_course_reorder_items')) {
             if (array_key_exists('section_id', $raw)) {
                 $section = trim((string) $raw['section_id']); $section = ($section === '' || $section === '__general__') ? null : $section;
                 if ($section !== null && !isset($sectionMap[$section])) continue;
+                if ($section !== null && in_array($sectionMap[$section], ['unit1', 'unit2'], true)) {
+                    $resourceStmt = $conn->prepare('SELECT i.item_description, i.template_data, i.assignment_id FROM course_items i WHERE i.id = ? AND i.course_id = ? LIMIT 1');
+                    if (!$resourceStmt) { $stmt->close(); $orderOnly->close(); throw new RuntimeException('Lesson resource access could not be checked.'); }
+                    $resourceStmt->bind_param('is', $id, $courseId); $resourceStmt->execute();
+                    $resourceRow = $resourceStmt->get_result()->fetch_assoc() ?: []; $resourceStmt->close();
+                    $resourceSource = strtolower(rawurldecode((string) ($resourceRow['item_description'] ?? '') . ' ' . (string) ($resourceRow['template_data'] ?? '')));
+                    $assignmentId = trim((string) ($resourceRow['assignment_id'] ?? ''));
+                    if ($assignmentId !== '') {
+                        $assignmentTable = $conn->prepare("SELECT 1 FROM INFORMATION_SCHEMA.TABLES WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'assignments' LIMIT 1");
+                        if (!$assignmentTable) { $stmt->close(); $orderOnly->close(); throw new RuntimeException('Homework resource access could not be checked.'); }
+                        $assignmentTable->execute();
+                        $hasAssignments = (bool) $assignmentTable->get_result()->fetch_assoc(); $assignmentTable->close();
+                        if ($hasAssignments) {
+                            $fileStmt = $conn->prepare('SELECT file_path FROM assignments WHERE assignment_id = ? AND course_id = ? LIMIT 1');
+                            if (!$fileStmt) { $stmt->close(); $orderOnly->close(); throw new RuntimeException('Homework resource access could not be checked.'); }
+                            $fileStmt->bind_param('ss', $assignmentId, $courseId); $fileStmt->execute();
+                            $resourceSource .= ' ' . strtolower(rawurldecode((string) ($fileStmt->get_result()->fetch_assoc()['file_path'] ?? ''))); $fileStmt->close();
+                        }
+                    }
+                    if (str_contains($resourceSource, 'uploads/')) { $stmt->close(); $orderOnly->close(); throw new RuntimeException('A lesson with a direct /uploads/ link cannot be moved into a Unit-restricted Section.'); }
+                }
                 $stmt->bind_param('siiis', $section, $order, $order, $id, $courseId);
                 if (!$stmt->execute()) { $stmt->close(); $orderOnly->close(); throw new RuntimeException('Lesson order could not be saved.'); }
                 $updated += $stmt->affected_rows >= 0 ? 1 : 0;

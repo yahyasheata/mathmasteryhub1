@@ -47,6 +47,17 @@ function item_table_exists(mysqli $conn, $table)
     return (int) ($row['total'] ?? 0) > 0;
 }
 
+function item_any_column_exists(mysqli $conn, string $table, string $column): bool
+{
+    $stmt = $conn->prepare('SELECT 1 FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = ? AND COLUMN_NAME = ? LIMIT 1');
+    if (!$stmt) return false;
+    $stmt->bind_param('ss', $table, $column);
+    $stmt->execute();
+    $exists = (bool) $stmt->get_result()->fetch_assoc();
+    $stmt->close();
+    return $exists;
+}
+
 function item_status_supports_hidden(mysqli $conn)
 {
     $stmt = $conn->prepare("SELECT COLUMN_TYPE FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'course_items' AND COLUMN_NAME = 'status' LIMIT 1");
@@ -1138,6 +1149,33 @@ if ($has_section_id) {
     // created without the section context used by reporting.
     if ($template_type === 'classified_assignment' && $method !== 'UPDATE' && $posted_section_id === '' && !$explicit_general_section) {
         item_response(false, 'Choose a named section or the explicit General option for this homework.');
+    }
+}
+
+// Files under /uploads are directly addressable by the web server. Do not
+// allow a new/edit resource to attach one to a Unit-restricted Section; the
+// Student gateway protects the lesson route but cannot protect a raw file URL.
+if ($section_id !== null && mmh_column_exists($conn, 'course_sections', 'access_unit')) {
+    $restrictedSection = $conn->prepare("SELECT access_unit FROM course_sections WHERE course_id = ? AND section_id = ? LIMIT 1");
+    if (!$restrictedSection) item_response(false, 'Section access could not be verified.');
+    $restrictedSection->bind_param('ss', $course_id, $section_id);
+    $restrictedSection->execute();
+    $sectionAccess = (string) ($restrictedSection->get_result()->fetch_assoc()['access_unit'] ?? 'shared');
+    $restrictedSection->close();
+    if (in_array($sectionAccess, ['unit1', 'unit2'], true)) {
+        $resourceSource = strtolower(rawurldecode($item_description . ' ' . $template_data_json . ' ' . $item_metadata_json));
+        $resourceAssignmentId = trim((string) ($built['data']['assignment_id'] ?? ''));
+        if ($resourceAssignmentId !== '' && item_table_exists($conn, 'assignments') && item_any_column_exists($conn, 'assignments', 'file_path')) {
+            $fileStmt = $conn->prepare('SELECT file_path FROM assignments WHERE assignment_id = ? AND course_id = ? LIMIT 1');
+            if (!$fileStmt) item_response(false, 'Homework resource access could not be verified.');
+            $fileStmt->bind_param('ss', $resourceAssignmentId, $course_id);
+            $fileStmt->execute();
+            $resourceSource .= ' ' . strtolower(rawurldecode((string) ($fileStmt->get_result()->fetch_assoc()['file_path'] ?? '')));
+            $fileStmt->close();
+        }
+        if (str_contains($resourceSource, 'uploads/')) {
+            item_response(false, 'Unit-restricted Sections cannot use direct /uploads/ links. Use a server-authorized resource instead.');
+        }
     }
 }
 

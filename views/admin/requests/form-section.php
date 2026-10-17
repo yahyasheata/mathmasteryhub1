@@ -4,6 +4,7 @@ require_once 'inc/functions.php';
 require_once 'inc/learning_schema.php';
 require_once 'inc/AcademicMetadata.php';
 require_once 'inc/CourseSectionAvailability.php';
+require_once 'inc/EnrollmentService.php';
 require_once 'inc/AssignmentIdentity.php';
 
 header('Content-Type: application/json; charset=utf-8');
@@ -246,6 +247,8 @@ if (!isset($_POST['course_id']) || trim($_POST['course_id']) === '') {
 $conn = db();
 mmh_ensure_learning_schema($conn);
 $course_id = trim($_POST['course_id']);
+$unitAccessSchema = mmh_enrollment_course_unit_state($conn, $course_id);
+if ($unitAccessSchema === null) form_section_response(false, 'Section Access could not be verified.');
 
 $course_stmt = $conn->prepare('SELECT course_title FROM courses WHERE course_id = ? LIMIT 1');
 $course_stmt->bind_param('s', $course_id);
@@ -268,6 +271,7 @@ $section = [
     'description' => '',
     'sort_order' => '',
     'status' => 'published',
+    'access_unit' => 'shared',
     'unlock_mode' => 'always',
     'completion_rule' => 'manual_completion',
     'unlock_at' => '',
@@ -357,6 +361,9 @@ $section_metadata_html = "
             </div>";
 $safe_sort_order = form_section_html($section['sort_order']);
 $status = form_section_status($section['status']);
+$access_unit = in_array((string) ($section['access_unit'] ?? 'shared'), ['shared', 'unit1', 'unit2'], true) ? (string) ($section['access_unit'] ?? 'shared') : 'shared';
+$access_unit_options_html = form_section_select_options(['shared' => 'All Students (Shared)', 'unit1' => 'Unit 1', 'unit2' => 'Unit 2'], $access_unit);
+$access_unit_disabled = empty($unitAccessSchema['ready']) ? 'disabled' : '';
 $published_selected = $status === 'published' ? 'selected' : '';
 $draft_selected = $status === 'draft' ? 'selected' : '';
 $unlock_mode = form_section_normalize_option($section['unlock_mode'] ?? 'always', form_section_unlock_mode_options(), 'always');
@@ -446,6 +453,11 @@ $html_response = "
                 <option value='published' {$published_selected}>Published</option>
                 <option value='draft' {$draft_selected}>Draft</option>
               </select>
+            </div>
+            <div class='col-12 col-lg-6 p-2'>
+              <label class='form-label'>Section Access</label>
+              <select name='access_unit' class='form-control' required {$access_unit_disabled}>{$access_unit_options_html}</select>
+              <small class='text-muted'>Choose who can access this Section. Unit restrictions apply in addition to release and sequential-learning rules.</small>
             </div>
             <div class='col-12 col-lg-6 p-2'>
               <label class='form-label'>Sort Order</label>

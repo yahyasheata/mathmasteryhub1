@@ -3,6 +3,7 @@ require_once 'connection/config.php';
 require_once '__init.php';
 require_once 'inc/functions.php';
 require_once 'inc/Auth.php';
+require_once 'inc/EnrollmentService.php';
 
 $conn = db();
 $base = rtrim((string) ($baseUrl ?? mmh_site_public_base_path()), '/');
@@ -20,9 +21,12 @@ if (!$course) {
     http_response_code(404);
     exit('Course not found.');
 }
+$unitAccessState = mmh_enrollment_course_unit_state($conn, $courseId);
+if ($unitAccessState === null) { http_response_code(503); exit('Course access configuration is unavailable.'); }
 
 $students = [];
-$studentsStmt = $conn->prepare('SELECT u.user_id, u.full_name, u.username, u.status, MIN(cl.purchase_date) AS enrolled_at, COUNT(cl.id) AS enrollment_rows FROM course_logs cl INNER JOIN users u ON u.user_id = cl.user_id WHERE cl.course_id = ? AND u.role = \'user\' GROUP BY u.user_id, u.full_name, u.username, u.status ORDER BY u.full_name ASC, u.username ASC');
+$unitSelect = !empty($unitAccessState['ready']) ? 'MAX(cl.unit_access) AS unit_access' : 'NULL AS unit_access';
+$studentsStmt = $conn->prepare("SELECT u.user_id, u.full_name, u.username, u.status, MIN(cl.purchase_date) AS enrolled_at, COUNT(cl.id) AS enrollment_rows, {$unitSelect} FROM course_logs cl INNER JOIN users u ON u.user_id = cl.user_id WHERE cl.course_id = ? AND u.role = 'user' GROUP BY u.user_id, u.full_name, u.username, u.status ORDER BY u.full_name ASC, u.username ASC");
 if ($studentsStmt) {
     $studentsStmt->bind_param('s', $courseId);
     $studentsStmt->execute();
@@ -38,6 +42,13 @@ if ($targetStmt) {
     $targetCourses = $targetStmt->get_result()->fetch_all(MYSQLI_ASSOC);
     $targetStmt->close();
 }
+foreach ($targetCourses as &$targetCourse) {
+    $state = mmh_enrollment_course_unit_state($conn, (string) $targetCourse['course_id']);
+    $targetCourse['unit_candidate'] = !empty($state['candidate']);
+    $targetCourse['unit_restricted'] = !empty($state['restricted']);
+}
+unset($targetCourse);
+$hasRestrictedTarget = count(array_filter($targetCourses, static fn(array $target): bool => !empty($target['unit_restricted']))) > 0;
 $flashType = (string) ($_GET['enrollment'] ?? '');
 $flashMessage = (string) ($_GET['message'] ?? '');
 ?>
@@ -69,6 +80,7 @@ $flashMessage = (string) ($_GET['message'] ?? '');
                     <span class="course-students-count"><?= count($students) ?> enrolled student<?= count($students) === 1 ? '' : 's' ?></span>
                 </div>
                 <?php if ($flashMessage !== ''): ?><div class="alert alert-<?= $flashType === 'success' ? 'success' : 'danger' ?>" role="alert"><?= $escape($flashMessage) ?></div><?php endif; ?>
+                <?php if (!empty($unitAccessState['candidate'])): ?><p class="course-students-note"><?= (int) count(array_filter($students, static fn(array $student): bool => !in_array((string) ($student['unit_access'] ?? ''), ['unit1', 'unit2', 'both'], true))) ?> enrolled student<?= count(array_filter($students, static fn(array $student): bool => !in_array((string) ($student['unit_access'] ?? ''), ['unit1', 'unit2', 'both'], true))) === 1 ? '' : 's' ?> still need Unit Access. Legacy enrollments remain unclassified until you set it here.</p><?php endif; ?>
                 <?php if (!$students): ?>
                     <div class="course-students-empty"><span class="fas fa-user-graduate" aria-hidden="true"></span><p class="mb-0">No enrolled students are attached to this course.</p></div>
                 <?php else: ?>
@@ -82,7 +94,7 @@ $flashMessage = (string) ($_GET['message'] ?? '');
                         </div>
                         <div class="course-students-table-wrap">
                             <table class="course-students-table">
-                                <thead><tr><th><span class="visually-hidden">Select</span></th><th>Student</th><th>Account</th><th>Enrollment status</th><th>Enrolled</th></tr></thead>
+                                <thead><tr><th><span class="visually-hidden">Select</span></th><th>Student</th><th>Account</th><th>Enrollment status</th><?php if (!empty($unitAccessState['candidate'])): ?><th>Unit Access</th><?php endif; ?><th>Enrolled</th></tr></thead>
                                 <tbody>
                                 <?php foreach ($students as $student): ?>
                                     <tr>
@@ -90,6 +102,7 @@ $flashMessage = (string) ($_GET['message'] ?? '');
                                         <td><strong><?= $escape($student['full_name'] ?: $student['username']) ?></strong><small>ID <?= (int) $student['user_id'] ?></small></td>
                                         <td><?= $escape($student['username']) ?></td>
                                         <td><?= (string) ($student['status'] ?? '') === '1' ? 'Active' : 'Inactive' ?><?php if ((int) ($student['enrollment_rows'] ?? 1) > 1): ?><small>Duplicate enrollment rows detected</small><?php endif; ?></td>
+                                        <?php if (!empty($unitAccessState['candidate'])): ?><td><?= in_array((string) ($student['unit_access'] ?? ''), ['unit1', 'unit2', 'both'], true) ? ['unit1' => 'Unit 1', 'unit2' => 'Unit 2', 'both' => 'Both Units'][(string) $student['unit_access']] : 'Unclassified' ?></td><?php endif; ?>
                                         <td><?= $student['enrolled_at'] ? $escape(date('j M Y', strtotime((string) $student['enrolled_at']))) : '—' ?></td>
                                     </tr>
                                 <?php endforeach; ?>
@@ -98,10 +111,17 @@ $flashMessage = (string) ($_GET['message'] ?? '');
                         </div>
                         <p class="course-students-note">Removing or moving students changes course access only. Accounts, submissions, grades, attendance, progress, and reports remain preserved.</p>
                         <div class="course-students-actions">
+                            <?php if (!empty($unitAccessState['candidate'])): ?>
+                            <label>Set Unit Access for selected students
+                                <select class="form-select" name="unit_access"><option value="">Choose Unit Access…</option><option value="unit1">Unit 1</option><option value="unit2">Unit 2</option><option value="both">Both Units</option></select>
+                            </label>
+                            <button class="btn btn-primary" type="submit" name="action" value="set_unit_access" data-enrollment-action="unit">Save Unit Access</button>
+                            <?php endif; ?>
                             <select class="form-select" name="target_course_id" aria-label="Target course for move">
                                 <option value="">Choose target course to move…</option>
-                                <?php foreach ($targetCourses as $target): ?><option value="<?= $escape($target['course_id']) ?>"><?= $escape($target['course_title']) ?> · <?= ucfirst($escape($target['course_state'])) ?></option><?php endforeach; ?>
+                                <?php foreach ($targetCourses as $target): ?><option value="<?= $escape($target['course_id']) ?>" data-unit-required="<?= !empty($target['unit_restricted']) ? '1' : '0' ?>"><?= $escape($target['course_title']) ?> · <?= ucfirst($escape($target['course_state'])) ?></option><?php endforeach; ?>
                             </select>
+                            <?php if ($hasRestrictedTarget): ?><select class="form-select" name="target_unit_access" aria-label="Unit Access for target Course"><option value="">Choose target Unit Access if required…</option><option value="unit1">Unit 1</option><option value="unit2">Unit 2</option><option value="both">Both Units</option></select><?php endif; ?>
                             <button class="btn btn-outline-danger" type="submit" name="action" value="remove" data-enrollment-action="remove">Remove from course</button>
                             <button class="btn btn-primary" type="submit" name="action" value="move" data-enrollment-action="move">Move to selected course</button>
                         </div>
@@ -124,7 +144,9 @@ document.addEventListener('DOMContentLoaded', function () {
         const selected = checks().filter(input => input.checked).length;
         const action = event.submitter?.value || '';
         if (!selected) { event.preventDefault(); alert('Select at least one enrolled student.'); return; }
+        if (action === 'set_unit_access' && !form.querySelector('[name="unit_access"]').value) { event.preventDefault(); alert('Choose Unit Access before saving.'); return; }
         if (action === 'move' && !form.querySelector('[name="target_course_id"]').value) { event.preventDefault(); alert('Choose a target course before moving students.'); return; }
+        if (action === 'move' && form.querySelector('[name="target_course_id"] option:checked')?.dataset.unitRequired === '1' && !form.querySelector('[name="target_unit_access"]').value) { event.preventDefault(); alert('Choose Unit Access for the restricted target course.'); return; }
         const title = action === 'remove' ? 'Remove ' + selected + ' student' + (selected === 1 ? '' : 's') + ' from this course?' : 'Move ' + selected + ' student' + (selected === 1 ? '' : 's') + ' to the selected course?';
         const detail = action === 'remove' ? 'Their accounts and historical submissions/progress will be preserved, but they will lose access to this course.' : 'Historical course data remains attached to the original course. Progress will not be fabricated or transferred.';
         if (!window.confirm(title + '\n\n' + detail)) event.preventDefault();

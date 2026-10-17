@@ -16,7 +16,7 @@ if ($courseStmt) {
     $course = $courseStmt->get_result()->fetch_assoc();
     $courseStmt->close();
 }
-if (!$course || !$studentIds || !in_array($action, ['remove', 'move'], true)) {
+if (!$course || !$studentIds || !in_array($action, ['remove', 'move', 'set_unit_access'], true)) {
     http_response_code(422);
     exit('Invalid enrollment request.');
 }
@@ -25,15 +25,21 @@ $targetCourseId = trim((string) ($_POST['target_course_id'] ?? ''));
 $ok = false;
 if ($action === 'remove') {
     $ok = mmh_enrollment_remove_batch($conn, $studentIds, (string) $course['course_id']);
+} elseif ($action === 'set_unit_access') {
+    $unitAccess = trim((string) ($_POST['unit_access'] ?? ''));
+    $ok = mmh_enrollment_set_unit_access_batch($conn, $studentIds, (string) $course['course_id'], $unitAccess);
 } else {
-    $ok = mmh_enrollment_move_batch($conn, $studentIds, (string) $course['course_id'], $targetCourseId);
+    $targetUnitAccess = trim((string) ($_POST['target_unit_access'] ?? ''));
+    $ok = mmh_enrollment_move_batch($conn, $studentIds, (string) $course['course_id'], $targetCourseId, $targetUnitAccess !== '' ? $targetUnitAccess : null);
 }
 
 $count = count($studentIds);
 $message = $ok
     ? ($action === 'remove'
         ? "Removed {$count} student" . ($count === 1 ? '' : 's') . ' from the course. Accounts and historical records were preserved.'
-        : "Moved {$count} student" . ($count === 1 ? '' : 's') . ' to the selected course. Historical records remain attached to the source course.')
+        : ($action === 'set_unit_access'
+            ? "Updated Unit Access for {$count} student" . ($count === 1 ? '' : 's') . '.'
+            : "Moved {$count} student" . ($count === 1 ? '' : 's') . ' to the selected course. Historical records remain attached to the source course.'))
     : 'No enrollment changes were made. Check the selected students and target course, then try again.';
 $base = rtrim((string) mmh_current_request_base_url(), '/');
 header('Location: ' . $base . '/admin/courses/' . rawurlencode((string) $course['course_id']) . '/students?enrollment=' . ($ok ? 'success' : 'error') . '&message=' . rawurlencode($message));

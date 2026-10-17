@@ -13,7 +13,8 @@ $exam = $course ? mmh_timed_exam_load($conn, (string) $course['course_id'], (int
 if (!$course || !$exam || !student_course_access_enrolled($conn, $studentId, (string) $course['course_id'])) { http_response_code(403); exit('Marked paper unavailable.'); }
 // Refresh the canonical attempt state so scheduled result release follows the
 // same rules as the normal student result page.
-mmh_timed_exam_student_context($conn, $exam, (int) $studentId, false);
+$context = mmh_timed_exam_student_context($conn, $exam, (int) $studentId, false);
+if (($context['state']['key'] ?? '') === 'unavailable') { http_response_code(403); exit('Marked paper unavailable.'); }
 $paper = mmh_timed_exam_marked_paper_for_student($conn, (int) $attemptIdValue, (int) $examIdValue, (int) $studentId);
 if (!$paper) { http_response_code(403); exit('Marked paper unavailable.'); }
 mmh_timed_exam_marked_paper_serve($conn, $paper, (string) ($_GET['download'] ?? '') === '1');

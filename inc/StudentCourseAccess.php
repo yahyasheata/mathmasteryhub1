@@ -176,6 +176,48 @@ if (!function_exists('student_course_access_enrolled')) {
     }
 }
 
+if (!function_exists('student_course_access_unit_schema_ready')) {
+    function student_course_access_unit_schema_ready(mysqli $conn): bool
+    {
+        static $cache = [];
+        $key = spl_object_id($conn);
+        if (array_key_exists($key, $cache)) return $cache[$key];
+        $stmt = $conn->prepare("SELECT COUNT(*) AS total FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_SCHEMA = DATABASE() AND ((TABLE_NAME = 'course_sections' AND COLUMN_NAME = 'access_unit') OR (TABLE_NAME = 'course_logs' AND COLUMN_NAME = 'unit_access'))");
+        if (!$stmt) return $cache[$key] = false;
+        $stmt->execute();
+        $ready = (int) (($stmt->get_result()->fetch_assoc()['total'] ?? 0)) === 2;
+        $stmt->close();
+        return $cache[$key] = $ready;
+    }
+}
+
+if (!function_exists('student_course_access_unit_allowed')) {
+    function student_course_access_unit_allowed($accessUnit, $unitAccess): bool
+    {
+        $sectionUnit = (string) $accessUnit;
+        if ($sectionUnit === 'shared') return true;
+        if (!in_array($sectionUnit, ['unit1', 'unit2'], true)) return false;
+        if (!in_array((string) $unitAccess, ['unit1', 'unit2', 'both'], true)) return false;
+        return $unitAccess === 'both' || $unitAccess === $sectionUnit;
+    }
+}
+
+if (!function_exists('student_course_access_unit_entitlement')) {
+    function student_course_access_unit_entitlement(mysqli $conn, $userId, $courseId): ?string
+    {
+        if (!student_course_access_unit_schema_ready($conn)) return null;
+        $stmt = $conn->prepare('SELECT unit_access FROM course_logs WHERE user_id = ? AND course_id = ? LIMIT 1');
+        if (!$stmt) return null;
+        $userId = (int) $userId;
+        $courseId = (string) $courseId;
+        $stmt->bind_param('is', $userId, $courseId);
+        if (!$stmt->execute()) { $stmt->close(); return null; }
+        $row = $stmt->get_result()->fetch_assoc();
+        $stmt->close();
+        return $row ? (string) ($row['unit_access'] ?? '') : null;
+    }
+}
+
 if (!function_exists('student_course_access_item')) {
     function student_course_access_item(mysqli $conn, $courseId, $itemId)
     {
@@ -211,7 +253,8 @@ if (!function_exists('student_course_access_section')) {
             return null;
         }
 
-        $stmt = $conn->prepare("SELECT id, section_id, course_id, title, description, sort_order, status, unlock_mode,
+        $unitColumn = student_course_access_unit_schema_ready($conn) ? 'access_unit' : "'shared' AS access_unit";
+        $stmt = $conn->prepare("SELECT id, section_id, course_id, title, description, sort_order, status, {$unitColumn}, unlock_mode,
                 completion_rule, unlock_at, unlock_timezone, unlock_homework_id, manual_unlocked,
                 release_mode, release_override, release_at, release_timezone, release_occurrence_id, release_delay_minutes, metadata
             FROM course_sections
@@ -471,7 +514,8 @@ if (!function_exists('student_course_access_visible_sections')) {
     {
         mmh_ensure_learning_schema($conn);
         $sections = [];
-        $stmt = $conn->prepare("SELECT s.section_id, s.course_id, s.title, s.description, s.sort_order, s.status, s.unlock_mode,
+        $unitColumn = student_course_access_unit_schema_ready($conn) ? 's.access_unit' : "'shared' AS access_unit";
+        $stmt = $conn->prepare("SELECT s.section_id, s.course_id, s.title, s.description, s.sort_order, s.status, {$unitColumn}, s.unlock_mode,
                 s.completion_rule, s.unlock_at, s.unlock_timezone, s.unlock_homework_id, s.manual_unlocked,
                 s.release_mode, s.release_override, s.release_at, s.release_timezone, s.release_occurrence_id, s.release_delay_minutes, s.metadata
             FROM course_sections AS s
@@ -531,7 +575,13 @@ if (!function_exists('student_course_access_section_state')) {
             return null;
         }
 
+        $unitAccess = student_course_access_unit_entitlement($conn, $userId, $course['course_id'] ?? '');
+        if (!student_course_access_unit_allowed($section['access_unit'] ?? null, $unitAccess)) {
+            return null;
+        }
+
         $sections = student_course_access_visible_sections($conn, $course['course_id']);
+        $sections = array_values(array_filter($sections, static fn(array $candidate): bool => student_course_access_unit_allowed($candidate['access_unit'] ?? null, $unitAccess)));
         $index = null;
         foreach ($sections as $position => $candidate) {
             if ((string) $candidate['section_id'] === (string) $section['section_id']) {

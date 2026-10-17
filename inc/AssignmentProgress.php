@@ -194,7 +194,7 @@ if (!function_exists('mmh_assignment_progress_latest_submissions')) {
 }
 
 if (!function_exists('mmh_assignment_progress_course_sources')) {
-    function mmh_assignment_progress_course_sources(mysqli $conn, $courseId)
+    function mmh_assignment_progress_course_sources(mysqli $conn, $courseId, ?string $unitAccess = null)
     {
         $courseId = mmh_assignment_progress_id($courseId);
         if ($courseId === null) {
@@ -205,6 +205,7 @@ if (!function_exists('mmh_assignment_progress_course_sources')) {
             "SELECT i.id, i.item_id, i.item_title, i.item_description, i.course_id, i.section_id, i.item_type,
                     i.template_type, i.template_data, i.assignment_id, i.due_date, i.page_order, i.sort_order,
                     s.title AS section_title, s.sort_order AS section_sort_order,
+                    " . (function_exists('student_course_access_unit_schema_ready') && student_course_access_unit_schema_ready($conn) ? 's.access_unit' : "'shared'") . " AS section_access_unit,
                     i.sort_order AS item_sort_order
              FROM course_items AS i
              LEFT JOIN course_sections AS s
@@ -229,6 +230,11 @@ if (!function_exists('mmh_assignment_progress_course_sources')) {
         if ($stmt->execute()) {
             $result = $stmt->get_result();
             while ($item = $result->fetch_assoc()) {
+                if (function_exists('student_course_access_unit_allowed')) {
+                    if (!student_course_access_unit_allowed($item['section_access_unit'] ?? 'shared', $unitAccess)) continue;
+                } elseif (($item['section_access_unit'] ?? 'shared') !== 'shared') {
+                    continue;
+                }
                 $itemId = mmh_assignment_progress_id($item['item_id'] ?? '');
                 if ($itemId === null) {
                     continue;
@@ -459,7 +465,10 @@ if (!function_exists('mmh_assignment_progress_load_course')) {
         if ($studentId <= 0 || $courseId === null) {
             return [];
         }
-        $sources = mmh_assignment_progress_course_sources($conn, $courseId);
+        $unitAccess = function_exists('student_course_access_unit_entitlement')
+            ? student_course_access_unit_entitlement($conn, $studentId, $courseId)
+            : null;
+        $sources = mmh_assignment_progress_course_sources($conn, $courseId, $unitAccess);
         $assignmentSources = $sources['assignments'];
         $stmt = $conn->prepare(
             "SELECT a.assignment_id, a.assignment_title, a.assignment_description, a.due_date, a.late_submission_enabled, a.late_submission_until,

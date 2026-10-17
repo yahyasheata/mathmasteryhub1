@@ -112,8 +112,16 @@ function getSiteSettings() {
         }
     }
 
-    public function saveCourseLog($user_id, $course_id)
+    public function saveCourseLog($user_id, $course_id, ?string $unitAccess = null)
     {
+        $unitState = mmh_enrollment_course_unit_state($this->conn, (string) $course_id);
+        if ($unitState === null) return ['status' => 0, 'message' => 'Course access could not be verified.'];
+        if (!empty($unitState['candidate']) && !mmh_enrollment_unit_access_valid($unitAccess)) {
+            return ['status' => 0, 'message' => 'This modular Course requires an explicit Unit Access assignment before enrollment.'];
+        }
+        if ($unitAccess !== null && !mmh_enrollment_unit_access_valid($unitAccess)) {
+            return ['status' => 0, 'message' => 'Choose Unit 1, Unit 2, or Both Units.'];
+        }
         // Check if the transaction was successful
         $purchaseResult = $this->purchaseCourse($user_id, $course_id);
 
@@ -121,7 +129,7 @@ function getSiteSettings() {
             $course_title = $purchaseResult['course_title'];
 
             // Record course access through the canonical idempotent writer.
-            $result = mmh_enrollment_ensure($this->conn, (int) $user_id, (string) $course_id, (string) $course_title);
+            $result = mmh_enrollment_ensure($this->conn, (int) $user_id, (string) $course_id, (string) $course_title, null, true, $unitAccess);
             return $result
                 ? ['status' => 1, 'message' => 'تم شراء الكورس بنجاح , يمكنك الان الاطلاع على محتوى الكورس ']
                 : ['status' => 0, 'message' => 'Enrollment could not be saved.'];

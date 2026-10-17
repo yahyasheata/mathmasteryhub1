@@ -42,7 +42,8 @@ try {
 
     $schema = [
         "CREATE TABLE courses (course_id VARCHAR(40) PRIMARY KEY, archived_at DATETIME NULL, course_state VARCHAR(16) NOT NULL)",
-        "CREATE TABLE course_items (id INT AUTO_INCREMENT PRIMARY KEY, course_id VARCHAR(40) NOT NULL, item_id VARCHAR(40) NOT NULL, archived_at DATETIME NULL, status VARCHAR(16) NULL, UNIQUE KEY uq_course_item(course_id,item_id))",
+        "CREATE TABLE course_items (id INT AUTO_INCREMENT PRIMARY KEY, course_id VARCHAR(40) NOT NULL, item_id VARCHAR(40) NOT NULL, section_id VARCHAR(40) NULL, archived_at DATETIME NULL, status VARCHAR(16) NULL, UNIQUE KEY uq_course_item(course_id,item_id))",
+        "CREATE TABLE course_sections (id INT AUTO_INCREMENT PRIMARY KEY, course_id VARCHAR(40) NOT NULL, section_id VARCHAR(40) NOT NULL, title VARCHAR(190), status VARCHAR(16) NULL)",
         "CREATE TABLE users (user_id INT PRIMARY KEY, username VARCHAR(120) NOT NULL, full_name VARCHAR(190) NULL, role VARCHAR(20) NOT NULL, status VARCHAR(20) NOT NULL, archived_at DATETIME NULL)",
         "CREATE TABLE course_logs (id INT AUTO_INCREMENT PRIMARY KEY, user_id INT NOT NULL, course_id VARCHAR(40) NOT NULL, purchase_date DATETIME NULL, KEY idx_enrollment(course_id,user_id))",
         "CREATE TABLE timed_exams (id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY, course_id VARCHAR(40) NOT NULL, item_id VARCHAR(40) NOT NULL, title VARCHAR(190) NOT NULL, status VARCHAR(16) NOT NULL, scheduled_start_at_utc DATETIME NULL, duration_minutes INT UNSIGNED NOT NULL, grace_minutes INT UNSIGNED NOT NULL, max_attempts INT UNSIGNED NOT NULL, late_submission_allowed TINYINT(1) NOT NULL, expiry_policy VARCHAR(32) NOT NULL, max_marks DECIMAL(10,2) NULL, results_release_at_utc DATETIME NULL, recovery_allowed TINYINT(1) NOT NULL DEFAULT 0, deleted_at DATETIME NULL, roster_finalized_at_utc DATETIME NULL)",
