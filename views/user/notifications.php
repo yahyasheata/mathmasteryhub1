@@ -98,6 +98,7 @@ function student_notifications_date(array $notification)
                         <?php
                         $notificationTitle = trim((string) ($notification['title'] ?? '')) ?: 'Notification';
                         $notificationMessage = trim((string) ($notification['message'] ?? ''));
+                        $notificationMessageRepeatsTitle = $notificationMessage !== '' && $notificationMessage === $notificationTitle;
                         $notificationDate = student_notifications_date($notification);
                         $isUnread = (string) ($notification['status'] ?? '1') === '0';
                         ?>
@@ -105,7 +106,7 @@ function student_notifications_date(array $notification)
                             <span class="student-notification-icon fas fa-bell" aria-hidden="true"></span>
                             <div class="student-notification-content">
                                 <h2><?= student_notifications_html($notificationTitle); ?></h2>
-                                <?php if ($notificationMessage !== ''): ?><p><?= student_notifications_html($notificationMessage); ?></p><?php endif; ?>
+                                <?php if ($notificationMessage !== '' && !$notificationMessageRepeatsTitle): ?><p><?= student_notifications_html($notificationMessage); ?></p><?php endif; ?>
                                 <?php if ($notificationDate !== ''): ?><time class="student-notification-meta" datetime="<?= student_notifications_html((string) ($notification['created_at'] ?? $notification['sent_at'] ?? $notification['updated_at'] ?? '')); ?>"><?= student_notifications_html($notificationDate); ?></time><?php endif; ?>
                             </div>
                         </article>

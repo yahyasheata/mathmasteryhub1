@@ -478,6 +478,41 @@
 .past-papers-recent-inline { display: flex; flex-wrap: wrap; gap: .5rem; margin-top: .7rem; }
 .past-papers-recent-inline a { align-items: center; background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius-sm); color: var(--text-primary); display: flex; font-size: .78rem; gap: .4rem; padding: .4rem .5rem; text-decoration: none; }
 .past-papers-recent-inline a:hover { border-color: var(--secondary); }
+
+/* The legacy frontend bundle applies DinNext to most elements with !important.
+   Keep the public archive on its approved interface type while retaining its
+   dense, practical table sizing. */
+html body.past-papers-public-page :not(.fileuploader):not([class^="fileuploader-icon-"]):not([class^="fa"]):not(.cairo):not([class^="vj"]):not([class^="tie-"]) {
+  font-family: var(--font-sans) !important;
+}
+
+html body.past-papers-public-page .past-papers-library-table th {
+  font-weight: 700;
+  letter-spacing: .035em;
+}
+
+html body.past-papers-public-page :not(.fileuploader):not([class^="fileuploader-icon-"]):not([class^="fa"]):not(.cairo):not([class^="vj"]):not([class^="tie-"]).exam-archive-header h1,
+html body.past-papers-public-page :not(.fileuploader):not([class^="fileuploader-icon-"]):not([class^="fa"]):not(.cairo):not([class^="vj"]):not([class^="tie-"]).exam-archive-paper-group-header h2,
+html body.past-papers-public-page :not(.fileuploader):not([class^="fileuploader-icon-"]):not([class^="fa"]):not(.cairo):not([class^="vj"]):not([class^="tie-"]).exam-archive-empty h2 {
+  font-family: var(--font-heading) !important;
+  font-weight: 400;
+  letter-spacing: -.025em;
+}
+
+html body.past-papers-public-page :not(.fileuploader):not([class^="fileuploader-icon-"]):not([class^="fa"]):not(.cairo):not([class^="vj"]):not([class^="tie-"]).exam-archive-eyebrow,
+html body.past-papers-public-page :not(.fileuploader):not([class^="fileuploader-icon-"]):not([class^="fa"]):not(.cairo):not([class^="vj"]):not([class^="tie-"]).archive-paper-tabs small {
+  font-family: var(--font-mono) !important;
+}
+
+html body.past-papers-public-page .exam-archive-table thead th {
+  font-weight: 700;
+  letter-spacing: .035em;
+}
+
+html body.past-papers-public-page .past-papers-list-action,
+html body.past-papers-public-page .past-papers-list-dash {
+  font-weight: 700;
+}
 .past-papers-recent-inline span { color: var(--secondary); }
 .past-papers-recent-inline small { color: var(--text-muted); }
 @media (max-width: 1100px) {

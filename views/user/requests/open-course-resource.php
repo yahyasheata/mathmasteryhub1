@@ -47,8 +47,8 @@ function course_resource_notice($statusCode, $title, $message, $courseId = '')
         : rtrim((string) $baseUrl, '/') . '/user/my-courses';
     echo '<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">'
         . '<link rel="stylesheet" href="' . course_resource_escape(rtrim((string) $baseUrl, '/') . '/resources/css/fontawsome5.min.css') . '">'
-        . '<link rel="stylesheet" href="' . course_resource_escape(rtrim((string) $baseUrl, '/') . '/resources/css/design-system.css') . '">'
-        . '<link rel="stylesheet" href="' . course_resource_escape(rtrim((string) $baseUrl, '/') . '/resources/css/course-learning.css') . '">'
+        . '<link rel="stylesheet" href="' . course_resource_escape(rtrim((string) $baseUrl, '/') . '/resources/css/design-system.css?v=' . (@filemtime('resources/css/design-system.css') ?: 1)) . '">'
+        . '<link rel="stylesheet" href="' . course_resource_escape(rtrim((string) $baseUrl, '/') . '/resources/css/course-learning.css?v=' . (@filemtime('resources/css/course-learning.css') ?: 1)) . '">'
         . '<title>' . course_resource_escape($title) . '</title></head><body class="course-learning-page">'
         . '<main class="course-resource-notice"><span class="fas fa-info-circle" aria-hidden="true"></span><h1>' . course_resource_escape($title) . '</h1><p>' . course_resource_escape($message) . '</p>'
         . '<a class="course-btn course-btn-secondary" href="' . course_resource_escape($back) . '"><span class="fas fa-arrow-left" aria-hidden="true"></span> Return to course</a>'
@@ -98,7 +98,7 @@ function course_resource_render_viewer(mysqli $conn, $baseUrl, $userId, array $c
     $embedUrl = (string) ($resource['embed_url'] ?? '');
     $openUrl = (string) ($resource['open_url'] ?? ($resource['url'] ?? ''));
     $courseLearningStylesheet = rtrim((string) $baseUrl, '/') . '/resources/css/course-learning.css'
-        . ($isExternalRecording ? '?v=recording-card-20260809' : '');
+        . '?v=' . (@filemtime('resources/css/course-learning.css') ?: 1);
     $downloadUrl = trim((string) ($resource['download_url'] ?? ''));
     $kind = (string) ($resource['embed_kind'] ?? 'resource');
     $stageKind = $kind === 'google' && strtolower(trim((string) ($resource['label'] ?? ''))) === 'recording'
@@ -155,7 +155,7 @@ function course_resource_render_viewer(mysqli $conn, $baseUrl, $userId, array $c
     <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=DM+Serif+Display:ital@0;1&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet">
     <script src="<?= course_resource_escape(rtrim((string) $baseUrl, '/') . '/resources/js/theme-preference.js'); ?>"></script>
     <link rel="stylesheet" href="<?= course_resource_escape(rtrim((string) $baseUrl, '/') . '/resources/css/fontawsome5.min.css'); ?>">
-    <link rel="stylesheet" href="<?= course_resource_escape(rtrim((string) $baseUrl, '/') . '/resources/css/design-system.css'); ?>">
+    <link rel="stylesheet" href="<?= course_resource_escape(rtrim((string) $baseUrl, '/') . '/resources/css/design-system.css?v=' . (@filemtime('resources/css/design-system.css') ?: 1)); ?>">
     <link rel="stylesheet" href="<?= course_resource_escape($courseLearningStylesheet); ?>">
 </head>
 <body class="course-learning-page course-resource-viewer-page">

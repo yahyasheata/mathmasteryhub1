@@ -125,10 +125,10 @@ elseif ($freeLearningMode === 'missing') { $freeLearningTitle = 'Resource not fo
     <link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=DM+Serif+Display:ital@0;1&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet">
     <script src="<?= free_learning_html($freeLearningBaseUrl) ?>/resources/js/theme-preference.js"></script>
-    <link rel="stylesheet" href="<?= free_learning_html($freeLearningBaseUrl) ?>/resources/css/design-system.css" data-design-system="mathhub">
+    <link rel="stylesheet" href="<?= free_learning_html($freeLearningBaseUrl) ?>/resources/css/design-system.css?v=<?=@filemtime('resources/css/design-system.css') ?: 1?>" data-design-system="mathhub">
     <link rel="stylesheet" href="<?= free_learning_html($freeLearningBaseUrl) ?>/resources/build/assets/app-38448552.css">
     <link rel="stylesheet" href="<?= free_learning_html($freeLearningBaseUrl) ?>/resources/css/fontawsome5.min.css">
-    <link rel="stylesheet" href="<?= free_learning_html($freeLearningBaseUrl) ?>/resources/css/public-resources.css">
+    <link rel="stylesheet" href="<?= free_learning_html($freeLearningBaseUrl) ?>/resources/css/public-resources.css?v=<?=@filemtime('resources/css/public-resources.css') ?: 1?>">
 </head>
 <body class="ds-bg-primary ds-text-primary free-learning-page">
 <?php include 'views/public/layouts/aside.php'; ?>

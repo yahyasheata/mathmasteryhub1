@@ -338,6 +338,7 @@
   gap: 16px;
   width: 100%;
   padding: clamp(11px, 1.6vw, 15px);
+  border-radius: var(--radius-md);
   color: var(--text-primary);
   background: var(--surface);
   border: 0;
@@ -560,8 +561,8 @@
 .course-learning-page .course-lesson-icon.notes,
 .course-learning-page .course-lesson-icon.learning-material,
 .course-learning-page .course-lesson-icon.file {
-  color: var(--warning);
-  background: color-mix(in srgb, var(--warning) 14%, transparent);
+  color: var(--primary);
+  background: var(--primary-soft);
 }
 
 .course-learning-page .course-lesson-icon.classified-assignment,

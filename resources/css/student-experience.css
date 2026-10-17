@@ -2303,12 +2303,12 @@ html[data-student-theme] body.student-analytics-page .student-analytics-homework
 
 html[data-student-theme] body.student-analytics-page .student-analytics-homework-card.overdue,
 html[data-student-theme] body.student-analytics-page .student-analytics-homework-card.rejected {
-  border-color: color-mix(in srgb, var(--primary) 32%, var(--border)) !important;
+  border-color: color-mix(in srgb, var(--danger) 32%, var(--border)) !important;
 }
 
 html[data-student-theme] body.student-analytics-page .student-analytics-homework-card.overdue > :is(.fas, .fal),
 html[data-student-theme] body.student-analytics-page .student-analytics-homework-card.rejected > :is(.fas, .fal) {
-  color: var(--primary);
+  color: var(--danger);
 }
 
 html[data-student-theme] body.student-analytics-page .student-analytics-availability-card {
@@ -2548,6 +2548,11 @@ html[data-student-theme] body.student-analytics-page main {
   background:
     radial-gradient(circle at top left, color-mix(in srgb, var(--primary) 9%, transparent), transparent 34%),
     linear-gradient(180deg, var(--surface) 0%, var(--bg-primary) 100%);
+}
+
+html[data-student-theme] body.student-live-sessions-page .student-dashboard-top,
+html[data-student-theme] body.notifications-page .student-dashboard-top {
+  background: linear-gradient(180deg, var(--surface) 0%, var(--bg-primary) 100%);
 }
 
 html[data-student-theme] body.student-dashboard-page .student-dashboard-eyebrow {

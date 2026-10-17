@@ -134,6 +134,29 @@ body.free-learning-page > .free-learning-main { flex: 0 0 auto; }
 @media (max-width: 580px) { .free-learning-shell { width: min(100% - 20px, 1180px); } .free-learning-hero { padding-top: 3.25rem; } .free-learning-hero h1 { font-size: clamp(2.1rem, 12vw, 3.1rem); } .free-learning-actions .free-learning-button { width: 100%; } .free-learning-section-heading.split { align-items: flex-start; flex-direction: column; } .free-learning-resource-grid, .free-learning-collection-grid { grid-template-columns: 1fr; } .free-learning-filters { grid-template-columns: 1fr; padding: .65rem; } .free-learning-search { grid-column: auto; } .free-learning-filters .free-learning-button { width: 100%; } .free-learning-resource-heading { align-items: flex-start; } .free-learning-resource-heading > img, .free-learning-resource-icon { width: 58px; height: 58px; flex-basis: 58px; font-size: 1.4rem; } .free-learning-resource-heading h1 { font-size: 2rem; } .free-learning-pdf { height: 66vh; min-height: 360px; } .free-learning-resource-card-body { min-height: 0; } }
 @media (prefers-reduced-motion: reduce) { .free-learning-resource-card, .free-learning-collection-card, .free-learning-button { transition: none; } }
 
+/* These public resource pages still load a legacy bundle whose broad !important
+   font rule forces DinNext over the approved interface and editorial families. */
+html body.free-learning-page :not(.fileuploader):not([class^="fileuploader-icon-"]):not([class^="fa"]):not(.cairo):not([class^="vj"]):not([class^="tie-"]) {
+  font-family: var(--font-sans) !important;
+}
+
+html body.free-learning-page :not(.fileuploader):not([class^="fileuploader-icon-"]):not([class^="fa"]):not(.cairo):not([class^="vj"]):not([class^="tie-"]) .free-learning-hero h1 {
+  font-family: var(--font-heading) !important;
+  font-size: clamp(2.4rem, 4.2vw, 3.7rem);
+  font-weight: 400;
+  letter-spacing: -.025em;
+  line-height: 1.08;
+}
+
+@media (max-width: 580px) {
+  html body.free-learning-page :not(.fileuploader):not([class^="fileuploader-icon-"]):not([class^="fa"]):not(.cairo):not([class^="vj"]):not([class^="tie-"]) .free-learning-hero h1 {
+    font-size: clamp(2rem, 8vw, 2.75rem);
+  }
+}
+
+.free-learning-page .free-learning-button { border-radius: var(--radius-sm); }
+.free-learning-page .free-learning-hero-note { border-radius: var(--radius-lg); box-shadow: none; }
+
 
 /* Shared public course and static-page presentation. Every selector is scoped so
    Free Learning styles cannot change unrelated public pages. */
