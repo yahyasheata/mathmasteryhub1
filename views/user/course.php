@@ -72,14 +72,13 @@ if ($username !== '' && $requested_course_id !== '') {
 $course_upcoming_session = null;
 $course_upcoming_join_state = null;
 if ($course_access_allowed && $user_id !== null) {
-    $course_sessions = mmh_live_occurrences($conn, $course_id, 0, 45, (int) $user_id);
-    foreach ($course_sessions as $course_session) {
-        if (!in_array((string) ($course_session['status'] ?? ''), ['scheduled', 'rescheduled'], true)) continue;
-        $startsAt = mmh_live_occurrence_timestamp($course_session, 'scheduled_start_at');
-        if ($startsAt === false || $startsAt <= time()) continue;
-        $course_upcoming_session = $course_session;
-        $course_upcoming_join_state = mmh_live_join_state($course_session);
-        break;
+    // Include recent past occurrences so a student can join during the same
+    // start and post-session grace window enforced by the join endpoint.
+    $course_sessions = mmh_live_occurrences($conn, $course_id, -3, 45, (int) $user_id);
+    $course_session_selection = mmh_live_select_course_occurrence($course_sessions);
+    if ($course_session_selection !== null) {
+        $course_upcoming_session = $course_session_selection['occurrence'];
+        $course_upcoming_join_state = $course_session_selection['join_state'];
     }
 }
 

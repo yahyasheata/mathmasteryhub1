@@ -667,6 +667,54 @@ if (!function_exists('mmh_live_join_state')) {
     }
 }
 
+if (!function_exists('mmh_live_select_course_occurrence')) {
+    /**
+     * Prefer a joinable occurrence over a later upcoming one for a Course page.
+     * Occurrences must already be scoped to the student's enrolled Course(s).
+     */
+    function mmh_live_select_course_occurrence(array $occurrences, $now = null)
+    {
+        $now = $now === null ? time() : (int) $now;
+        $nearestUpcoming = null;
+        $nearestUpcomingStart = PHP_INT_MAX;
+        $joinableOccurrence = null;
+        $joinableStart = PHP_INT_MAX;
+
+        foreach ($occurrences as $occurrence) {
+            if (!is_array($occurrence)) {
+                continue;
+            }
+
+            $status = strtolower(trim((string) ($occurrence['status'] ?? 'scheduled')));
+            if (in_array($status, ['cancelled', 'deleted'], true)) {
+                continue;
+            }
+
+            $joinState = mmh_live_join_state($occurrence, $now);
+            if (!empty($joinState['active'])) {
+                $startsAt = mmh_live_occurrence_timestamp($occurrence, 'scheduled_start_at');
+                if ($startsAt !== false && $startsAt < $joinableStart) {
+                    $joinableStart = $startsAt;
+                    $joinableOccurrence = ['occurrence' => $occurrence, 'join_state' => $joinState];
+                }
+                continue;
+            }
+
+            if (!in_array($status, ['scheduled', 'rescheduled', 'live'], true)) {
+                continue;
+            }
+
+            $startsAt = mmh_live_occurrence_timestamp($occurrence, 'scheduled_start_at');
+            if ($startsAt !== false && $startsAt > $now && $startsAt < $nearestUpcomingStart) {
+                $nearestUpcomingStart = $startsAt;
+                $nearestUpcoming = ['occurrence' => $occurrence, 'join_state' => $joinState];
+            }
+        }
+
+        return $joinableOccurrence ?? $nearestUpcoming;
+    }
+}
+
 if (!function_exists('mmh_live_current_priority')) {
     function mmh_live_current_priority(mysqli $conn, $userId)
     {
