@@ -396,6 +396,17 @@ function admin_course_link(array $changes = []): string {
                           </div>
                     </div>
 
+                    <div class="col-12 col-lg-12 p-2">
+                          <div class="col-12">A-Level Group</div>
+                          <div class="col-12 pt-3">
+                            <select class="form-control" name="my_courses_group_key" style="width: 100%">
+                                <option value="">None</option>
+                                <option value="cambridge_a_level">Cambridge A-Level Mathematics</option>
+                                <option value="edexcel_a_level">Edexcel A-Level Mathematics</option>
+                            </select>
+                          </div>
+                    </div>
+
 
                     <div class="col-12 col-lg-6 p-2">
                             <div class="col-12">

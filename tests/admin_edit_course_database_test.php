@@ -24,7 +24,7 @@ try {
     if (!$admin->select_db($database)) throw new RuntimeException('Unable to select the isolated Edit Course test database.');
     $query($admin, "CREATE TABLE users (user_id INT PRIMARY KEY, username VARCHAR(80) NOT NULL, role VARCHAR(20) NOT NULL, status CHAR(1) NOT NULL, archived_at DATETIME NULL)");
     $query($admin, "INSERT INTO users (user_id,username,role,status) VALUES (1,'test-admin','admin','1')");
-    $query($admin, "CREATE TABLE courses (course_id INT PRIMARY KEY, course_title VARCHAR(190) NOT NULL, course_title_en VARCHAR(190) NULL, course_description TEXT NOT NULL, course_image VARCHAR(255) NULL, course_price DECIMAL(10,2) NOT NULL, preDiscount_course_price DECIMAL(10,2) NOT NULL DEFAULT 0, course_category INT NOT NULL, whatsapp_group TEXT NULL, sequential_learning TINYINT NOT NULL DEFAULT 0, default_homework_score_mode VARCHAR(32) NOT NULL DEFAULT 'disabled')");
+    $query($admin, "CREATE TABLE courses (course_id INT PRIMARY KEY, course_title VARCHAR(190) NOT NULL, course_title_en VARCHAR(190) NULL, course_description TEXT NOT NULL, course_image VARCHAR(255) NULL, course_price DECIMAL(10,2) NOT NULL, preDiscount_course_price DECIMAL(10,2) NOT NULL DEFAULT 0, course_category INT NOT NULL, my_courses_group_key VARCHAR(32) NULL DEFAULT NULL, whatsapp_group TEXT NULL, sequential_learning TINYINT NOT NULL DEFAULT 0, default_homework_score_mode VARCHAR(32) NOT NULL DEFAULT 'disabled', username VARCHAR(80) NULL, course_state VARCHAR(16) NOT NULL DEFAULT 'draft')");
     $query($admin, "INSERT INTO courses (course_id,course_title,course_title_en,course_description,course_image,course_price,preDiscount_course_price,course_category,whatsapp_group,sequential_learning,default_homework_score_mode) VALUES (7,'Old title','A distinct legacy title','Old description','uploads/keep.jpg',100,150,2,'https://chat.example/existing',0,'disabled')");
 
     if (session_status() !== PHP_SESSION_ACTIVE) session_start();
@@ -39,6 +39,7 @@ try {
         '_method' => 'UPDATE',
         'course_id' => '7',
         'course_category' => '4',
+        'my_courses_group_key' => 'cambridge_a_level',
         'course_title' => 'Math OL May/June 2027',
         'course_description' => 'Updated description',
         'course_price' => '250',
@@ -67,13 +68,45 @@ try {
     $assert(($saved['course_image'] ?? '') === 'uploads/keep.jpg', 'Omitting a new image changed the current Course image.');
     $assert((int) ($saved['sequential_learning'] ?? 0) === 1, 'Sequential Learning value was not preserved.');
     $assert(($saved['default_homework_score_mode'] ?? '') === 'accept_automatically', 'Homework marking default was not preserved.');
+    $assert(($saved['my_courses_group_key'] ?? '') === 'cambridge_a_level', 'Edit Course did not save the selected A-Level group.');
+    $assert((int) ($saved['course_category'] ?? 0) === 4, 'Saving a group changed the Course Category.');
+
+    $_POST['my_courses_group_key'] = 'edexcel_a_level';
+    ob_start(); include $root . '/views/admin/requests/edit-course.php'; ob_end_clean();
+    $saved = $GLOBALS['conn']->query('SELECT my_courses_group_key FROM courses WHERE course_id = 7')->fetch_assoc();
+    $assert(($saved['my_courses_group_key'] ?? '') === 'edexcel_a_level', 'Edit Course did not change the selected A-Level group.');
+    $_POST['my_courses_group_key'] = '';
+    ob_start(); include $root . '/views/admin/requests/edit-course.php'; ob_end_clean();
+    $saved = $GLOBALS['conn']->query('SELECT my_courses_group_key FROM courses WHERE course_id = 7')->fetch_assoc();
+    $assert(($saved['my_courses_group_key'] ?? null) === null, 'Edit Course did not remove the A-Level group.');
 
     $form = (string) file_get_contents($root . '/views/admin/requests/edit-course.php');
     $router = (string) file_get_contents($root . '/index.php');
     $assert(!str_contains($form, "name='course_title_en'") && !str_contains($form, "\$_POST['course_title_en']"), 'English Title is still a separately submitted Edit Course field.');
     $assert(!str_contains($form, "name='whatsapp_group'") && !str_contains($form, "whatsapp_group = ?"), 'WhatsApp is still submitted or overwritten by Edit Course.');
     $assert(str_contains($form, "name='mmh_csrf_token'") && str_contains($router, 'mmh_admin_require_mutation();'), 'Edit Course form/route CSRF contract is missing.');
+    $assert(str_contains($form, "name='my_courses_group_key'") && str_contains((string) file_get_contents($root . '/views/admin/courses.php'), 'name="my_courses_group_key"'), 'Add/Edit Course A-Level Group selector is missing.');
     $assert(str_contains($form, 'Previous Price (optional)') && str_contains($form, 'Default Homework Marking') && str_contains($form, 'When enabled, students follow the Section prerequisite/unlock rules.'), 'Simplified labels or help text are missing.');
+
+    $_SERVER['REQUEST_METHOD'] = 'POST';
+    $_POST = [
+        'course_title' => 'Edexcel Pure 2',
+        'course_title_en' => 'Edexcel Pure 2',
+        'course_description' => 'Course description',
+        'course_price' => '0',
+        'preDiscount_course_price' => '0',
+        'course_category' => '4',
+        'my_courses_group_key' => 'edexcel_a_level',
+        'sequential_learning' => '0',
+        'default_homework_score_mode' => 'disabled',
+    ];
+    $_FILES = [];
+    ob_start(); include $root . '/views/admin/requests/add-course.php'; $addOutput = (string) ob_get_clean();
+    $addResponse = json_decode($addOutput, true);
+    $assert(is_array($addResponse) && (int) ($addResponse['status'] ?? 0) === 1, 'Add Course handler did not save a valid A-Level group: ' . $addOutput);
+    $added = $GLOBALS['conn']->query("SELECT course_category,my_courses_group_key FROM courses WHERE course_title='Edexcel Pure 2'")->fetch_assoc();
+    $assert(($added['my_courses_group_key'] ?? '') === 'edexcel_a_level', 'Add Course did not persist its selected group.');
+    $assert((int) ($added['course_category'] ?? 0) === 4, 'Add Course grouping replaced the existing Category.');
 
     echo "Admin Edit Course isolated database test passed.\n";
 } finally {

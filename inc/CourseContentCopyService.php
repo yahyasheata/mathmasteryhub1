@@ -54,6 +54,7 @@ final class CourseContentCopyService
                 // Promotions are session-specific; do not carry an old discount forward.
                 'preDiscount_course_price' => 0,
                 'course_category' => $sourceCourse['course_category'] ?? 0,
+                'my_courses_group_key' => $sourceCourse['my_courses_group_key'] ?? null,
                 // A previous session's private class-chat link is not reusable by default.
                 'whatsapp_group' => null,
                 'sequential_learning' => $sourceCourse['sequential_learning'] ?? 0,

@@ -9,6 +9,7 @@ require_once 'inc/StudentLearningJourney.php';
 require_once 'inc/RecoveryPlan.php';
 require_once 'inc/TimedExam.php';
 require_once 'inc/StudentResourceGateway.php';
+require_once 'inc/CourseGroups.php';
 
 $pageName = 'mycourses';
 $username = (string) ($_SESSION['username'] ?? '');
@@ -226,6 +227,7 @@ foreach ($enrolledCourses as $course) {
         'progress_percent' => $progressPercent === null ? null : max(0, min(100, (int) $progressPercent)),
     ];
 }
+$courseCardGroups = mmh_group_enrolled_course_cards($courseCards);
 ?>
 <!doctype html>
 <html lang="en" dir="ltr">
@@ -290,8 +292,11 @@ foreach ($enrolledCourses as $course) {
                     <a href="<?= student_courses_html(rtrim((string) $baseUrl, '/') . '/user/courses'); ?>" class="student-dashboard-btn primary">Browse courses</a>
                 </div>
             <?php else: ?>
-                <div class="student-course-grid student-course-dashboard-grid">
-                    <?php foreach ($courseCards as $card): ?>
+                <?php foreach ($courseCardGroups as $courseCardGroup): ?>
+                <section class="student-course-group" aria-label="<?= student_courses_html($courseCardGroup['label'] ?: 'Enrolled courses'); ?>">
+                    <?php if ($courseCardGroup['label'] !== ''): ?><h2 class="student-course-group-title"><?= student_courses_html($courseCardGroup['label']); ?></h2><?php endif; ?>
+                    <div class="student-course-grid student-course-dashboard-grid">
+                    <?php foreach ($courseCardGroup['cards'] as $card): ?>
                         <?php
                         $course = $card['course'];
                         $courseTitle = trim((string) ($course['course_title'] ?? 'Course'));
@@ -372,7 +377,9 @@ foreach ($enrolledCourses as $course) {
                             </div>
                         </article>
                     <?php endforeach; ?>
-                </div>
+                    </div>
+                </section>
+                <?php endforeach; ?>
             <?php endif; ?>
         </section>
     </main>

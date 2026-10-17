@@ -3,6 +3,7 @@ require_once 'connection/config.php';
 require_once '__init.php';
 require_once 'inc/functions.php';
 require_once 'inc/AcademicMetadata.php';
+require_once 'inc/CourseGroups.php';
 
 if($_SERVER['REQUEST_METHOD'] == "POST" ){
     if(isset($_POST['_method']) && $_POST['_method'] == 'GET' ){
@@ -28,6 +29,12 @@ if($_SERVER['REQUEST_METHOD'] == "POST" ){
                 $course_price = $course_data["course_price"];
                 $preDiscount_course_price = $course_data["preDiscount_course_price"];
                 $c_course_category = $course_data["course_category"];
+                $courseGroup = (string) ($course_data['my_courses_group_key'] ?? '');
+                $courseGroupOptions = "<option value=''>None</option>";
+                foreach (mmh_course_group_options() as $groupKey => $groupLabel) {
+                    $selected = $courseGroup === $groupKey ? ' selected' : '';
+                    $courseGroupOptions .= "<option value='" . htmlspecialchars($groupKey, ENT_QUOTES, 'UTF-8') . "'{$selected}>" . htmlspecialchars($groupLabel, ENT_QUOTES, 'UTF-8') . "</option>";
+                }
                 $sequential_learning = isset($course_data["sequential_learning"]) ? (int) $course_data["sequential_learning"] : 0;
                 $sequential_off_selected = $sequential_learning === 1 ? '' : 'selected';
                 $sequential_on_selected = $sequential_learning === 1 ? 'selected' : '';
@@ -76,6 +83,15 @@ if($_SERVER['REQUEST_METHOD'] == "POST" ){
                                 <select class='form-control select2' id='' name='course_category'  data-placeholder='Select category' style='width: 100%'  required>
                                     $categorie_options
                                 </select>
+                                </div>
+                            </div>
+
+                            <div class='col-12 col-lg-12 p-2'>
+                                <div class='col-12'>A-Level Group</div>
+                                <div class='col-12 pt-3'>
+                                    <select class='form-control' name='my_courses_group_key' style='width: 100%'>
+                                        $courseGroupOptions
+                                    </select>
                                 </div>
                             </div>
         
@@ -214,6 +230,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && (string) ($_POST['_method'] ?? '') 
     $preDiscount = $previousPriceInput === '' ? 0.0 : (is_numeric($previousPriceInput) ? (float) $previousPriceInput : -1.0);
     $sequential = (string) ($_POST['sequential_learning'] ?? '') === '1' ? 1 : 0;
     $scoreMode = mmh_academic_score_mode($_POST['default_homework_score_mode'] ?? 'disabled');
+    $courseGroup = mmh_course_group_from_input($_POST['my_courses_group_key'] ?? '');
+    if ($courseGroup === false) {
+        exit(json_encode(['status' => 0, 'message' => 'Choose a valid A-Level Group.']));
+    }
     if ($courseId === false || $category === false || $title === '' || $description === '' || $price < 0 || $preDiscount < 0) {
         exit(json_encode(['status' => 0, 'message' => 'Check the required fields and enter valid non-negative prices.']));
     }
@@ -228,11 +248,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && (string) ($_POST['_method'] ?? '') 
     }
     $conn = db();
     if ($imagePath !== null && $imagePath !== '') {
-        $stmt = $conn->prepare('UPDATE courses SET course_title = ?, course_title_en = ?, course_description = ?, course_image = ?, course_price = ?, preDiscount_course_price = ?, course_category = ?, sequential_learning = ?, default_homework_score_mode = ? WHERE course_id = ?');
-        $stmt->bind_param('ssssddiisi', $title, $title, $description, $imagePath, $price, $preDiscount, $category, $sequential, $scoreMode, $courseId);
+        $stmt = $conn->prepare('UPDATE courses SET course_title = ?, course_title_en = ?, course_description = ?, course_image = ?, course_price = ?, preDiscount_course_price = ?, course_category = ?, sequential_learning = ?, default_homework_score_mode = ?, my_courses_group_key = ? WHERE course_id = ?');
+        $stmt->bind_param('ssssddiissi', $title, $title, $description, $imagePath, $price, $preDiscount, $category, $sequential, $scoreMode, $courseGroup, $courseId);
     } else {
-        $stmt = $conn->prepare('UPDATE courses SET course_title = ?, course_title_en = ?, course_description = ?, course_price = ?, preDiscount_course_price = ?, course_category = ?, sequential_learning = ?, default_homework_score_mode = ? WHERE course_id = ?');
-        $stmt->bind_param('sssddiisi', $title, $title, $description, $price, $preDiscount, $category, $sequential, $scoreMode, $courseId);
+        $stmt = $conn->prepare('UPDATE courses SET course_title = ?, course_title_en = ?, course_description = ?, course_price = ?, preDiscount_course_price = ?, course_category = ?, sequential_learning = ?, default_homework_score_mode = ?, my_courses_group_key = ? WHERE course_id = ?');
+        $stmt->bind_param('sssddiissi', $title, $title, $description, $price, $preDiscount, $category, $sequential, $scoreMode, $courseGroup, $courseId);
     }
     $ok = $stmt && $stmt->execute();
     if ($stmt) { $stmt->close(); }
