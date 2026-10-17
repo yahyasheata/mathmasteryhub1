@@ -1,7 +1,8 @@
 (function () {
     'use strict';
 
-    var storageKey = 'math-mastery-student-theme';
+    var storageKey = 'theme';
+    var legacyStorageKey = 'math-mastery-student-theme';
     var documentRoot = document.documentElement;
 
     function normalizeTheme(theme) {
@@ -41,6 +42,7 @@
         if (persist) {
             try {
                 window.localStorage.setItem(storageKey, normalizedTheme);
+            window.localStorage.setItem(legacyStorageKey, normalizedTheme);
             } catch (error) {
                 // Theme selection still works for the current page when storage is unavailable.
             }

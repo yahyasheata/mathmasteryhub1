@@ -100,6 +100,9 @@ $loginUrl = rtrim((string) $baseUrl, '/') . '/auth/login?return=' . rawurlencode
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Checkout · <?=mmh_checkout_escape($courseTitle)?> | <?=mmh_checkout_escape($site_name)?></title>
+  <link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=DM+Serif+Display:ital@0;1&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+  <script src="<?=mmh_site_public_url('resources/js/theme-preference.js')?>"></script>
   <link rel="stylesheet" href="<?=mmh_site_public_url('resources/css/design-system.css')?>" data-design-system="mathhub">
   <link rel="stylesheet" href="<?=mmh_site_public_url('resources/css/fontawsome5.min.css')?>">
   <link rel="stylesheet" href="<?=mmh_site_public_url('resources/css/course-checkout.css')?>">

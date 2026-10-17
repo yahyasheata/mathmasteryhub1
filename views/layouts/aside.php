@@ -12,7 +12,7 @@
             </div>
             <div class="col-auto d-flex align-items-center px-1 py-2">
                 <a href="/">
-                    <img src="<?=rtrim((string)$baseUrl, '/')?>/<?=$site_settings['website_logo']?>" style="width: 105px;" alt="<?=$site_name;?>" class="site-logo mathhub-logo mathhub-logo--light" >
+                    <img src="<?=mmh_site_public_url('resources/images/branding/mathhub-logo-light.png')?>?v=<?=@filemtime('resources/images/branding/mathhub-logo-light.png') ?: 1?>" style="width: 105px;" alt="<?=$site_name;?>" class="site-logo mathhub-logo mathhub-logo--light" >
                     <img src="<?=rtrim((string)$baseUrl, '/')?>/resources/images/branding/mathhub-logo-white.png" style="width: 105px;" alt="<?=$site_name;?>" class="site-logo mathhub-logo mathhub-logo--dark">
                 </a>
             </div>
@@ -100,7 +100,7 @@
     <div class="col-12 d-flex justify-content-between  align-items-center p-0 shadow" style="height:65px">
         <span class="px-3 font-1 kufi">
 
-            <img src="<?=rtrim((string)$baseUrl, '/')?>/<?=$site_settings['website_logo']?>" style="width: 105px;" alt="<?=$site_name;?>" class="site-logo mathhub-logo mathhub-logo--light">
+            <img src="<?=mmh_site_public_url('resources/images/branding/mathhub-logo-light.png')?>?v=<?=@filemtime('resources/images/branding/mathhub-logo-light.png') ?: 1?>" style="width: 105px;" alt="<?=$site_name;?>" class="site-logo mathhub-logo mathhub-logo--light">
             <img src="<?=rtrim((string)$baseUrl, '/')?>/resources/images/branding/mathhub-logo-white.png" style="width: 105px;" alt="<?=$site_name;?>" class="site-logo mathhub-logo mathhub-logo--dark">
 
         </span>

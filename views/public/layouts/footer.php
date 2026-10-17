@@ -3,7 +3,7 @@ $site_settings = isset($site_settings) && is_array($site_settings) ? $site_setti
 $site_name = $site_name ?? ($site_settings['website_name'] ?? 'Math Mastery Hub');
 $footerDescription = trim((string) ($site_settings['footer_description'] ?? '')) ?: (string) ($site_settings['website_bio'] ?? '');
 $footerBaseUrl = rtrim(mmh_site_public_base_path(), '/');
-$footerLogoUrl = mmh_site_settings_asset_url($site_settings, 'website_logo', 'resources/images/default/wide-logo.png');
+$footerLogoUrl = mmh_site_public_url('resources/images/branding/mathhub-logo-light.png') . '?v=' . (@filemtime('resources/images/branding/mathhub-logo-light.png') ?: 1);
 $footerDarkLogoUrl = mmh_site_public_url('resources/images/branding/mathhub-logo-white.png');
 $footerSocialLinks = [
   'twitter_link' => ['X / Twitter', 'fab fa-twitter'], 'facebook_link' => ['Facebook', 'fab fa-facebook-f'], 'instagram_link' => ['Instagram', 'fab fa-instagram'], 'youtube_link' => ['YouTube', 'fab fa-youtube'], 'whatsapp_link' => ['WhatsApp', 'fab fa-whatsapp'],

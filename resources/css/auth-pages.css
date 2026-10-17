@@ -1,0 +1,96 @@
+/* Shared visual treatment for the existing sign-in and registration layouts. */
+.mmh-auth-page {
+  min-height: 100vh;
+  background: var(--bg-primary);
+  color: var(--text-primary);
+  font-family: var(--font-sans);
+}
+.mmh-auth-page h1,
+.mmh-auth-page h2 { color: var(--text-primary); font-family: var(--font-heading); font-weight: 400; }
+.mmh-auth-page:not(.mmh-auth-page--public-header) > header { width: 100%; min-height: 72px; border: 0; border-bottom: 1px solid var(--border); border-radius: 0 !important; background: var(--surface) !important; box-shadow: none !important; }
+.mmh-auth-page:not(.mmh-auth-page--public-header) > header > .container { width: min(1180px, calc(100% - 32px)); max-width: none; padding-inline: 0; }
+.mmh-auth-page:not(.mmh-auth-page--public-header) > header > .container > .flex { min-height: 72px; padding-block: 0; }
+.mmh-auth-page:not(.mmh-auth-page--public-header) > header .mathhub-logo { width: 112px !important; height: auto; }
+.mmh-auth-page:not(.mmh-auth-page--public-header) > header nav { gap: 1.05rem; }
+.mmh-auth-page:not(.mmh-auth-page--public-header) > header nav > a:first-child { color: var(--text-secondary); font-family: var(--font-sans); font-size: 1rem !important; font-weight: 650; text-decoration: none; }
+.mmh-auth-page:not(.mmh-auth-page--public-header) > header nav > a:first-child:hover { color: var(--primary); }
+.mmh-auth-page:not(.mmh-auth-page--public-header) > header nav > a:last-child { min-height: 40px; display: inline-flex; align-items: center; justify-content: center; padding: .55rem .95rem; border: 1px solid var(--border); border-radius: var(--radius-sm); background: var(--surface); color: var(--text-primary); font-family: var(--font-sans); font-size: .9rem; font-weight: 800; text-decoration: none; }
+.mmh-auth-page:not(.mmh-auth-page--public-header) > header nav > a:last-child:hover { background: var(--surface-hover); border-color: var(--border-strong); }
+.mmh-auth-page:not(.mmh-auth-page--public-header) > header #mobile-menu > div { border-radius: 0; box-shadow: none; }
+.mmh-auth-page:not(.mmh-auth-page--public-header) > header #mobile-menu a { font-family: var(--font-sans); font-size: 1rem; font-weight: 700; }
+.mmh-auth-page:not(.mmh-auth-page--public-header) > header #mobile-menu a:last-child { min-height: 40px; display: flex; align-items: center; justify-content: center; margin-top: .4rem; border: 1px solid var(--border); border-radius: var(--radius-sm); background: var(--surface); color: var(--text-primary); text-align: center; }
+.mmh-auth-page:not(.mmh-auth-page--public-header) > header #mobile-menu a:last-child:hover { background: var(--surface-hover); }
+.mmh-auth-page > main { min-height: 0 !important; padding-block: clamp(1.5rem, 4vh, 2.5rem) !important; }
+.mmh-auth-page main > div.ds-surface,
+.mmh-auth-page main > div > .ds-surface {
+  width: min(100% - 2rem, 46rem);
+  max-width: 46rem;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-xl);
+  background: var(--surface);
+  box-shadow: var(--shadow-sm);
+}
+.mmh-auth-page main > div.ds-surface > div,
+.mmh-auth-page main > div > .ds-surface > div { padding: clamp(1.5rem, 3vw, 2.25rem); }
+.mmh-auth-page main h2 { font-size: clamp(1.55rem, 2.5vw, 1.85rem); margin-bottom: 1.15rem; }
+.mmh-auth-page main .registerBtn { padding: .62rem 1.05rem !important; font-size: .92rem !important; }
+.mmh-auth-page main .oauthProviderAction,
+.mmh-auth-page main button[disabled] {
+  box-sizing: border-box;
+  min-height: 42px;
+  padding-block: .55rem !important;
+  font-family: var(--font-sans);
+  font-size: .88rem !important;
+  font-weight: 600;
+  line-height: 1.5;
+  letter-spacing: normal;
+  border-radius: var(--radius-sm);
+}
+.mmh-auth-page :is(input:not([type="checkbox"]), select, textarea) {
+  min-height: 44px;
+  border-color: var(--border-strong);
+  border-radius: var(--radius-sm);
+  background: var(--surface-elevated);
+  color: var(--text-primary);
+}
+.mmh-auth-page :is(input, select, textarea):focus-visible {
+  border-color: var(--primary);
+  outline: 3px solid var(--primary-ring);
+  outline-offset: 1px;
+}
+.mmh-auth-page .registerBtn {
+  min-height: 42px;
+  font-family: var(--font-sans);
+  font-size: .95rem;
+  font-weight: 700;
+  border-radius: var(--radius-sm);
+  background: var(--primary-action);
+  color: var(--primary-foreground);
+}
+.mmh-auth-page .registerBtn:hover { background: var(--primary-action-hover); }
+.mmh-auth-page .registerBtn:focus-visible { outline: 3px solid var(--primary-ring); outline-offset: 2px; }
+.mmh-auth-page .mmh-theme-switch { flex: 0 0 84px; }
+
+@media (max-width: 1023px) {
+  .mmh-auth-page:not(.mmh-auth-page--public-header) > header { min-height: 66px; }
+  .mmh-auth-page:not(.mmh-auth-page--public-header) > header > .container > .flex { min-height: 66px; }
+  .mmh-auth-page:not(.mmh-auth-page--public-header) > header > .container > .flex > nav { display: none !important; }
+  .mmh-auth-page:not(.mmh-auth-page--public-header) > header > .container > .flex > div.flex { display: flex !important; }
+}
+
+@media (max-width: 767px) {
+  .mmh-auth-page > main { min-height: 0 !important; padding-block: 1.5rem !important; }
+  .mmh-auth-page main > div.ds-surface,
+  .mmh-auth-page main > div > .ds-surface { width: min(100% - 1.5rem, 34rem); }
+  .mmh-auth-page main > div.ds-surface > div,
+  .mmh-auth-page main > div > .ds-surface > div { padding: 1.35rem; }
+}
+
+@media (max-width: 640px) {
+  .mmh-auth-page:not(.mmh-auth-page--public-header) > header > .container { width: min(1180px, calc(100% - 20px)); }
+  .mmh-auth-page:not(.mmh-auth-page--public-header) > header .mathhub-logo { width: 100px !important; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .mmh-auth-page *, .mmh-auth-page *::before, .mmh-auth-page *::after { transition-duration: .01ms !important; }
+}

@@ -122,6 +122,9 @@ elseif ($freeLearningMode === 'missing') { $freeLearningTitle = 'Resource not fo
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title><?= free_learning_html($freeLearningTitle) ?> | <?= free_learning_html($site_name) ?></title>
+    <link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=DM+Serif+Display:ital@0;1&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+    <script src="<?= free_learning_html($freeLearningBaseUrl) ?>/resources/js/theme-preference.js"></script>
     <link rel="stylesheet" href="<?= free_learning_html($freeLearningBaseUrl) ?>/resources/css/design-system.css" data-design-system="mathhub">
     <link rel="stylesheet" href="<?= free_learning_html($freeLearningBaseUrl) ?>/resources/build/assets/app-38448552.css">
     <link rel="stylesheet" href="<?= free_learning_html($freeLearningBaseUrl) ?>/resources/css/fontawsome5.min.css">

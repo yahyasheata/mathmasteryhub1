@@ -61,7 +61,7 @@ body.dash .admin-sidebar {
 .admin-nav-logout { color:var(--danger); }
 .admin-nav-logout:hover, .admin-nav-logout:focus-visible { color:var(--danger); background:color-mix(in srgb,var(--danger) 10%,var(--surface)); }
 
-body.dash .admin-top-nav { min-height:55px; border-bottom:1px solid var(--border); box-shadow:0 4px 16px color-mix(in srgb,var(--text-primary) 4%,transparent); }
+body.dash .admin-top-nav { min-height:55px; border:0; border-bottom:1px solid var(--border); border-radius:0 !important; margin:0; box-shadow:none; }
 body.dash .admin-top-nav .admin-sidebar-toggle { border:0; border-inline-end:1px solid var(--border); color:var(--text-secondary); background:transparent; }
 body.dash .admin-top-nav .admin-sidebar-toggle:hover, body.dash .admin-top-nav .admin-sidebar-toggle:focus-visible { color:var(--primary); background:var(--surface-hover); outline:none; }
 body.dash .admin-top-nav img { object-fit:cover; }

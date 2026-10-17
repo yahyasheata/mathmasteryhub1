@@ -48,7 +48,7 @@ html[data-student-theme] body.body * {
 html[data-student-theme] body.body {
   background: var(--bg-primary) !important;
   color: var(--text-primary);
-  font-family: var(--bs-font-sans-serif, Arial, sans-serif);
+  font-family: var(--font-sans);
   font-size: 16px;
   line-height: 1.55;
   margin-top: 58px !important;
@@ -2593,7 +2593,8 @@ html[data-student-theme] body.unified-private-page .assignment-card {
 .assignment-progress-title-row h2 { margin: 0; color: var(--text-primary); font-size: 1.05rem; }
 .assignment-progress-course, .assignment-progress-meta, .assignment-progress-reason { margin: 5px 0 0; color: var(--text-secondary); font-size: .9rem; }
 .assignment-progress-reason { color: var(--text-muted); }
-.assignment-progress-status { display: inline-flex; align-items: center; padding: 4px 8px; border-radius: 999px; font-size: .74rem; font-weight: 700; color: var(--text-secondary); background: var(--surface-hover); border: 1px solid var(--border); }
+.assignment-progress-status { display: inline-flex; align-items: center; min-height: 25px; padding: .2rem .48rem; border-radius: 6px !important; font-size: .74rem; line-height: 1.2; font-weight: 700; color: var(--text-secondary); background: var(--surface-hover); border: 1px solid var(--border); white-space: nowrap; }
+.assignment-progress-imported { display: inline-flex; align-items: center; min-height: 24px; padding: .16rem .42rem; border: 1px solid color-mix(in srgb, var(--secondary) 40%, var(--border)); border-radius: 6px !important; color: var(--secondary); font-size: .72rem; font-weight: 700; white-space: nowrap; }
 .assignment-progress-status.overdue, .assignment-progress-status.needs-revision { color: var(--danger); background: var(--danger-soft); }
 .assignment-progress-status.optional-completed, .assignment-progress-status.approved { color: var(--success); background: var(--success-soft); }
 .assignment-progress-status.awaiting-review, .assignment-progress-status.due-soon { color: var(--warning); background: var(--warning-soft); }

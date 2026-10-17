@@ -9,6 +9,9 @@ $maintenanceReopen = trim((string) ($siteSettings['maintenance_reopen_at'] ?? ''
   <meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
   <title><?=htmlspecialchars($maintenanceTitle, ENT_QUOTES, 'UTF-8')?></title>
   <?php include __DIR__ . '/../partials/favicon.php'; ?>
+  <link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=DM+Serif+Display:ital@0;1&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+  <script src="<?=rtrim((string)$baseUrl, '/')?>/resources/js/theme-preference.js"></script>
   <link rel="stylesheet" href="<?=rtrim((string) $baseUrl, '/')?>/resources/css/design-system.css">
   <link rel="stylesheet" href="<?=rtrim((string) $baseUrl, '/')?>/resources/css/fontawsome5.min.css">
   <style>

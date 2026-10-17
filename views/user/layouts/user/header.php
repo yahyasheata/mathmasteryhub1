@@ -7,7 +7,7 @@
     (function () {
         var storedTheme = null;
         try {
-            storedTheme = window.localStorage.getItem('math-mastery-student-theme');
+            storedTheme = window.localStorage.getItem('theme') || window.localStorage.getItem('math-mastery-student-theme');
         } catch (error) {
             storedTheme = null;
         }
@@ -26,8 +26,11 @@ require_once dirname(__DIR__, 4) . '/inc/functions.php';
 $userBrandSettings = isset($site_settings) && is_array($site_settings) ? $site_settings : getSiteSettings();
 $userFaviconUrl = mmh_site_settings_asset_url($userBrandSettings, 'website_icon', 'resources/images/default/favicon.png');
 ?>
-<link rel="stylesheet" href="<?=mmh_site_public_url('resources/css/design-system.css')?>" data-design-system="mathhub" />
-<script src="<?=mmh_site_public_url('resources/js/student-theme.js')?>" defer></script>
+<link rel="stylesheet" href="<?=mmh_site_public_url('resources/css/design-system.css')?>?v=<?=@filemtime('resources/css/design-system.css') ?: 1?>" data-design-system="mathhub" />
+<link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=DM+Serif+Display:ital@0;1&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<script src="<?=mmh_site_public_url('resources/js/theme-preference.js')?>?v=<?=@filemtime('resources/js/theme-preference.js') ?: 1?>"></script>
+<script src="<?=mmh_site_public_url('resources/js/student-theme.js')?>?v=<?=@filemtime('resources/js/student-theme.js') ?: 1?>" defer></script>
     <?=$metatags."\n"?>
     <?=$keywords."\n"?>
 

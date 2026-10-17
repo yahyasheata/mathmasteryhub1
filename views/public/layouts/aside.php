@@ -1,7 +1,7 @@
 <?php
 $publicBaseUrl = rtrim(mmh_site_public_base_path(), '/');
 $publicSiteName = $site_name ?? ($site_settings['website_name'] ?? 'Math Mastery Hub');
-$publicLogoUrl = mmh_site_settings_asset_url($site_settings, 'website_logo', 'resources/images/default/wide-logo.png');
+$publicLogoUrl = mmh_site_public_url('resources/images/branding/mathhub-logo-light.png') . '?v=' . (@filemtime('resources/images/branding/mathhub-logo-light.png') ?: 1);
 $publicDarkLogoUrl = mmh_site_public_url('resources/images/branding/mathhub-logo-white.png');
 $publicUserLoggedIn = !empty($_SESSION['username']);
 $publicUserName = 'Account';
@@ -53,49 +53,19 @@ $publicAccountItems = [
 ];
 function public_nav_html($value) { return htmlspecialchars((string)$value, ENT_QUOTES, 'UTF-8'); }
 ?>
-<script>
-  (function() {
-    var root = document.documentElement;
-    function storedTheme() {
-      try {
-        return localStorage.getItem('theme') || localStorage.getItem('math-mastery-student-theme');
-      } catch (error) {
-        return null;
-      }
-    }
-    function preferredTheme() {
-      var savedTheme = storedTheme();
-      if (savedTheme === 'light' || savedTheme === 'dark') { return savedTheme; }
-      return window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
-    }
-    function applyTheme(theme, persist) {
-      var normalized = theme === 'dark' ? 'dark' : 'light';
-      root.classList.toggle('dark', normalized === 'dark');
-      root.dataset.studentTheme = normalized;
-      root.style.colorScheme = normalized;
-      if (persist) {
-        try {
-          localStorage.setItem('theme', normalized);
-          localStorage.setItem('math-mastery-student-theme', normalized);
-        } catch (error) {}
-      }
-    }
-    window.mmhApplyTheme = applyTheme;
-    window.mmhCurrentTheme = function() { return root.classList.contains('dark') ? 'dark' : 'light'; };
-    applyTheme(preferredTheme(), false);
-  })();
-</script>
 <style>
   .public-site-header {
     position: fixed;
     top: 0;
     left: 0;
     right: 0;
+    width: 100%;
+    border-radius: 0;
     z-index: 50;
     background: var(--surface);
     border-bottom: 1px solid var(--border);
-    box-shadow: var(--shadow-sm);
-    backdrop-filter: saturate(140%) blur(16px);
+    box-shadow: none;
+    backdrop-filter: none;
     transition: background var(--transition-fast), border-color var(--transition-fast), box-shadow var(--transition-fast);
   }
   body {
@@ -179,7 +149,7 @@ function public_nav_html($value) { return htmlspecialchars((string)$value, ENT_Q
     align-items: center;
     min-height: 38px;
     padding: .55rem .75rem;
-    border-radius: var(--radius-md);
+    border-radius: var(--radius-sm);
     color: var(--text-secondary);
     text-decoration: none;
     white-space: nowrap;
@@ -188,27 +158,84 @@ function public_nav_html($value) { return htmlspecialchars((string)$value, ENT_Q
     color: var(--text-primary);
     background: var(--surface-hover);
   }
+  .public-account-dropdown > summary { max-width: 280px; }
+  .public-account-name {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  .public-account-menu {
+    width: min(248px, calc(100vw - 24px));
+    max-height: min(65vh, 360px);
+    top: calc(100% + 4px);
+    right: 0;
+    overflow-y: auto;
+    padding: .3rem;
+    border-radius: var(--radius-sm);
+    box-shadow: var(--shadow-md, var(--shadow-sm));
+    gap: .12rem;
+  }
+  .public-account-menu a {
+    min-height: 36px;
+    padding: .42rem .6rem;
+    border-radius: var(--radius-sm);
+    font-family: var(--font-sans);
+    font-size: .88rem;
+    font-weight: 550;
+    line-height: 1.25;
+    white-space: normal;
+  }
+  .public-account-menu a:not(.is-logout) + a:not(.is-logout) {
+    border-top: 1px solid color-mix(in srgb, var(--border) 72%, transparent);
+  }
+  .public-account-menu a:hover,
+  .public-account-menu a:active {
+    color: var(--text-primary);
+    background: var(--surface-hover);
+  }
+  .public-account-menu a:focus-visible {
+    outline: 2px solid var(--primary);
+    outline-offset: 1px;
+    color: var(--text-primary);
+    background: var(--surface-hover);
+  }
+  .public-account-menu a.is-logout,
+  .public-mobile-account-group a.is-logout {
+    margin-top: .25rem;
+    padding-top: .65rem;
+    border-top: 1px solid var(--border);
+    color: var(--danger, var(--text-secondary));
+  }
+  .public-mobile-account-group a.is-logout { margin-top: .2rem; }
   .public-auth-actions {
     display: flex;
     align-items: center;
     gap: .65rem;
   }
-  .public-nav-button {
+  .public-nav-button,
+  button.public-nav-button {
     min-height: 40px;
     display: inline-flex;
     align-items: center;
     justify-content: center;
     gap: .45rem;
-    border-radius: var(--radius-md);
-    padding: .55rem .95rem;
-    font-weight: 800;
+    border-radius: var(--radius-sm);
+    padding: 8.8px 15.2px;
+    font: 800 16px/normal var(--font-sans);
+    font-family: var(--font-sans) !important;
+    box-sizing: border-box;
     text-decoration: none;
     border: 1px solid var(--border);
   }
+  #public-site-header .public-nav-button { font-family: var(--font-sans) !important; }
   .public-nav-button.primary {
     background: var(--primary-action);
     color: var(--primary-foreground);
     border-color: var(--primary-action);
+  }
+  .public-nav-button.primary:hover {
+    background: var(--primary-action-hover);
+    border-color: var(--primary-action-hover);
   }
   .public-nav-button.secondary {
     color: var(--text-secondary);
@@ -219,8 +246,7 @@ function public_nav_html($value) { return htmlspecialchars((string)$value, ENT_Q
     align-items: center;
     gap: .65rem;
   }
-  .public-mobile-toggle,
-  .public-theme-toggle {
+  .public-mobile-toggle {
     min-width: 40px;
     min-height: 40px;
     display: inline-flex;
@@ -233,14 +259,13 @@ function public_nav_html($value) { return htmlspecialchars((string)$value, ENT_Q
     cursor: pointer;
     transition: color var(--transition-fast), background var(--transition-fast), border-color var(--transition-fast);
   }
-  .public-mobile-toggle:hover,
-  .public-theme-toggle:hover {
+  .public-mobile-toggle:hover {
     color: var(--primary);
     background: var(--surface-hover);
   }
-  .public-theme-icon--dark { display: none; }
-  .dark .public-theme-icon--light { display: none; }
-  .dark .public-theme-icon--dark { display: inline-flex; }
+  .public-theme-toggle.mmh-theme-switch { width:84px; min-width:84px; height:42px; min-height:42px; justify-content:flex-start; padding:4px; border:0; border-radius:999px; background:#AFCFC8; color:var(--primary-foreground); }
+  .public-theme-toggle.mmh-theme-switch:hover { filter:brightness(.97); }
+  .dark .public-theme-toggle.mmh-theme-switch { background:#193A34; color:#F6AB32; }
   .public-mobile-menu {
     display: none;
     position: absolute;
@@ -293,7 +318,7 @@ function public_nav_html($value) { return htmlspecialchars((string)$value, ENT_Q
   @media (max-width: 1120px) {
     .public-site-nav,
     .public-desktop-nav { gap: .78rem; }
-    .public-nav-button { padding-inline: .75rem; }
+    .public-nav-button { padding-inline: 12px; }
   }
   @media (max-width: 1023px) {
     body { --public-header-offset: 66px; }
@@ -311,7 +336,7 @@ function public_nav_html($value) { return htmlspecialchars((string)$value, ENT_Q
     .public-logo-link img { width: 100px; }
   }
 </style>
-<header class="public-site-header">
+<header id="public-site-header" class="public-site-header">
     <div class="public-header-shell">
         <div class="public-header-row">
             <a href="<?=public_nav_html($publicBaseUrl)?>/" class="public-logo-link" aria-label="<?=public_nav_html($publicSiteName)?> home">
@@ -334,17 +359,16 @@ function public_nav_html($value) { return htmlspecialchars((string)$value, ENT_Q
                     </details><?php endif; ?>
                 </div>
 
-                <button id="theme-toggle" type="button" aria-label="Toggle theme" title="Toggle theme" class="public-theme-toggle">
-                    <i class="fas fa-moon public-theme-icon--light" aria-hidden="true"></i>
-                    <i class="fas fa-sun public-theme-icon--dark" aria-hidden="true"></i>
+                <button id="theme-toggle" type="button" aria-label="Switch theme" class="public-theme-toggle mmh-theme-switch" data-mmh-theme-toggle aria-pressed="false">
+                    <span class="mmh-theme-switch__knob" aria-hidden="true"><svg class="mmh-theme-switch__icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><g class="mmh-theme-icon-sun" fill="none" stroke="currentColor" stroke-linecap="round" stroke-width="1.8"><circle cx="12" cy="12" r="3.5"></circle><path d="M12 2.5v2.2M12 19.3v2.2M4.7 4.7l1.55 1.55m11.5 11.5 1.55 1.55M2.5 12h2.2m14.6 0h2.2M4.7 19.3l1.55-1.55m11.5-11.5L19.3 4.7"></path></g><path class="mmh-theme-icon-moon" d="M19.3 14.2A7.8 7.8 0 0 1 9.8 4.7a7.9 7.9 0 1 0 9.5 9.5Z" fill="currentColor"></path></svg></span>
                 </button>
                 
                 <?php if ($publicUserLoggedIn): ?>
-                    <details class="public-dropdown">
-                        <summary class="public-account-toggle public-nav-button secondary"><i class="fas fa-user-circle" aria-hidden="true"></i> <?=public_nav_html($publicUserName)?> <i class="fas fa-chevron-down text-xs" aria-hidden="true"></i></summary>
-                        <div class="public-dropdown-menu">
+                    <details class="public-dropdown public-account-dropdown">
+                        <summary class="public-account-toggle public-nav-button secondary"><i class="fas fa-user-circle" aria-hidden="true"></i> <span class="public-account-name"><?=public_nav_html($publicUserName)?></span> <i class="fas fa-chevron-down text-xs" aria-hidden="true"></i></summary>
+                        <div class="public-dropdown-menu public-account-menu">
                             <?php foreach ($publicAccountItems as $publicAccountItem): ?>
-                                <a href="<?=public_nav_html($publicAccountItem['href'])?>"><?=public_nav_html($publicAccountItem['label'])?></a>
+                                <a class="<?= $publicAccountItem['label'] === 'Logout' ? 'is-logout' : ''; ?>" href="<?=public_nav_html($publicAccountItem['href'])?>"><?=public_nav_html($publicAccountItem['label'])?></a>
                             <?php endforeach; ?>
                         </div>
                     </details>
@@ -357,9 +381,8 @@ function public_nav_html($value) { return htmlspecialchars((string)$value, ENT_Q
             </nav>
             
             <div class="public-mobile-actions">
-                <button id="theme-toggle-mobile" type="button" aria-label="Toggle theme" title="Toggle theme" class="public-theme-toggle">
-                    <i class="fas fa-moon public-theme-icon--light" aria-hidden="true"></i>
-                    <i class="fas fa-sun public-theme-icon--dark" aria-hidden="true"></i>
+                <button id="theme-toggle-mobile" type="button" aria-label="Switch theme" class="public-theme-toggle mmh-theme-switch" data-mmh-theme-toggle aria-pressed="false">
+                    <span class="mmh-theme-switch__knob" aria-hidden="true"><svg class="mmh-theme-switch__icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><g class="mmh-theme-icon-sun" fill="none" stroke="currentColor" stroke-linecap="round" stroke-width="1.8"><circle cx="12" cy="12" r="3.5"></circle><path d="M12 2.5v2.2M12 19.3v2.2M4.7 4.7l1.55 1.55m11.5 11.5 1.55 1.55M2.5 12h2.2m14.6 0h2.2M4.7 19.3l1.55-1.55m11.5-11.5L19.3 4.7"></path></g><path class="mmh-theme-icon-moon" d="M19.3 14.2A7.8 7.8 0 0 1 9.8 4.7a7.9 7.9 0 1 0 9.5 9.5Z" fill="currentColor"></path></svg></span>
                 </button>
                 <button id="menu-toggle" type="button" aria-label="Open navigation menu" title="Open navigation menu" class="public-mobile-toggle" aria-controls="mobile-menu" aria-expanded="false">
                     <i class="fas fa-bars ds-icon ds-icon-lg" aria-hidden="true"></i>
@@ -379,7 +402,7 @@ function public_nav_html($value) { return htmlspecialchars((string)$value, ENT_Q
             <div class="public-mobile-account-group public-mobile-grid">
                 <?php if ($publicUserLoggedIn): ?>
                     <?php foreach ($publicAccountItems as $publicAccountItem): ?>
-                        <a href="<?=public_nav_html($publicAccountItem['href'])?>"><?=public_nav_html($publicAccountItem['label'])?></a>
+                        <a class="<?= $publicAccountItem['label'] === 'Logout' ? 'is-logout' : ''; ?>" href="<?=public_nav_html($publicAccountItem['href'])?>"><?=public_nav_html($publicAccountItem['label'])?></a>
                     <?php endforeach; ?>
                 <?php else: ?>
                     <a href="<?=public_nav_html($publicBaseUrl)?>/auth/login">Login</a>
@@ -399,8 +422,6 @@ function public_nav_html($value) { return htmlspecialchars((string)$value, ENT_Q
   (function() {
     var menu = document.getElementById('mobile-menu');
     var toggle = document.getElementById('menu-toggle');
-    var themeToggle = document.getElementById('theme-toggle');
-    var themeToggleMobile = document.getElementById('theme-toggle-mobile');
     function closePublicMobileMenu() {
       if (menu) { menu.classList.add('hidden'); }
       if (toggle) { toggle.setAttribute('aria-expanded', 'false'); }
@@ -412,18 +433,7 @@ function public_nav_html($value) { return htmlspecialchars((string)$value, ENT_Q
       menu.classList.toggle('hidden');
       toggle.setAttribute('aria-expanded', menu.classList.contains('hidden') ? 'false' : 'true');
     }
-    function toggleSharedTheme(event) {
-      if (event) {
-        event.preventDefault();
-        event.stopImmediatePropagation();
-      }
-      if (typeof window.mmhApplyTheme === 'function') {
-        window.mmhApplyTheme(document.documentElement.classList.contains('dark') ? 'light' : 'dark', true);
-      }
-    }
     if (toggle) { toggle.addEventListener('click', togglePublicMobileMenu); }
-    if (themeToggle) { themeToggle.addEventListener('click', toggleSharedTheme); }
-    if (themeToggleMobile) { themeToggleMobile.addEventListener('click', toggleSharedTheme); }
     if (menu) {
       document.addEventListener('click', function(event) {
         if (!menu.classList.contains('hidden') && !menu.contains(event.target) && (!toggle || !toggle.contains(event.target))) {
@@ -437,5 +447,22 @@ function public_nav_html($value) { return htmlspecialchars((string)$value, ENT_Q
         link.addEventListener('click', closePublicMobileMenu);
       });
     }
+    var accountMenus = Array.prototype.slice.call(document.querySelectorAll('.public-account-dropdown'));
+    function closeAccountMenus(returnFocus) {
+      accountMenus.forEach(function(details) {
+        if (!details.open) return;
+        details.open = false;
+        if (returnFocus) {
+          var summary = details.querySelector('summary');
+          if (summary) summary.focus();
+        }
+      });
+    }
+    document.addEventListener('click', function(event) {
+      if (!event.target.closest || !event.target.closest('.public-account-dropdown')) closeAccountMenus(false);
+    });
+    document.addEventListener('keydown', function(event) {
+      if (event.key === 'Escape') closeAccountMenus(true);
+    });
   })();
 </script>

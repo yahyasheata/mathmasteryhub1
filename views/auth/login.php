@@ -16,8 +16,6 @@ if(isset($_SESSION['username'])){
         $site_description = $site_settings["website_bio"];
         $site_icon = $site_settings["website_icon"];
 $authRootUrl = mmh_site_public_base_path() ?: '/';
-$authBrandLogoUrl = mmh_site_settings_asset_url($site_settings, 'website_logo', 'resources/images/default/wide-logo.png');
-$authDarkLogoUrl = mmh_site_public_url('resources/images/branding/mathhub-logo-white.png');
 $authFaviconUrl = mmh_site_settings_asset_url($site_settings, 'website_icon', 'resources/images/default/favicon.png');
 
 $authCsrfToken = mmh_auth_csrf_token();
@@ -101,7 +99,7 @@ trackTraffic();
     <script>
       (function() {
         try {
-          var savedTheme = localStorage.getItem('theme');
+          var savedTheme = localStorage.getItem('theme') || localStorage.getItem('math-mastery-student-theme');
           var prefersDark = window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches;
           document.documentElement.classList.toggle('dark', savedTheme === 'dark' || (!savedTheme && prefersDark));
         } catch (error) {}
@@ -113,7 +111,7 @@ trackTraffic();
     <!-- Google Fonts -->
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Tajawal:wght@300;400;500;700;900&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=DM+Serif+Display:ital@0;1&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet">
     <!-- Font Awesome -->
     <link rel="stylesheet" href="<?=mmh_site_public_url('resources/css/fontawsome5.min.css')?>">
     
@@ -128,17 +126,13 @@ trackTraffic();
                         dark: 'var(--bg-primary)',
                         light: 'var(--surface)'
                     },
-                    fontFamily: {
-                        tajawal: ['Tajawal', 'sans-serif']
-                    }
+                    fontFamily: { sans: ['DM Sans', 'sans-serif'], serif: ['DM Serif Display', 'serif'], mono: ['IBM Plex Mono', 'monospace'] }
                 }
             }
         }
     </script>
     <style>
-        body {
-            font-family: 'Tajawal', sans-serif;
-        }
+        body { font-family: 'DM Sans', sans-serif; }
         .dark .dark-invert {
             filter: invert(1);
         }
@@ -147,70 +141,19 @@ trackTraffic();
             transition: background-color 0.3s ease, color 0.3s ease, border-color 0.3s ease, box-shadow 0.3s ease;
         }
     </style>
-    <link rel="stylesheet" href="<?=mmh_site_public_url('resources/css/design-system.css')?>" data-design-system="mathhub" />
+    <link rel="stylesheet" href="<?=mmh_site_public_url('resources/css/design-system.css')?>?v=<?=@filemtime('resources/css/design-system.css') ?: 1?>" data-design-system="mathhub" />
+    <script src="<?=mmh_site_public_url('resources/js/theme-preference.js')?>?v=<?=@filemtime('resources/js/theme-preference.js') ?: 1?>"></script>
+    <link rel="stylesheet" href="<?=mmh_site_public_url('resources/css/auth-pages.css')?>?v=<?=@filemtime('resources/css/auth-pages.css') ?: 1?>">
 </head>
-<body class='font-tajawal ds-bg-primary ds-text-primary transition-colors duration-300'>
-     
-    <!-- Navigation -->
-    <header class='sticky top-0 z-50 ds-surface shadow-sm transition-colors duration-300'>
-        <div class="container mx-auto px-4">
-            <div class="flex justify-between items-center py-4">
-                <a href="<?=$authRootUrl?>" class="flex items-center gap-2">
-                  <img src="<?=$authBrandLogoUrl?>" style="width: 105px;" alt="<?=$site_name;?>" class="mathhub-logo mathhub-logo--light">
-                  <img src="<?=$authDarkLogoUrl?>" style="width: 105px;" alt="<?=$site_name;?>" class="mathhub-logo mathhub-logo--dark">
-                </a>
-                
-                <nav class="hidden md:flex items-center gap-6">
-                    <a href="#home" class='ds-text-secondary hover:text-primary font-medium transition duration-200'>
-                        Home
-                    </a>
-                    <!-- <a href="#docs" class='ds-text-secondary hover:text-primary font-medium transition duration-200'>Documentation</a> -->
-                    <!-- <a href="#apis" class='ds-text-secondary hover:text-primary font-medium transition duration-200'>API Services</a> -->
-                    <!-- <a href="#community" class='ds-text-secondary hover:text-primary font-medium transition duration-200'>Community</a> -->
-                    <button id="theme-toggle" type="button" aria-label="Toggle theme" title="Toggle theme" class='ds-icon-button ds-icon-button--sm p-2 rounded-lg ds-text-secondary hover:text-primary transition duration-200'>
-                        <i class="fas fa-moon ds-icon ds-icon-md dark:hidden" aria-hidden="true"></i>
-                        <i class="fas fa-sun ds-icon ds-icon-md hidden dark:block" aria-hidden="true"></i>
-                    </button>
-                    <a href="<?=$authBaseUrl?>/login" class='bg-primary ds-text-inverse px-5 py-2 rounded-lg hover:bg-primary/90 transition duration-200'>
-                        Login
-                    </a>
-                </nav>
-                
-                <div class="flex items-center gap-4 md:hidden">
-                    <button id="theme-toggle-mobile" type="button" aria-label="Toggle theme" title="Toggle theme" class='ds-icon-button ds-icon-button--sm p-2 rounded-lg ds-text-secondary hover:text-primary transition duration-200'>
-                        <i class="fas fa-moon ds-icon ds-icon-md dark:hidden" aria-hidden="true"></i>
-                        <i class="fas fa-sun ds-icon ds-icon-md hidden dark:block" aria-hidden="true"></i>
-                    </button>
-                    <button id="menu-toggle" type="button" aria-label="Open navigation menu" title="Open navigation menu" class='ds-icon-button ds-icon-button--sm flex items-center ds-text-secondary hover:text-primary focus:outline-none'>
-                        <i class="fas fa-bars ds-icon ds-icon-lg" aria-hidden="true"></i>
-                    </button>
-                </div>
-            </div>
-        </div>
-        
-        <!-- Mobile Menu -->
-        <div id="mobile-menu" class="md:hidden hidden">
-            <div class='container mx-auto px-4 py-4 ds-surface border-t transition-colors duration-300'>
-                <a href="/" class='block py-2 ds-text-secondary hover:text-primary'>
-                    Home
-                </a>
-                <a href="<?=$authBaseUrl?>/login" class='block py-2 mt-2 bg-primary ds-text-inverse text-center rounded-lg hover:bg-primary/90'>
-                    Login
-                </a>
-            </div>
-        </div>
-    </header>
+<body class='font-sans mmh-auth-page mmh-auth-page--public-header ds-bg-primary ds-text-primary transition-colors duration-300'>
+    <?php include __DIR__ . '/../public/layouts/aside.php'; ?>
 
     <!-- Login Section -->
     <main class="flex flex-1 items-center justify-center py-20 min-h-[60vh]">
       <div class='w-full max-w-4xl mx-auto ds-surface rounded-xl shadow-lg flex flex-col md:flex-row overflow-hidden'>
         <!-- Login Form Side -->
         <div class="w-full md:w-1/2 flex flex-col justify-center p-8 md:p-12">
-          <div class="flex justify-center mb-6">
-            <img src='<?=$authBrandLogoUrl?>' alt='<?=$site_name;?> Logo' class="h-16 w-auto mathhub-logo mathhub-logo--light">
-            <img src='<?=$authDarkLogoUrl?>' alt='<?=$site_name;?> Logo' class="h-16 w-auto mathhub-logo mathhub-logo--dark">
-          </div>
-          <h2 class="text-3xl font-extrabold mb-6 text-center text-primary">Login</h2>
+          <h2 class="mb-6 text-center text-primary">Login</h2>
           <?php if ($authFlashError !== ''): ?>
             <div class="mb-4 rounded-lg border ds-border ds-surface-muted px-3 py-2 text-sm ds-text-primary" role="alert"><?=htmlspecialchars($authFlashError, ENT_QUOTES, 'UTF-8')?></div>
           <?php endif; ?>
@@ -247,7 +190,7 @@ trackTraffic();
                 <input id="remember" name="remember" type="checkbox" checked class='h-4 w-4 text-primary focus:ring-primary ds-border rounded'>
                 <label for="remember" class='ml-2 block text-sm ds-text-secondary'>Remember me</label>
               </div>
-              <button type="submit" class='loginBtn bg-secondary ds-text-inverse px-6 py-2 rounded-lg font-bold hover:bg-secondary/90 transition focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-2' aria-live="polite"><span class="loginBtnLabel">Login</span><span class="loginBtnSpinner hidden ml-2"><i class="fas fa-spinner fa-spin" aria-hidden="true"></i></span></button>
+              <button type="submit" class='public-nav-button primary loginBtn' aria-live="polite"><span class="loginBtnLabel">Login</span><span class="loginBtnSpinner hidden ml-2"><i class="fas fa-spinner fa-spin" aria-hidden="true"></i></span></button>
             </div>
             <div class="text-center mt-4">
               <a href="<?=$authBaseUrl?>/register" class="text-primary hover:underline font-medium"><i class="fas fa-circle ds-icon ds-icon-xs mr-1" aria-hidden="true"></i> Don't have an account?</a>
@@ -286,68 +229,7 @@ trackTraffic();
     
         <?php include $_SERVER['DOCUMENT_ROOT'].dirname($_SERVER['SCRIPT_NAME'])."/views/public/layouts/footer.php"; ?>
 
-    <!-- JavaScript -->
-    <script>
-        // Mobile Menu Toggle
-        const menuToggle = document.getElementById('menu-toggle');
-        const mobileMenu = document.getElementById('mobile-menu');
-        
-        menuToggle.addEventListener('click', () => {
-            mobileMenu.classList.toggle('hidden');
-        });
-        
-        // Smooth Scrolling
-        document.querySelectorAll('a[href^="#"]').forEach(anchor => {
-            anchor.addEventListener('click', function(e) {
-                e.preventDefault();
-                
-                const target = document.querySelector(this.getAttribute('href'));
-                if (target) {
-                    window.scrollTo({
-                        top: target.offsetTop - 80,
-                        behavior: 'smooth'
-                    });
-                    
-                    // Close mobile menu when a link is clicked
-                    if (!mobileMenu.classList.contains('hidden')) {
-                        mobileMenu.classList.add('hidden');
-                    }
-                }
-            });
-        });
-        
-        // Theme Toggle
-        const themeToggle = document.getElementById('theme-toggle');
-        const themeToggleMobile = document.getElementById('theme-toggle-mobile');
-        
-        // Function to toggle theme
-        function toggleTheme() {
-            if (document.documentElement.classList.contains('dark')) {
-                document.documentElement.classList.remove('dark');
-                localStorage.setItem('theme', 'light');
-            } else {
-                document.documentElement.classList.add('dark');
-                localStorage.setItem('theme', 'dark');
-            }
-        }
-        
-        // Add event listeners to both buttons
-        themeToggle.addEventListener('click', toggleTheme);
-        themeToggleMobile.addEventListener('click', toggleTheme);
-        
-        // Check user preference and localStorage on page load
-        document.addEventListener('DOMContentLoaded', () => {
-            // Check localStorage first
-            const savedTheme = localStorage.getItem('theme');
-            
-            if (savedTheme === 'dark' || 
-                (!savedTheme && window.matchMedia('(prefers-color-scheme: dark)').matches)) {
-                document.documentElement.classList.add('dark');
-            } else {
-                document.documentElement.classList.remove('dark');
-            }
-        });
-    </script>
+    <!-- Shared public header owns mobile-menu behavior. -->
     <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
     <script>

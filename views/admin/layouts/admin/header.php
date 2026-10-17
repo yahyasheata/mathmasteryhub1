@@ -42,7 +42,10 @@ if ($themeStmt) {
     document.documentElement.setAttribute('data-bs-theme', '<?=$isDarkMode == 1 ? 'dark' : 'light'?>');
     document.documentElement.classList.toggle('dark', <?=$isDarkMode == 1 ? 'true' : 'false'?>);
 </script>
-<link rel="stylesheet" href="<?=mmh_site_public_url('resources/css/design-system.css')?>" data-design-system="mathhub" />
+<link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=DM+Serif+Display:ital@0;1&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<script src="<?=mmh_site_public_url('resources/js/theme-preference.js')?>?v=<?=@filemtime('resources/js/theme-preference.js') ?: 1?>"></script>
+<link rel="stylesheet" href="<?=mmh_site_public_url('resources/css/design-system.css')?>?v=<?=@filemtime('resources/css/design-system.css') ?: 1?>" data-design-system="mathhub" />
 <?=$adminMetaTags."\n"?>
     <?=$adminKeywords."\n"?>
 

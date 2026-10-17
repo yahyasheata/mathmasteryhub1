@@ -9,7 +9,7 @@ $site_settings = getSiteSettings();
 $site_name = (string) ($site_settings['website_name'] ?? 'Math Mastery Hub');
 $authRootUrl = mmh_site_public_base_path() ?: '/';
 $authBaseUrl = rtrim(mmh_site_public_base_path(), '/') . '/auth';
-$authBrandLogoUrl = mmh_site_settings_asset_url($site_settings, 'website_logo', 'resources/images/default/wide-logo.png');
+$authBrandLogoUrl = mmh_site_public_url('resources/images/branding/mathhub-logo-light.png') . '?v=' . (@filemtime('resources/images/branding/mathhub-logo-light.png') ?: 1);
 $authDarkLogoUrl = mmh_site_public_url('resources/images/branding/mathhub-logo-white.png');
 $authMessage = mmh_auth_flash('password_reset');
 $authError = mmh_auth_flash('password_reset_error');
@@ -25,7 +25,7 @@ $authSupportWhatsAppUrl = mmh_site_settings_whatsapp_url($site_settings);
   <script>
     (function () {
       try {
-        var savedTheme = window.localStorage.getItem('theme');
+        var savedTheme = window.localStorage.getItem('theme') || window.localStorage.getItem('math-mastery-student-theme');
         var prefersDark = window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches;
         var dark = savedTheme === 'dark' || (!savedTheme && prefersDark);
         document.documentElement.classList.toggle('dark', dark);
@@ -33,6 +33,9 @@ $authSupportWhatsAppUrl = mmh_site_settings_whatsapp_url($site_settings);
       } catch (error) {}
     }());
   </script>
+  <link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=DM+Serif+Display:ital@0;1&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+  <script src="<?= mmh_site_public_url('resources/js/theme-preference.js') ?>"></script>
   <link rel="stylesheet" href="<?= mmh_site_public_url('resources/css/fontawsome5.min.css') ?>">
   <link rel="stylesheet" href="<?= mmh_site_public_url('resources/css/design-system.css') ?>" data-design-system="mathhub">
   <style>
@@ -99,27 +102,8 @@ $authSupportWhatsAppUrl = mmh_site_settings_whatsapp_url($site_settings);
     html[data-theme="dark"] .password-reset-logo--light { display: none; }
     html.dark .password-reset-logo--dark,
     html[data-theme="dark"] .password-reset-logo--dark { display: block; }
-    .password-reset-theme {
-      display: inline-grid;
-      flex: 0 0 auto;
-      place-items: center;
-      width: var(--icon-button);
-      height: var(--icon-button);
-      border: 1px solid var(--border);
-      border-radius: var(--radius-sm);
-      background: var(--surface-hover);
-      color: var(--text-secondary);
-      cursor: pointer;
-      transition: background var(--transition), border-color var(--transition), color var(--transition), transform var(--transition-fast);
-    }
-    .password-reset-theme:hover { border-color: var(--primary); color: var(--primary); }
-    .password-reset-theme:active { transform: scale(.96); }
-    .password-reset-theme .fa-sun { display: none; }
-    html.dark .password-reset-theme .fa-moon,
-    html[data-theme="dark"] .password-reset-theme .fa-moon { display: none; }
-    html.dark .password-reset-theme .fa-sun,
-    html[data-theme="dark"] .password-reset-theme .fa-sun { display: inline-block; }
-    .password-reset-heading { margin: 0; color: var(--text-primary); font-size: clamp(1.65rem, 5vw, 2.15rem); font-weight: 800; letter-spacing: -.025em; line-height: var(--line-tight); }
+    .password-reset-theme.mmh-theme-switch { flex: 0 0 84px; }
+    .password-reset-heading { margin: 0; color: var(--text-primary); font-family: var(--font-heading); font-size: clamp(1.65rem, 5vw, 2.15rem); font-weight: 400; letter-spacing: -.025em; line-height: var(--line-tight); }
     .password-reset-intro { max-width: 31rem; margin: .7rem 0 1.65rem; color: var(--text-secondary); font-size: .96rem; line-height: 1.55; }
     .password-reset-feedback {
       display: grid;
@@ -194,11 +178,11 @@ $authSupportWhatsAppUrl = mmh_site_settings_whatsapp_url($site_settings);
       .password-reset-topbar { margin-bottom: 1.8rem; }
     }
     @media (prefers-reduced-motion: reduce) {
-      .password-reset-theme, .password-reset-input, .password-reset-submit { transition: none; }
+      .password-reset-input, .password-reset-submit { transition: none; }
     }
   </style>
 </head>
-<body class="ds-bg-primary ds-text-primary">
+<body class="mmh-auth-page ds-bg-primary ds-text-primary">
   <main class="password-reset-page">
     <section class="password-reset-card" aria-labelledby="forgot-title">
       <div class="password-reset-topbar">
@@ -206,9 +190,8 @@ $authSupportWhatsAppUrl = mmh_site_settings_whatsapp_url($site_settings);
           <img class="password-reset-logo password-reset-logo--light" src="<?= htmlspecialchars($authBrandLogoUrl, ENT_QUOTES, 'UTF-8') ?>" alt="<?= htmlspecialchars($site_name, ENT_QUOTES, 'UTF-8') ?>">
           <img class="password-reset-logo password-reset-logo--dark" src="<?= htmlspecialchars($authDarkLogoUrl, ENT_QUOTES, 'UTF-8') ?>" alt="<?= htmlspecialchars($site_name, ENT_QUOTES, 'UTF-8') ?>">
         </a>
-        <button class="password-reset-theme" id="password-reset-theme" type="button" aria-label="Toggle theme" title="Toggle theme">
-          <i class="fas fa-moon" aria-hidden="true"></i>
-          <i class="fas fa-sun" aria-hidden="true"></i>
+        <button class="password-reset-theme mmh-theme-switch" id="password-reset-theme" data-mmh-theme-toggle type="button" aria-label="Switch theme" aria-pressed="false">
+          <span class="mmh-theme-switch__knob" aria-hidden="true"><i class="fas fa-sun mmh-theme-switch__icon"></i></span>
         </button>
       </div>
 
@@ -251,17 +234,5 @@ $authSupportWhatsAppUrl = mmh_site_settings_whatsapp_url($site_settings);
       <a class="password-reset-back" href="<?= htmlspecialchars($authBaseUrl . '/login', ENT_QUOTES, 'UTF-8') ?>"><i class="fas fa-arrow-left" aria-hidden="true"></i><span>Back to login</span></a>
     </section>
   </main>
-  <script>
-    (function () {
-      var toggle = document.getElementById('password-reset-theme');
-      if (!toggle) return;
-      toggle.addEventListener('click', function () {
-        var dark = !document.documentElement.classList.contains('dark');
-        document.documentElement.classList.toggle('dark', dark);
-        document.documentElement.dataset.theme = dark ? 'dark' : 'light';
-        try { window.localStorage.setItem('theme', dark ? 'dark' : 'light'); } catch (error) {}
-      });
-    }());
-  </script>
 </body>
 </html>

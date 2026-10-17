@@ -697,13 +697,10 @@
 .exam-archive-paper-group-hint { font-size: .64rem !important; }
 .exam-archive-table-scroll { background: var(--archive-surface); border: 1px solid var(--archive-line); border-radius: .7rem; overflow: auto; scrollbar-color: color-mix(in srgb, var(--secondary) 36%, var(--border)) transparent; scrollbar-width: thin; }
 .exam-archive-table-scroll:focus-visible { box-shadow: 0 0 0 3px color-mix(in srgb, var(--secondary) 28%, transparent); outline: 0; }
-.exam-archive-table { border-collapse: separate; border-spacing: 0; min-width: 795px; table-layout: fixed; width: 100%; }
+.exam-archive-table { border-collapse: separate; border-spacing: 0; min-width: 1320px; table-layout: auto; width: max-content; }
 .exam-archive-table thead th { background: color-mix(in srgb, var(--surface-elevated, var(--surface)) 96%, var(--bg-primary)); border-bottom: 1px solid var(--archive-line); color: var(--archive-muted); font-size: .59rem; font-weight: 850; height: 2.1rem; letter-spacing: .07em; padding: .35rem .5rem; position: sticky; text-align: left; text-transform: uppercase; top: calc(65px + 4rem); white-space: nowrap; z-index: 3; }
-.exam-archive-table thead th:first-child { border-top-left-radius: .68rem; padding-left: .75rem; width: 24%; }
-.exam-archive-table thead th:nth-child(2) { width: 8%; }
-.exam-archive-table thead th:nth-child(3) { width: 10%; }
-.exam-archive-table thead th:nth-child(n+4):not(:last-child) { width: 11%; }
-.exam-archive-table thead th:last-child { border-top-right-radius: .68rem; width: 14%; }
+.exam-archive-table thead th:first-child { border-top-left-radius: .68rem; padding-left: .75rem; }
+.exam-archive-table thead th:last-child { border-top-right-radius: .68rem; }
 .exam-archive-table thead th > span:first-child { color: var(--secondary); font-size: .68rem; margin-right: .3rem; }
 .exam-archive-table tbody tr { background: transparent; transition: background 150ms ease, box-shadow 150ms ease; }
 .exam-archive-table tbody tr:hover { background: color-mix(in srgb, var(--secondary) 7%, var(--surface)); box-shadow: inset 3px 0 0 var(--primary); }
@@ -733,17 +730,12 @@
   .exam-archive-paper-group-header h2 { font-size: .94rem; }
   .exam-archive-paper-group-hint { display: none; }
   .exam-archive-table-scroll { border-radius: .58rem; margin-inline: -.05rem; }
-  .exam-archive-table { min-width: 675px; }
   .exam-archive-table thead th { font-size: .55rem; height: 2.2rem; padding-inline: .42rem; position: static; }
-  .exam-archive-table thead th:first-child { min-width: 7.8rem; padding-left: .65rem; width: 26%; }
-  .exam-archive-table thead th:nth-child(2) { min-width: 3.5rem; }
-  .exam-archive-table thead th:nth-child(3) { min-width: 4.2rem; }
-  .exam-archive-table thead th > span:not(:first-child) { display: none; }
+  .exam-archive-table thead th:first-child { padding-left: .65rem; }
   .exam-archive-table :is(th, td) { height: 3.35rem; padding-inline: .42rem; }
   .exam-archive-table tbody th { font-size: .71rem; padding-left: .65rem; }
   .exam-archive-table .exam-resource-button { min-height: 2.1rem; min-width: 2.1rem; }
   .exam-archive-table .exam-resource-button span { display: none; }
-  .exam-archive-extra-column { display: none; }
 }
 
 /* Board-aware archive hierarchy and single-table header behavior. */
@@ -782,17 +774,6 @@
 @media (max-width: 700px) { .exam-archive-table-scroll { max-height: min(64svh, 34rem); } }
 
 /* Supplemental resources keep the archive table dense without exposing targets. */
-.exam-archive-table { min-width: 1040px; }
-.exam-archive-table thead th:first-child { width: 18%; }
-.exam-archive-table thead th:nth-child(2) { width: 7%; }
-.exam-archive-table thead th:nth-child(3) { width: 8%; }
-.exam-archive-table thead th:nth-child(4),
-.exam-archive-table thead th:nth-child(5),
-.exam-archive-table thead th:nth-child(6),
-.exam-archive-table thead th:nth-child(7),
-.exam-archive-table thead th:nth-child(8),
-.exam-archive-table thead th:nth-child(9) { width: 9%; }
-.exam-archive-table thead th:last-child { width: 13%; }
 .exam-archive-resource-menu { display: inline-block; position: relative; }
 .exam-archive-resource-menu > summary { list-style: none; cursor: pointer; }
 .exam-archive-resource-menu > summary::-webkit-details-marker { display: none; }
@@ -803,6 +784,50 @@
 .exam-archive-resource-menu-item:hover, .exam-archive-resource-menu-item:focus-visible { background: color-mix(in srgb, var(--secondary) 12%, var(--surface)); color: var(--secondary); outline: 0; }
 .exam-archive-resource-menu-item.is-unavailable { color: var(--text-muted); cursor: help; }
 @media (max-width: 700px) {
-  .exam-archive-table { min-width: 900px; }
   .exam-archive-resource-menu-popover { position: fixed; left: auto; right: .75rem; top: auto; min-width: min(18rem, calc(100vw - 1.5rem)); }
 }
+
+/* Shared public identity: compact filters, editorial headings, and a shorter archive footer. */
+.past-papers-public-page { font-family: var(--font-sans); }
+.past-papers-public-page .exam-archive-header h1,
+.past-papers-public-page .exam-archive-paper-group-header h2,
+.past-papers-public-page .exam-archive-empty h2 {
+  font-family: var(--font-heading);
+  font-weight: 400;
+  letter-spacing: -.025em;
+}
+.past-papers-public-page .exam-archive-eyebrow { font-family: var(--font-mono); font-weight: 500; letter-spacing: .06em; }
+.past-papers-public-page .archive-hierarchy-tabs a,
+.past-papers-public-page .archive-paper-tabs a {
+  border-radius: 8px !important;
+  font-family: var(--font-sans);
+  font-size: .82rem;
+  font-weight: 650;
+  min-height: 2.3rem;
+  transition: background 150ms ease, border-color 150ms ease, color 150ms ease;
+}
+.past-papers-public-page .archive-hierarchy-tabs a:hover,
+.past-papers-public-page .archive-paper-tabs a:hover { transform: none; }
+.past-papers-public-page .archive-paper-tabs a.is-active { box-shadow: none; }
+.past-papers-public-page .archive-paper-tabs small {
+  border-radius: .22rem;
+  font-family: var(--font-mono);
+  font-size: .62rem;
+  font-weight: 500;
+  padding: .12rem .28rem;
+}
+.past-papers-public-page .archive-hierarchy-tabs a:focus-visible,
+.past-papers-public-page .archive-paper-tabs a:focus-visible { outline: 3px solid var(--primary); outline-offset: 2px; }
+.past-papers-public-page .archive-command-actions .archive-apply-button,
+.past-papers-public-page .archive-command-actions .archive-reset-button { border-radius: var(--radius-sm); }
+.past-papers-public-page > .public-site-footer { padding: 1.5rem 0 .75rem; }
+.past-papers-public-page .public-footer-grid { gap: clamp(1rem, 3vw, 2rem); }
+.past-papers-public-page .public-footer-logo { width: min(128px, 100%); }
+.past-papers-public-page .public-footer-brand p { margin-top: .55rem; font-size: .84rem; line-height: 1.5; }
+.past-papers-public-page .public-footer-links h2,
+.past-papers-public-page .public-footer-social h2 { margin-bottom: .55rem; font-size: .9rem; }
+.past-papers-public-page .public-footer-links ul { gap: .38rem; }
+.past-papers-public-page .public-footer-links a { font-size: .84rem; }
+.past-papers-public-page .public-footer-social a { width: 34px; height: 34px; }
+.past-papers-public-page .public-footer-bottom { margin-top: 1.2rem; padding-top: .75rem; }
+.past-papers-public-page .public-footer-bottom p { font-size: .78rem; }

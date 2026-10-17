@@ -106,8 +106,12 @@ trackTraffic();
   <?= $openGraph ?? '' ?>
   <?= $schema ?? '' ?>
   <?php include __DIR__ . '/partials/favicon.php'; ?>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=DM+Serif+Display:ital@0;1&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="<?= $e(mmh_site_public_url('resources/css/fontawsome5.min.css')); ?>">
-  <link rel="stylesheet" href="<?= $e(mmh_site_public_url('resources/css/design-system.css')); ?>" data-design-system="mathhub">
+  <link rel="stylesheet" href="<?= $e(mmh_site_public_url('resources/css/design-system.css')); ?>?v=<?=@filemtime('resources/css/design-system.css') ?: 1?>" data-design-system="mathhub">
+  <script src="<?= $e(mmh_site_public_url('resources/js/theme-preference.js')); ?>?v=<?=@filemtime('resources/js/theme-preference.js') ?: 1?>"></script>
   <link rel="stylesheet" href="<?= $e($landingCssUrl); ?>">
 </head>
 <body class="public-landing-body">
@@ -291,20 +295,32 @@ trackTraffic();
             <h2 id="courses-title"><?= $e($homeCoursesHeading); ?></h2>
             <p><?= $e($homeCoursesDescription); ?></p>
           </div>
-          <div class="landing-course-grid">
-            <?php foreach (array_slice($homeCourses, 0, 6) as $course): ?>
+          <?php $carouselCourses = $homeCourses; ?>
+          <div class="landing-course-carousel" data-course-carousel role="region" aria-roledescription="carousel" aria-label="Available courses">
+            <div class="landing-carousel-controls" role="group" aria-label="Course carousel controls">
+              <button type="button" class="landing-carousel-button" data-carousel-previous aria-controls="home-course-track" aria-label="Previous courses"><i class="fas fa-arrow-left" aria-hidden="true"></i></button>
+              <button type="button" class="landing-carousel-button" data-carousel-next aria-controls="home-course-track" aria-label="Next courses"><i class="fas fa-arrow-right" aria-hidden="true"></i></button>
+            </div>
+            <div id="home-course-track" class="landing-course-grid" data-carousel-track tabindex="0" aria-label="Course choices">
+            <?php foreach ($carouselCourses as $courseIndex => $course): ?>
               <?php
                 $courseTitle = (string) ($course['course_title'] ?? 'Course');
                 $courseDescription = $plain($course['course_description'] ?? '', 150);
                 $courseUrl = $homeBasePath . '/course/' . rawurlencode((string) ($course['id'] ?? ''));
+                $courseImagePath = function_exists('mmh_site_settings_valid_local_asset')
+                  ? mmh_site_settings_valid_local_asset($course['course_image'] ?? '')
+                  : null;
+                $courseImageUrl = $courseImagePath !== null ? mmh_site_public_url($courseImagePath) : '';
                 $price = !empty($course['course_price']) ? $course['course_price'] . ' EGP' : 'Free';
                 $oldPrice = (!empty($course['preDiscount_course_price']) && (float) $course['preDiscount_course_price'] > (float) ($course['course_price'] ?? 0))
                   ? $course['preDiscount_course_price'] . ' EGP'
                   : '';
               ?>
-              <article class="landing-course-card">
-                <div>
-                  <span class="landing-course-label">Course</span>
+              <article class="landing-course-card<?= $courseImageUrl !== '' ? ' has-cover' : ''; ?>" data-carousel-slide role="group" aria-roledescription="slide" aria-label="Course <?= $courseIndex + 1; ?> of <?= count($carouselCourses); ?>">
+                <?php if ($courseImageUrl !== ''): ?>
+                  <img class="landing-course-cover" src="<?= $e($courseImageUrl); ?>" alt="<?= $e($courseTitle); ?>" loading="lazy">
+                <?php endif; ?>
+                <div class="landing-course-content">
                   <h3><?= $e($courseTitle); ?></h3>
                   <?php if ($courseDescription !== ''): ?><p><?= $e($courseDescription); ?></p><?php endif; ?>
                 </div>
@@ -317,6 +333,8 @@ trackTraffic();
                 </div>
               </article>
             <?php endforeach; ?>
+            </div>
+            <p class="landing-carousel-status sr-only" data-carousel-status aria-live="polite" aria-atomic="true"></p>
           </div>
         </div>
       </section>
@@ -365,6 +383,7 @@ trackTraffic();
     <?php endif; ?>
 
     <?php include $_SERVER['DOCUMENT_ROOT'] . dirname($_SERVER['SCRIPT_NAME']) . '/views/public/layouts/footer.php'; ?>
+    <script src="<?= $e(mmh_site_public_url('resources/js/landing-course-carousel.js')); ?>?v=<?=@filemtime('resources/js/landing-course-carousel.js') ?: 1?>" defer></script>
   </div>
 </body>
 </html>

@@ -13,7 +13,11 @@ $adminTopAvatarUrl = mmh_site_public_url(mmh_site_settings_valid_local_asset($us
         style="width: 55px; height: 55px" aria-controls="admin-sidebar" aria-expanded="true" aria-label="Collapse sidebar">
         <span class="fas fa-bars font-4" aria-hidden="true"></span>
     </button>
-    <div class="col-12 px-0 d-flex justify-content-end" style="height: 60px">
+    <div class="col-12 px-0 d-flex justify-content-end align-items-center" style="height: 60px; gap: 12px">
+
+        <button type="button" class="mmh-theme-switch admin-theme-switch" data-mmh-theme-toggle aria-label="Switch theme" aria-pressed="false">
+            <span class="mmh-theme-switch__knob" aria-hidden="true"><i class="fas fa-sun mmh-theme-switch__icon"></i></span>
+        </button>
 
 
 

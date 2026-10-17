@@ -6,7 +6,7 @@
             <div class="row mb-3 d-flex">
                 <div class="col-md-6 mb-3">
                     <div class="widget">
-                        <img src="<?=rtrim((string)$baseUrl, '/')?>/<?=$site_settings['website_logo']?>" style="width:160px;max-width:100%" class="mb-3 site-logo mathhub-logo mathhub-logo--light">
+                        <img src="<?=mmh_site_public_url('resources/images/branding/mathhub-logo-light.png')?>?v=<?=@filemtime('resources/images/branding/mathhub-logo-light.png') ?: 1?>" style="width:160px;max-width:100%" class="mb-3 site-logo mathhub-logo mathhub-logo--light">
                         <img src="<?=rtrim((string)$baseUrl, '/')?>/resources/images/branding/mathhub-logo-white.png" style="width:160px;max-width:100%" class="mb-3 site-logo mathhub-logo mathhub-logo--dark">
                         <div style="text-align:justify;"><?=$site_settings['website_bio']?></div>
                     </div>

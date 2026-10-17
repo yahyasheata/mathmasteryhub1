@@ -2158,7 +2158,7 @@ body.theme-light .course-learning-page .student-course-section.is-locked .studen
 .course-homework-status .fa-circle { font-size: .5rem; }
 .course-homework-status.is-pending { color: var(--text-secondary); }.course-homework-status.is-submitted { color: var(--success); }.course-homework-status.is-late,.course-homework-status.is-overdue { color: var(--warning); }.course-homework-status.is-legacy-late { color: var(--accent); border-color: color-mix(in srgb, var(--accent) 45%, var(--border)); }.course-homework-status.is-graded { color: var(--secondary); }
 .course-homework-imported-badge { display: inline-flex; align-items: center; margin-inline-start: .45rem; padding: .18rem .45rem; border: 1px solid color-mix(in srgb, var(--secondary) 40%, var(--border)); border-radius: 999px; color: var(--secondary); font-size: .74rem; font-weight: 700; white-space: nowrap; }
-.assignment-progress-imported { display: inline-flex; align-items: center; margin-inline-start: .45rem; padding: .16rem .42rem; border: 1px solid color-mix(in srgb, var(--secondary) 40%, var(--border)); border-radius: 999px; color: var(--secondary); font-size: .72rem; font-weight: 700; white-space: nowrap; }
+.assignment-progress-imported { display: inline-flex; align-items: center; margin-inline-start: .45rem; padding: .16rem .42rem; border: 1px solid color-mix(in srgb, var(--secondary) 40%, var(--border)); border-radius: 6px !important; color: var(--secondary); font-size: .72rem; font-weight: 700; white-space: nowrap; }
 .course-homework-heading .course-resource-viewer-return { margin-left: auto; }
 .course-homework-grid { display: grid; grid-template-columns: minmax(0, 1.5fr) minmax(250px, .75fr); gap: 16px; margin-top: 16px; }
 .course-homework-details { margin-top: 16px; }

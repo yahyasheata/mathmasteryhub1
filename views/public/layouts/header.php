@@ -13,6 +13,9 @@
 
 
 
+    <link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=DM+Serif+Display:ital@0;1&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+    <script src="<?=$baseUrl?>/resources/js/theme-preference.js?v=<?=@filemtime('resources/js/theme-preference.js') ?: 1?>"></script>
     <link rel="preload" as="style" href="<?=$baseUrl?>/resources//build/assets/app-38448552.css" />
     <link rel="stylesheet" href="<?=$baseUrl?>/resources//build/assets/app-38448552.css" data-navigate-track="reload" />
     
@@ -101,4 +104,4 @@
         width: 100%;
     }
 </style>
-<link rel="stylesheet" href="<?=$baseUrl?>/resources/css/design-system.css" data-design-system="mathhub" />
+<link rel="stylesheet" href="<?=$baseUrl?>/resources/css/design-system.css?v=<?=@filemtime('resources/css/design-system.css') ?: 1?>" data-design-system="mathhub" />

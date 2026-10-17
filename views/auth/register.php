@@ -10,7 +10,7 @@ $site_name = $site_settings["website_name"];
 $site_description = $site_settings["website_bio"];
 $site_icon = $site_settings["website_icon"];
 $authRootUrl = mmh_site_public_base_path() ?: '/';
-$authBrandLogoUrl = mmh_site_settings_asset_url($site_settings, 'website_logo', 'resources/images/default/wide-logo.png');
+$authBrandLogoUrl = mmh_site_public_url('resources/images/branding/mathhub-logo-light.png') . '?v=' . (@filemtime('resources/images/branding/mathhub-logo-light.png') ?: 1);
 $authDarkLogoUrl = mmh_site_public_url('resources/images/branding/mathhub-logo-white.png');
 $authFaviconUrl = mmh_site_settings_asset_url($site_settings, 'website_icon', 'resources/images/default/favicon.png');
 
@@ -65,7 +65,7 @@ foreach ($governorates as $governorate ) {
     <script>
       (function() {
         try {
-          var savedTheme = localStorage.getItem('theme');
+          var savedTheme = localStorage.getItem('theme') || localStorage.getItem('math-mastery-student-theme');
           var prefersDark = window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches;
           document.documentElement.classList.toggle('dark', savedTheme === 'dark' || (!savedTheme && prefersDark));
         } catch (error) {}
@@ -76,7 +76,7 @@ foreach ($governorates as $governorate ) {
     <!-- Google Fonts -->
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Tajawal:wght@300;400;500;700;900&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=DM+Serif+Display:ital@0;1&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet">
     <!-- Font Awesome -->
     <link rel="stylesheet" href="<?=mmh_site_public_url('resources/css/fontawsome5.min.css')?>">
     <script>
@@ -90,21 +90,21 @@ foreach ($governorates as $governorate ) {
                         dark: 'var(--bg-primary)',
                         light: 'var(--surface)'
                     },
-                    fontFamily: {
-                        tajawal: ['Tajawal', 'sans-serif']
-                    }
+                    fontFamily: { sans: ['DM Sans', 'sans-serif'], serif: ['DM Serif Display', 'serif'], mono: ['IBM Plex Mono', 'monospace'] }
                 }
             }
         }
     </script>
     <style>
-        body { font-family: 'Tajawal', sans-serif; }
+        body { font-family: 'DM Sans', sans-serif; }
         .dark .dark-invert { filter: invert(1); }
         .dark-transition { transition: background-color 0.3s ease, color 0.3s ease, border-color 0.3s ease, box-shadow 0.3s ease; }
     </style>
-    <link rel="stylesheet" href="<?=mmh_site_public_url('resources/css/design-system.css')?>" data-design-system="mathhub" />
+    <link rel="stylesheet" href="<?=mmh_site_public_url('resources/css/design-system.css')?>?v=<?=@filemtime('resources/css/design-system.css') ?: 1?>" data-design-system="mathhub" />
+    <script src="<?=mmh_site_public_url('resources/js/theme-preference.js')?>?v=<?=@filemtime('resources/js/theme-preference.js') ?: 1?>"></script>
+    <link rel="stylesheet" href="<?=mmh_site_public_url('resources/css/auth-pages.css')?>?v=<?=@filemtime('resources/css/auth-pages.css') ?: 1?>">
 </head>
-<body class='font-tajawal ds-bg-primary ds-text-primary transition-colors duration-300'>
+<body class='font-sans font-tajawal mmh-auth-page ds-bg-primary ds-text-primary transition-colors duration-300'>
     <!-- Navigation -->
     <header class='sticky top-0 z-50 ds-surface shadow-sm transition-colors duration-300'>
         <div class="container mx-auto px-4">
@@ -115,16 +115,14 @@ foreach ($governorates as $governorate ) {
                 </a>
                 <nav class="hidden md:flex items-center gap-6">
                     <a href="#home" class='ds-text-secondary hover:text-primary font-medium transition duration-200'>Home</a>
-                    <button id="theme-toggle" class='p-2 rounded-lg ds-text-secondary hover:text-primary transition duration-200'>
-                        <i class="fas fa-moon dark:hidden"></i>
-                        <i class="fas fa-sun hidden dark:block"></i>
+                    <button id="theme-toggle" type="button" class="mmh-theme-switch" data-mmh-theme-toggle aria-label="Switch theme" aria-pressed="false">
+                        <span class="mmh-theme-switch__knob" aria-hidden="true"><i class="fas fa-sun mmh-theme-switch__icon"></i></span>
                     </button>
                     <a href="<?=$authBaseUrl?>/login" class='bg-primary ds-text-inverse px-5 py-2 rounded-lg hover:bg-primary/90 transition duration-200'>Login</a>
                 </nav>
                 <div class="flex items-center gap-4 md:hidden">
-                    <button id="theme-toggle-mobile" class='p-2 rounded-lg ds-text-secondary hover:text-primary transition duration-200'>
-                        <i class="fas fa-moon dark:hidden"></i>
-                        <i class="fas fa-sun hidden dark:block"></i>
+                    <button id="theme-toggle-mobile" type="button" class="mmh-theme-switch" data-mmh-theme-toggle aria-label="Switch theme" aria-pressed="false">
+                        <span class="mmh-theme-switch__knob" aria-hidden="true"><i class="fas fa-sun mmh-theme-switch__icon"></i></span>
                     </button>
                     <button id="menu-toggle" class='flex items-center ds-text-secondary hover:text-primary focus:outline-none'>
                         <i class="fas fa-bars text-xl"></i>
@@ -247,29 +245,6 @@ foreach ($governorates as $governorate ) {
                     }
                 }
             });
-        });
-        // Theme Toggle
-        const themeToggle = document.getElementById('theme-toggle');
-        const themeToggleMobile = document.getElementById('theme-toggle-mobile');
-        function toggleTheme() {
-            if (document.documentElement.classList.contains('dark')) {
-                document.documentElement.classList.remove('dark');
-                localStorage.setItem('theme', 'light');
-            } else {
-                document.documentElement.classList.add('dark');
-                localStorage.setItem('theme', 'dark');
-            }
-        }
-        themeToggle.addEventListener('click', toggleTheme);
-        themeToggleMobile.addEventListener('click', toggleTheme);
-        document.addEventListener('DOMContentLoaded', () => {
-            const savedTheme = localStorage.getItem('theme');
-            if (savedTheme === 'dark' || 
-                (!savedTheme && window.matchMedia('(prefers-color-scheme: dark)').matches)) {
-                document.documentElement.classList.add('dark');
-            } else {
-                document.documentElement.classList.remove('dark');
-            }
         });
     </script>
     <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>

@@ -302,7 +302,6 @@ $public_course_enrolled = $publicCourseEnrolled;
     <!-- Google Fonts -->
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Tajawal:wght@300;400;500;700;900&display=swap" rel="stylesheet">
     <!-- Font Awesome -->
     <link rel="stylesheet" href="<?=mmh_site_public_url('resources/css/fontawsome5.min.css')?>">
     <script>
@@ -317,22 +316,25 @@ $public_course_enrolled = $publicCourseEnrolled;
                         light: 'var(--surface)'
                     },
                     fontFamily: {
-                        tajawal: ['Tajawal', 'sans-serif']
+                        sans: ['DM Sans', 'sans-serif'], serif: ['DM Serif Display', 'serif'], mono: ['IBM Plex Mono', 'monospace']
                     }
                 }
             }
         }
     </script>
     <style>
-        body { font-family: 'Tajawal', sans-serif; }
+        body { font-family: 'DM Sans', sans-serif; }
         .dark .dark-invert { filter: invert(1); }
         .dark-transition { transition: background-color 0.3s, color 0.3s, border-color 0.3s, box-shadow 0.3s; }
     </style>
-    <link rel="stylesheet" href="<?=$baseUrl?>/resources/css/design-system.css" data-design-system="mathhub" />
+    <link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=DM+Serif+Display:ital@0;1&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+    <script src="<?=rtrim($baseUrl, '/')?>/resources/js/theme-preference.js?v=<?=@filemtime('resources/js/theme-preference.js') ?: 1?>"></script>
+    <link rel="stylesheet" href="<?=$baseUrl?>/resources/css/design-system.css?v=<?=@filemtime('resources/css/design-system.css') ?: 1?>" data-design-system="mathhub" />
     <link rel="stylesheet" href="<?=rtrim($baseUrl, '/')?>/resources/css/public-course-preview.css?v=<?=@filemtime('resources/css/public-course-preview.css') ?: 1?>" />
-    <link rel="stylesheet" href="<?=rtrim($baseUrl, '/')?>/resources/css/past-papers-frontend.css" />
+    <link rel="stylesheet" href="<?=rtrim($baseUrl, '/')?>/resources/css/past-papers-frontend.css?v=<?=@filemtime('resources/css/past-papers-frontend.css') ?: 1?>" />
 </head>
-<body class='font-tajawal ds-bg-primary ds-text-primary transition-colors duration-300'>
+<body class='font-sans font-tajawal ds-bg-primary ds-text-primary transition-colors duration-300'>
 <?php include $_SERVER['DOCUMENT_ROOT'].dirname($_SERVER['SCRIPT_NAME'])."/views/public/layouts/aside.php"; ?>
 
 <?php if ($course !== null):

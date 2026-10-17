@@ -14,6 +14,9 @@ $resourcePageCards = $resourcePageCards ?? [];
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title><?=resource_page_html($resourcePageTitle ?? 'Resources')?> | <?=resource_page_html($site_name)?></title>
+    <link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=DM+Serif+Display:ital@0;1&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+    <script src="<?=resource_page_html($resourceBaseUrl)?>/resources/js/theme-preference.js"></script>
     <link rel="stylesheet" href="<?=resource_page_html($resourceBaseUrl)?>/resources/css/design-system.css" data-design-system="mathhub">
     <link rel="stylesheet" href="<?=resource_page_html($resourceBaseUrl)?>/resources/build/assets/app-38448552.css">
     <link rel="stylesheet" href="<?=resource_page_html($resourceBaseUrl)?>/resources/css/fontawsome5.min.css">

@@ -460,11 +460,13 @@ body.dash > .col-12.d-flex {
     right: auto !important;
 }
 
-/* The shared Admin top bar scrolls with its document instead of the
-   viewport. Existing pages already reserve its 55px layout slot, so preserve
-   their current spacing and horizontal alignment. */
+/* Keep the Admin top bar aligned with the fixed sidebar/content shell.
+   Pages reserve its existing 55px slot, so this does not change content flow. */
 body.dash .main-content > .admin-top-nav {
-    position: absolute !important;
+    position: fixed !important;
+    top: 0 !important;
+    z-index: 1050;
+    border-radius: 0 !important;
 }
 
 /* Shared Admin navigation: submenu state is controlled by admin-shell.js.

@@ -146,11 +146,14 @@ function course_resource_render_viewer(mysqli $conn, $baseUrl, $userId, array $c
     <script>
     (function () {
         var theme = 'dark';
-        try { theme = localStorage.getItem('math-mastery-student-theme') || theme; } catch (error) {}
+        try { theme = localStorage.getItem('theme') || localStorage.getItem('math-mastery-student-theme') || theme; } catch (error) {}
         document.documentElement.dataset.studentTheme = theme === 'light' ? 'light' : 'dark';
         document.documentElement.style.colorScheme = document.documentElement.dataset.studentTheme;
     }());
     </script>
+    <link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=DM+Serif+Display:ital@0;1&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+    <script src="<?= course_resource_escape(rtrim((string) $baseUrl, '/') . '/resources/js/theme-preference.js'); ?>"></script>
     <link rel="stylesheet" href="<?= course_resource_escape(rtrim((string) $baseUrl, '/') . '/resources/css/fontawsome5.min.css'); ?>">
     <link rel="stylesheet" href="<?= course_resource_escape(rtrim((string) $baseUrl, '/') . '/resources/css/design-system.css'); ?>">
     <link rel="stylesheet" href="<?= course_resource_escape($courseLearningStylesheet); ?>">

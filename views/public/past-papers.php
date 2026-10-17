@@ -47,7 +47,10 @@ $cssVersion = @filemtime('resources/css/past-papers-frontend.css') ?: time();
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>Past Papers | <?=pastpapers_html($site_name)?></title>
-    <link rel="stylesheet" href="<?=pastpapers_html(rtrim((string)$baseUrl, '/'))?>/resources/css/design-system.css" data-design-system="mathhub">
+    <link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=DM+Serif+Display:ital@0;1&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+    <script src="<?=pastpapers_html(rtrim((string)$baseUrl, '/'))?>/resources/js/theme-preference.js?v=<?=@filemtime('resources/js/theme-preference.js') ?: 1?>"></script>
+    <link rel="stylesheet" href="<?=pastpapers_html(rtrim((string)$baseUrl, '/'))?>/resources/css/design-system.css?v=<?=@filemtime('resources/css/design-system.css') ?: 1?>" data-design-system="mathhub">
     <link rel="stylesheet" href="<?=pastpapers_html(rtrim((string)$baseUrl, '/'))?>/resources/build/assets/app-38448552.css">
     <link rel="stylesheet" href="<?=pastpapers_html(rtrim((string)$baseUrl, '/'))?>/resources/css/fontawsome5.min.css">
     <link rel="stylesheet" href="<?=pastpapers_html(rtrim((string)$baseUrl, '/'))?>/resources/css/past-papers-frontend.css?v=<?=pastpapers_html($cssVersion)?>">
