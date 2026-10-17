@@ -1553,6 +1553,7 @@ body.theme-light .course-learning-page .student-course-section.is-locked .studen
 }
 .course-resource-viewer-page .course-resource-viewer-heading h1 {
   max-width: 24ch;
+  font-family: var(--font-sans);
   font-size: clamp(1.45rem, 2.7vw, 2.15rem);
   letter-spacing: -.025em;
 }
