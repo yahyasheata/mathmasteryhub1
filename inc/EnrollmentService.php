@@ -63,6 +63,14 @@ if (!function_exists('mmh_enrollment_course_unit_state')) {
             if (in_array((string) ($row['access_unit'] ?? 'shared'), ['unit1', 'unit2'], true)) $restricted = true;
         }
         $stmt->close();
+        // An explicit entitlement is also a durable indication that an Admin
+        // intentionally configured Unit access before restricting Sections.
+        $enrollments = $conn->prepare("SELECT COUNT(*) AS total FROM course_logs WHERE course_id = ? AND unit_access IN ('unit1', 'unit2', 'both')");
+        if (!$enrollments) return null;
+        $enrollments->bind_param('s', $courseId);
+        if (!$enrollments->execute()) { $enrollments->close(); return null; }
+        $candidate = $candidate || (int) (($enrollments->get_result()->fetch_assoc()['total'] ?? 0)) > 0;
+        $enrollments->close();
         return ['ready' => true, 'candidate' => $candidate || $restricted, 'restricted' => $restricted];
     }
 }
@@ -293,7 +301,7 @@ if (!function_exists('mmh_enrollment_set_unit_access_batch')) {
             $courseExists = (bool) $courseLock->get_result()->fetch_assoc();
             $courseLock->close();
             $unitState = $courseExists ? mmh_enrollment_course_unit_state($conn, $courseId) : null;
-            if ($unitState === null || empty($unitState['ready']) || empty($unitState['candidate'])) throw new RuntimeException('This Course does not use Unit access.');
+            if ($unitState === null || empty($unitState['ready'])) throw new RuntimeException('Unit access is not available for this Course.');
 
             foreach ($userIds as $userId) {
                 $check = $conn->prepare('SELECT id FROM course_logs WHERE user_id = ? AND course_id = ? LIMIT 1 FOR UPDATE');

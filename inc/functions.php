@@ -276,7 +276,17 @@ function governoratesInfo($id){
     
         ];
 
-    return $governorates[$id-1];
+    $unavailable = [
+        'id' => null,
+        'governorate_name_ar' => 'غير محدد',
+        'governorate_name_en' => 'Not specified'
+    ];
+    if ($id === null || $id === '') return $unavailable;
+    if (!is_int($id) && !(is_string($id) && preg_match('/\A[0-9]+\z/', $id))) return $unavailable;
+
+    $governorateId = (int) $id;
+    if ($governorateId < 1 || $governorateId > count($governorates)) return $unavailable;
+    return $governorates[$governorateId - 1];
 
 }
 

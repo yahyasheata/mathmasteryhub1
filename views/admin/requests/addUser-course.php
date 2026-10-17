@@ -190,8 +190,8 @@ if($_SERVER['REQUEST_METHOD'] == "POST" ){
             $course = add_user_course_fetch_course($conn, (string) $course_id);
             $section_options = add_user_course_section_options(db(), $course_id);
             $unitState = $course ? mmh_enrollment_course_unit_state($conn, (string) $course['course_id']) : null;
-            $unitAccessOptions = !empty($unitState['candidate'])
-                ? "<div class='col-12 col-lg-6 p-2'><label class='col-12' for='enrollment-unit-access'>Unit Access</label><div class='col-12 pt-3'><select class='form-control' id='enrollment-unit-access' name='unit_access' required><option value='' selected disabled>Select Unit Access</option><option value='unit1'>Unit 1</option><option value='unit2'>Unit 2</option><option value='both'>Both Units</option></select><small class='text-muted'>This modular Course requires an explicit Unit entitlement.</small></div></div>"
+            $unitAccessOptions = !empty($unitState['ready'])
+                ? "<div class='col-12 col-lg-6 p-2'><details" . (!empty($unitState['candidate']) ? ' open' : '') . "><summary>" . (!empty($unitState['candidate']) ? 'Required Unit Access' : 'Optional Unit Access') . "</summary><label class='col-12 pt-2' for='enrollment-unit-access'>Unit Access</label><div class='col-12 pt-2'><select class='form-control' id='enrollment-unit-access' name='unit_access'" . (!empty($unitState['candidate']) ? ' required' : '') . "><option value=''>" . (!empty($unitState['candidate']) ? 'Select Unit Access' : 'Leave unset for a non-modular Course') . "</option><option value='unit1'>Unit 1</option><option value='unit2'>Unit 2</option><option value='both'>Both Units</option></select><small class='text-muted'>Set this before restricting any Course Sections. Existing students are not classified automatically.</small></div></details></div>"
                 : '';
     
             // $query = "SELECT * FROM courses WHERE course_id='$course_id' ";
