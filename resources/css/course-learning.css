@@ -2097,18 +2097,19 @@ body.theme-light .course-learning-page .student-course-section.is-locked .studen
 /* Shared Homework surface — distinct assignment actions on the same LMS canvas. */
 .course-homework-page { min-height: 100vh; margin: 0; color: var(--text-primary); background: var(--bg-primary); }
 .course-homework { width: min(1240px, calc(100% - 32px)); margin: 0 auto; padding: clamp(20px, 3vw, 42px) 0 48px; }
-.course-homework-header, .course-homework-panel { border: 1px solid var(--border); background: var(--surface); box-shadow: var(--shadow-sm); }
-.course-homework-header { padding: clamp(18px, 2.5vw, 28px); border-radius: var(--radius-lg); }
+.course-homework-header, .course-homework-panel { border: 1px solid var(--border); background: var(--surface); box-shadow: none; }
+.course-homework-header { padding: clamp(18px, 2.5vw, 28px); border-radius: var(--radius-md); }
+.course-homework-page .course-btn { border-radius: var(--radius-sm); }
 .course-homework-heading { display: flex; align-items: center; gap: 16px; }
 .course-homework-heading h1, .course-homework-panel h2 { margin: 0; color: var(--text-primary); }
 .course-homework-heading h1 { font-size: clamp(1.35rem, 2.2vw, 2rem); line-height: 1.2; }
 .course-homework-icon { display: grid; flex: 0 0 auto; width: 46px; height: 46px; place-items: center; border: 1px solid color-mix(in srgb, var(--primary) 35%, var(--border)); border-radius: var(--radius-md); color: var(--primary); background: color-mix(in srgb, var(--primary) 10%, var(--surface)); }
 .course-homework-header-meta { display: flex; flex-wrap: wrap; gap: 9px 14px; margin-top: 9px; color: var(--text-secondary); font-size: var(--text-sm); }
 .course-homework-status, .course-homework-due { display: inline-flex; align-items: center; gap: 6px; }
-.course-homework-status { padding: 4px 9px; border: 1px solid var(--border); border-radius: 999px; font-weight: 700; }
+.course-homework-status { padding: 4px 9px; border: 1px solid var(--border); border-radius: var(--radius-sm); font-weight: 700; }
 .course-homework-status .fa-circle { font-size: .5rem; }
 .course-homework-status.is-pending { color: var(--text-secondary); }.course-homework-status.is-submitted { color: var(--success); }.course-homework-status.is-late { color: var(--warning); }.course-homework-status.is-overdue { color: var(--danger); background: var(--danger-soft); border-color: color-mix(in srgb, var(--danger) 30%, var(--border)); }.course-homework-status.is-legacy-late { color: var(--accent); border-color: color-mix(in srgb, var(--accent) 45%, var(--border)); }.course-homework-status.is-graded { color: var(--secondary); }
-.course-homework-imported-badge { display: inline-flex; align-items: center; margin-inline-start: .45rem; padding: .18rem .45rem; border: 1px solid color-mix(in srgb, var(--secondary) 40%, var(--border)); border-radius: 999px; color: var(--secondary); font-size: .74rem; font-weight: 700; white-space: nowrap; }
+.course-homework-imported-badge { display: inline-flex; align-items: center; margin-inline-start: .45rem; padding: .18rem .45rem; border: 1px solid color-mix(in srgb, var(--secondary) 40%, var(--border)); border-radius: var(--radius-sm); color: var(--secondary); font-size: .74rem; font-weight: 700; white-space: nowrap; }
 .assignment-progress-imported { display: inline-flex; align-items: center; margin-inline-start: .45rem; padding: .16rem .42rem; border: 1px solid color-mix(in srgb, var(--secondary) 40%, var(--border)); border-radius: 6px !important; color: var(--secondary); font-size: .72rem; font-weight: 700; white-space: nowrap; }
 .course-homework-heading .course-resource-viewer-return { margin-left: auto; }
 .course-homework-grid { display: grid; grid-template-columns: minmax(0, 1.5fr) minmax(250px, .75fr); gap: 16px; margin-top: 16px; }
@@ -2122,7 +2123,7 @@ body.theme-light .course-learning-page .student-course-section.is-locked .studen
 .course-homework-resource-card.is-locked .course-homework-resource-heading > .fas { color: var(--text-muted); border-color: var(--border); background: var(--surface-inset); }
 .course-homework-resource-heading .course-resource-viewer-meta { margin: 0; }
 .course-homework-resource-state { display: inline-flex; align-items: center; gap: 8px; margin-top: auto !important; color: var(--text-muted) !important; font-size: var(--text-sm); }
-.course-homework-panel { padding: clamp(18px, 2.2vw, 24px); border-radius: var(--radius-lg); }
+.course-homework-panel { padding: clamp(18px, 2.2vw, 24px); border-radius: var(--radius-md); }
 .course-homework-panel h2 { font-size: 1.05rem; }.course-homework-panel p { margin: 10px 0 0; color: var(--text-secondary); line-height: var(--line-normal); }
 .course-homework-details dl { display: grid; grid-template-columns: repeat(auto-fit, minmax(170px, 1fr)); gap: 13px; margin: 18px 0 0; }.course-homework-details dl div { padding-top: 12px; border-top: 1px solid var(--border); }.course-homework-details dt { color: var(--text-muted); font-size: var(--text-xs); font-weight: 700; text-transform: uppercase; letter-spacing: .04em; }.course-homework-details dd { margin: 5px 0 0; color: var(--text-primary); }
 .course-homework-actions { display: flex; flex-direction: column; align-items: stretch; gap: 10px; }.course-homework-actions .course-btn { justify-content: center; min-height: 44px; }.course-homework-actions p { font-size: var(--text-sm); }

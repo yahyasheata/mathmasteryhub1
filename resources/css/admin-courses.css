@@ -226,14 +226,26 @@ body.dash.admin-courses-page .admin-course-pagination a { color: var(--primary);
 body.dash.admin-courses-page .admin-course-pagination { justify-content: flex-end; }
 body.dash.admin-courses-page .admin-course-pagination span { color: var(--text-muted); }
 
-body.dash.admin-courses-page .admin-course-table .dropdown-menu {
+body.dash.admin-courses-page .admin-course-table .dropdown-menu,
+body.dash.admin-courses-page .admin-course-actions-menu {
   min-width: 13rem;
   padding: .4rem;
   background: var(--surface-elevated);
   border-color: var(--border);
   box-shadow: var(--shadow-md);
 }
-body.dash.admin-courses-page .admin-course-table .dropdown-item {
+body.dash.admin-courses-page .admin-course-actions-menu {
+  position: fixed !important;
+  z-index: 1200;
+  inset: auto;
+  width: min(13rem, calc(100vw - 24px));
+  max-height: min(70vh, 420px);
+  overflow-y: auto;
+  overscroll-behavior: contain;
+}
+body.dash.admin-courses-page .admin-course-actions-menu[hidden] { display: none !important; }
+body.dash.admin-courses-page .admin-course-table .dropdown-item,
+body.dash.admin-courses-page .admin-course-actions-menu .dropdown-item {
   display: flex;
   align-items: center;
   gap: .55rem;
@@ -241,7 +253,9 @@ body.dash.admin-courses-page .admin-course-table .dropdown-item {
   color: var(--text-primary);
 }
 body.dash.admin-courses-page .admin-course-table .dropdown-item:hover,
-body.dash.admin-courses-page .admin-course-table .dropdown-item:focus { background: var(--surface-hover); color: var(--primary); }
+body.dash.admin-courses-page .admin-course-table .dropdown-item:focus,
+body.dash.admin-courses-page .admin-course-actions-menu .dropdown-item:hover,
+body.dash.admin-courses-page .admin-course-actions-menu .dropdown-item:focus-visible { background: var(--surface-hover); color: var(--primary); }
 
 @media (max-width: 991.98px) {
   body.dash.admin-courses-page .admin-course-filters .form-select { flex: 1 1 9rem; }
