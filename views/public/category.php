@@ -25,7 +25,7 @@ if(mysqli_num_rows($coures_result) > 0){
     $date = date('Y-m-d', strtotime($courses_data['created_at']));
     if($first) {
       $categorie_header = "
-        <div class='max-w-2xl mx-auto text-center mb-12'>
+        <div class='public-category-intro max-w-2xl mx-auto text-center mb-12'>
           <h1 class='text-4xl md:text-5xl font-extrabold mb-4 ds-text-primary'>{$courses_data['category_title']}</h1>
           <p class='text-lg ds-text-secondary'>{$courses_data['category_description']}</p>
         </div>
@@ -71,11 +71,11 @@ if(mysqli_num_rows($coures_result) > 0){
   }
 } else {
   $courses_grid = "
-    <div class='col-span-full text-center py-16'>
-      <div class='inline-flex flex-col items-center justify-center bg-yellow-50 border border-yellow-200 rounded-xl p-8'>
-        <i class='fas fa-info-circle text-4xl text-yellow-400 mb-4'></i>
-        <p class='text-lg ds-text-secondary mb-4'>No courses available at the moment.</p>
-        <a href='/' class='bg-primary ds-text-inverse px-6 py-2 rounded-lg hover:bg-primary/90 transition font-bold flex items-center'>
+    <div class='public-category-empty-state'>
+      <div class='public-category-empty-state__content'>
+        <i class='fas fa-info-circle public-category-empty-state__icon' aria-hidden='true'></i>
+        <p>No courses available at the moment.</p>
+        <a href='/' class='public-category-empty-state__home'>
           <i class='fas fa-home mr-2'></i> Go to Home
         </a>
       </div>
@@ -124,20 +124,22 @@ if(mysqli_num_rows($coures_result) > 0){
     <link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=DM+Serif+Display:ital@0;1&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet">
     <script src="<?=$baseUrl?>/resources/js/theme-preference.js"></script>
-    <link rel="stylesheet" href="<?=$baseUrl?>/resources/css/design-system.css" data-design-system="mathhub" />
+    <link rel="stylesheet" href="<?=$baseUrl?>/resources/css/design-system.css?v=<?=@filemtime('resources/css/design-system.css') ?: 1?>" data-design-system="mathhub" />
 </head>
 <body class='font-sans font-tajawal ds-bg-primary ds-text-primary transition-colors duration-300 public-category-page'>
 <?php include $_SERVER['DOCUMENT_ROOT'].dirname($_SERVER['SCRIPT_NAME'])."/views/public/layouts/aside.php"; ?>
 
+<?php if ($categorie_header !== ''): ?>
 <!-- Category Hero/Header -->
-<section class='relative ds-surface py-16 lg:py-24 overflow-hidden transition-colors duration-300'>
+<section class='public-category-hero relative ds-surface py-16 lg:py-24 overflow-hidden transition-colors duration-300'>
   <div class="container mx-auto px-4 relative">
     <?=$categorie_header;?>
   </div>
 </section>
+<?php endif; ?>
 
 <!-- Courses Grid -->
-<section class='py-12 ds-surface transition-colors duration-300'>
+<section class='public-category-courses py-12 ds-surface transition-colors duration-300'>
   <div class="container mx-auto px-4">
     <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
       <?=$courses_grid?>

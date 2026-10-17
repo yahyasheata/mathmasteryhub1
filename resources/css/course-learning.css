@@ -1665,13 +1665,30 @@ body.theme-light .course-learning-page .student-course-section.is-locked .studen
 }
 .course-resource-viewer-page .course-resource-viewer-navigation > div { min-width: 0; }
 @media (max-width: 720px) {
-  .course-resource-viewer-page .course-resource-viewer-header { padding: 18px; }
-  .course-resource-viewer-page .course-resource-viewer-heading h1 { max-width: none; }
-  .course-resource-viewer-page .course-resource-viewer-return { width: auto; margin-left: 0; }
-  .course-resource-viewer-page .course-resource-viewer-primary-actions { width: 100%; margin: 20px 0 0; align-items: stretch; }
+  .course-resource-viewer-page .course-resource-viewer { width: min(100% - 20px, 1640px); padding-top: 10px; padding-bottom: 28px; }
+  .course-resource-viewer-page .course-resource-viewer-header { padding: 14px; }
+  .course-resource-viewer-page .course-resource-viewer-breadcrumb { gap: 5px; margin-bottom: 12px; font-size: .76rem; line-height: 1.4; }
+  .course-resource-viewer-page .course-resource-viewer-heading { display: grid; grid-template-columns: 40px minmax(0, 1fr); gap: 8px 11px; }
+  .course-resource-viewer-page .course-resource-viewer-icon { width: 40px; height: 40px; flex-basis: 40px; }
+  .course-resource-viewer-page .course-resource-viewer-title-block { min-width: 0; }
+  .course-resource-viewer-page .course-resource-viewer-meta { gap: 4px 6px; margin-bottom: 4px; font-size: .76rem; line-height: 1.4; }
+  .course-resource-viewer-page .course-resource-viewer-heading h1 { max-width: none; font-size: 1.4rem; line-height: 1.2; }
+  .course-resource-viewer-page .course-resource-viewer-completion { margin-top: 7px; font-size: .82rem; }
+  .course-resource-viewer-page .course-resource-viewer-title-block > [data-resource-complete] { min-height: 40px; margin-top: 8px; padding: 8px 12px; }
+  .course-resource-viewer-page .course-resource-viewer-return { grid-column: 2; width: fit-content; min-height: 40px; margin: 0; padding: 8px 10px; }
+  .course-resource-viewer-page .course-resource-viewer-primary-actions { width: 100%; margin: 10px 0 0; align-items: stretch; }
   .course-resource-viewer-page .course-resource-viewer-primary-actions .course-btn { width: 100%; justify-content: center; }
   .course-resource-viewer-page .course-resource-viewer-external-link { justify-content: center; min-height: 40px; }
-  .course-resource-viewer-page .course-resource-viewer-tools { gap: 5px 13px; }
+  .course-resource-viewer-page .course-resource-viewer-toolbar { gap: 7px; margin-top: 10px; padding: 8px; }
+  .course-resource-viewer-page .course-resource-viewer-tool-group { flex: 1 1 100%; gap: 4px; min-width: 0; }
+  .course-resource-viewer-page .course-resource-viewer-tool-group-actions { margin-left: 0; }
+  .course-resource-viewer-page .course-resource-viewer-tool-label { flex: 0 0 100%; margin: 0; padding: 0 2px; font-size: .67rem; }
+  .course-resource-viewer-page .course-resource-viewer-tool-divider { display: none; }
+  .course-resource-viewer-page .course-resource-viewer-toolbar a,
+  .course-resource-viewer-page .course-resource-viewer-toolbar button { min-height: 40px; padding: 6px 8px; font-size: .8rem; }
+  .course-resource-viewer-page .course-resource-viewer-tools { gap: 4px 10px; }
+  .course-resource-viewer-page .course-resource-viewer-description { margin: 12px 2px 0; }
+  .course-resource-viewer-page .course-resource-viewer-stage { margin-top: 10px; }
   .course-resource-viewer-page .course-resource-viewer-navigation { gap: 18px; }
   .course-resource-viewer-page .course-resource-viewer-navigation > div { flex: 1 1 auto; }
 }
@@ -2141,4 +2158,4 @@ body.theme-light .course-learning-page .student-course-section.is-locked .studen
 .course-homework-file-remove { flex: 0 0 auto; min-height: 34px !important; padding: 6px 10px !important; }
 .course-homework-upload form { display: grid; gap: 10px; margin-top: 16px; }.course-homework-upload label { color: var(--text-primary); font-weight: 700; }.course-homework-upload label span { color: var(--text-muted); font-size: var(--text-sm); font-weight: 400; }.course-homework-upload input { width: 100%; min-height: 42px; color: var(--text-primary); background: var(--surface-inset); border: 1px solid var(--border); border-radius: var(--radius-sm); padding: 9px 11px; }.course-homework-upload-actions { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 6px; }
 .course-homework-upload [data-homework-upload-message] { min-height: 1.25em; margin: 0; color: var(--text-secondary); }
-@media (max-width: 720px) { .course-homework-file-picker { display: grid; gap: 8px; } .course-homework-file-picker input[type=file] { width: 100%; } .course-homework-file-row { align-items: flex-start; flex-wrap: wrap; } .course-homework-file-name { flex: 1 1 100%; white-space: normal; overflow-wrap: anywhere; } .course-homework-file-remove { margin-inline-start: auto; } .course-homework { width: min(100% - 20px, 1240px); padding-top: 14px; }.course-homework-heading { align-items: flex-start; flex-wrap: wrap; }.course-homework-heading .course-resource-viewer-return { width: 100%; margin-left: 0; justify-content: center; }.course-homework-grid, .course-homework-resource-grid { grid-template-columns: 1fr; }.course-homework-actions .course-btn, .course-homework-resource-card .course-btn, .course-homework-upload-actions .course-btn { width: 100%; justify-content: center; } }
+@media (max-width: 720px) { .course-homework-file-picker { display: grid; gap: 8px; } .course-homework-file-picker input[type=file] { width: 100%; } .course-homework-file-row { align-items: flex-start; flex-wrap: wrap; } .course-homework-file-name { flex: 1 1 100%; white-space: normal; overflow-wrap: anywhere; } .course-homework-file-remove { margin-inline-start: auto; } .course-homework { width: min(100% - 20px, 1240px); padding-top: 14px; }.course-homework-heading { align-items: flex-start; flex-wrap: wrap; }.course-homework-heading .course-resource-viewer-return { width: 100%; margin-left: 0; justify-content: center; }.course-homework-grid, .course-homework-resource-grid { grid-template-columns: minmax(0, 1fr); gap: 12px; }.course-homework-resource-card { min-width: 0; min-height: 0; padding: 16px; }.course-homework-actions .course-btn, .course-homework-resource-card .course-btn, .course-homework-upload-actions .course-btn { box-sizing: border-box; width: 100%; max-width: 100%; min-width: 0; justify-content: center; white-space: normal; text-align: center; line-height: 1.35; } }

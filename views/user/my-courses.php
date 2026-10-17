@@ -95,6 +95,7 @@ $coursesQuery = "
     ) AS homework_counts ON courses.course_id = homework_counts.course_id
     WHERE course_logs.user_id = '" . (int) $userId . "'
       AND courses.course_state IN ('public', 'private')
+      AND courses.archived_at IS NULL
     ORDER BY course_logs.purchase_date DESC, courses.id ASC";
 
 $enrolledCourses = [];

@@ -129,11 +129,12 @@ if (!function_exists('student_course_access_course')) {
             FROM courses
             WHERE archived_at IS NULL AND course_state IN ('public', 'private')
               AND (course_id = ? OR CAST(id AS CHAR) = ?)
+            ORDER BY (course_id = ?) DESC
             LIMIT 1");
         if (!$stmt) {
             return null;
         }
-        $stmt->bind_param('ss', $courseId, $courseId);
+        $stmt->bind_param('sss', $courseId, $courseId, $courseId);
         $stmt->execute();
         $course = $stmt->get_result()->fetch_assoc();
         $stmt->close();
