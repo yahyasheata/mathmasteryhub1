@@ -2103,7 +2103,7 @@ body.theme-light .course-learning-page .student-course-section.is-locked .studen
 .course-homework-header { padding: clamp(18px, 2.5vw, 28px); border-radius: var(--radius-md); }
 .course-homework-page .course-btn { border-radius: var(--radius-sm); }
 .course-homework-heading { display: flex; align-items: center; gap: 16px; }
-.course-homework-heading h1, .course-homework-panel h2 { margin: 0; color: var(--text-primary); }
+.course-homework-heading h1, .course-homework-panel h2 { margin: 0; color: var(--text-primary); font-family: var(--font-sans); }
 .course-homework-heading h1 { font-size: clamp(1.35rem, 2.2vw, 2rem); line-height: 1.2; }
 .course-homework-icon { display: grid; flex: 0 0 auto; width: 46px; height: 46px; place-items: center; border: 1px solid color-mix(in srgb, var(--primary) 35%, var(--border)); border-radius: var(--radius-md); color: var(--primary); background: color-mix(in srgb, var(--primary) 10%, var(--surface)); }
 .course-homework-header-meta { display: flex; flex-wrap: wrap; gap: 9px 14px; margin-top: 9px; color: var(--text-secondary); font-size: var(--text-sm); }
