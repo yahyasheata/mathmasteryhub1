@@ -729,6 +729,72 @@ if (!function_exists('mmh_live_reassign_occurrence_course')) {
     }
 }
 
+if (!function_exists('mmh_live_occurrence_unassign_block_reason')) {
+    /** Return a reason when an occurrence is not safe to unassign from its Paper. */
+    function mmh_live_occurrence_unassign_block_reason(mysqli $conn, $occurrenceId, $forUpdate = false)
+    {
+        $occurrenceId = trim((string) $occurrenceId);
+        if ($occurrenceId === '') return 'Choose a valid occurrence.';
+        $lockSql = $forUpdate ? ' FOR UPDATE' : '';
+        $stmt = $conn->prepare("SELECT o.course_id, o.scheduled_start_at, o.status, o.actual_start_at, o.actual_end_at, o.teams_attendance_report_id, o.teams_imported_at, s.group_key AS schedule_group_key, s.deleted_at AS schedule_deleted_at, (o.scheduled_start_at > UTC_TIMESTAMP()) AS is_future FROM live_session_occurrences o INNER JOIN course_live_schedules s ON s.schedule_id = o.schedule_id WHERE o.occurrence_id = ?{$lockSql}");
+        if (!$stmt) return 'Unable to verify whether this occurrence can be unassigned.';
+        $stmt->bind_param('s', $occurrenceId);
+        if (!$stmt->execute()) {
+            $stmt->close();
+            return 'Unable to verify whether this occurrence can be unassigned.';
+        }
+        $occurrence = $stmt->get_result()->fetch_assoc();
+        $stmt->close();
+        if (!$occurrence) return 'Occurrence or recurring schedule not found.';
+        if (!in_array((string) ($occurrence['schedule_group_key'] ?? ''), ['cambridge_a_level', 'edexcel_a_level'], true)) return 'Only explicitly group-owned A-Level occurrences can have a Paper unassigned.';
+        if (empty($occurrence['course_id'])) return 'This occurrence does not have an assigned Paper.';
+        if (!empty($occurrence['schedule_deleted_at'])) return 'Occurrences from deleted schedules cannot be changed.';
+        if (!(int) $occurrence['is_future'] || !empty($occurrence['actual_start_at']) || !empty($occurrence['actual_end_at']) || !in_array(strtolower((string) $occurrence['status']), ['scheduled', 'rescheduled'], true)) return 'Only a not-yet-started future session can have its Paper unassigned.';
+        if (!empty($occurrence['teams_attendance_report_id']) || !empty($occurrence['teams_imported_at'])) return 'This occurrence has imported attendance history and its Paper cannot be unassigned.';
+
+        foreach ([['live_session_join_events', 'occurrence_id'], ['live_session_attendance', 'occurrence_id'], ['course_sections', 'release_occurrence_id']] as [$historyTable, $historyColumn]) {
+            $check = $conn->prepare("SELECT 1 FROM `{$historyTable}` WHERE `{$historyColumn}` = ? LIMIT 1" . ($forUpdate ? ' FOR UPDATE' : ''));
+            if (!$check) return 'Unable to check session history and Course Section references.';
+            $check->bind_param('s', $occurrenceId);
+            if (!$check->execute()) {
+                $check->close();
+                return 'Unable to check session history and Course Section references.';
+            }
+            $hasHistory = $check->get_result()->num_rows > 0;
+            $check->close();
+            if ($hasHistory) return 'This occurrence has join, attendance, or Course Section history and its Paper cannot be unassigned.';
+        }
+        return '';
+    }
+}
+
+if (!function_exists('mmh_live_unassign_occurrence_course')) {
+    /** Remove the Paper from one safe future group-owned occurrence, preserving its identity and schedule. */
+    function mmh_live_unassign_occurrence_course(mysqli $conn, $occurrenceId)
+    {
+        $occurrenceId = trim((string) $occurrenceId);
+        if ($occurrenceId === '') return [false, 'Choose a valid occurrence.'];
+        try {
+            $conn->begin_transaction();
+            $reason = mmh_live_occurrence_unassign_block_reason($conn, $occurrenceId, true);
+            if ($reason !== '') throw new RuntimeException($reason);
+            $update = $conn->prepare("UPDATE live_session_occurrences o INNER JOIN course_live_schedules s ON s.schedule_id = o.schedule_id SET o.course_id = NULL WHERE o.occurrence_id = ? AND o.course_id IS NOT NULL AND s.group_key IN ('cambridge_a_level', 'edexcel_a_level') AND s.deleted_at IS NULL AND o.scheduled_start_at > UTC_TIMESTAMP() AND o.actual_start_at IS NULL AND o.actual_end_at IS NULL AND o.status IN ('scheduled', 'rescheduled') AND o.teams_attendance_report_id IS NULL AND o.teams_imported_at IS NULL");
+            if (!$update) throw new RuntimeException('Unable to prepare the Paper unassignment.');
+            $update->bind_param('s', $occurrenceId);
+            if (!$update->execute() || $update->affected_rows !== 1) {
+                $update->close();
+                throw new RuntimeException('The occurrence changed and its Paper could not be unassigned. Refresh and try again.');
+            }
+            $update->close();
+            if (!$conn->commit()) throw new RuntimeException('Unable to save the Paper unassignment.');
+            return [true, 'Paper unassigned. The session remains scheduled.'];
+        } catch (Throwable $exception) {
+            $conn->rollback();
+            return [false, $exception->getMessage()];
+        }
+    }
+}
+
 if (!function_exists('mmh_live_display_time')) {
     function mmh_live_display_time(array $occurrence, $format = 'D, j M g:i A')
     {

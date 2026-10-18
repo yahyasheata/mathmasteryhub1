@@ -9,6 +9,10 @@ if ($_SERVER['REQUEST_METHOD'] !== 'POST' || !isset($_SESSION['admin'])) {
 $conn = db();
 mmh_live_ensure_schema($conn);
 $occurrenceId = trim((string) ($_POST['occurrence_id'] ?? ''));
+if (($_POST['live_action'] ?? '') === 'unassign_paper') {
+    [$unassigned, $unassignMessage] = mmh_live_unassign_occurrence_course($conn, $occurrenceId);
+    mmh_live_response($unassigned, $unassignMessage, [], $unassigned ? 200 : 422);
+}
 if (array_key_exists('target_course_id', $_POST)) {
     [$reassigned, $reassignmentMessage] = mmh_live_reassign_occurrence_course(
         $conn,

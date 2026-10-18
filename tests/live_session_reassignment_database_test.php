@@ -127,7 +127,7 @@ try {
     $assert(count(mmh_live_admin_upcoming_occurrences($adminGroupRows)) > 25, 'The bounded Admin occurrence list still hides generated sessions beyond row 25.');
     $firstUnassigned = (string) $unassignedRows[0]['occurrence_id'];
     $secondUnassigned = (string) $unassignedRows[1]['occurrence_id'];
-    $firstIdentity = $admin->query("SELECT occurrence_id,schedule_id FROM live_session_occurrences WHERE occurrence_id='" . $admin->real_escape_string($firstUnassigned) . "'")->fetch_assoc();
+    $firstIdentity = $admin->query("SELECT occurrence_id,schedule_id,scheduled_start_at,scheduled_end_at,teams_url_snapshot FROM live_session_occurrences WHERE occurrence_id='" . $admin->real_escape_string($firstUnassigned) . "'")->fetch_assoc();
     [$assignPure, $assignMessage] = mmh_live_reassign_occurrence_course($admin, $firstUnassigned, 'cam-p1');
     $assert($assignPure, 'Unassigned group occurrence could not be assigned to Cambridge Pure 1: ' . $assignMessage);
     [$assignMechanics, $mechanicsMessage] = mmh_live_reassign_occurrence_course($admin, $secondUnassigned, 'cam-m1');
@@ -136,9 +136,24 @@ try {
     $assert(!$crossGroup, 'A Cambridge group occurrence accepted an Edexcel Paper.');
     $afterAssignment = $admin->query("SELECT occurrence_id,schedule_id,course_id FROM live_session_occurrences WHERE occurrence_id='" . $admin->real_escape_string($firstUnassigned) . "'")->fetch_assoc();
     $assert(($afterAssignment['occurrence_id'] ?? '') === ($firstIdentity['occurrence_id'] ?? '') && ($afterAssignment['schedule_id'] ?? '') === ($firstIdentity['schedule_id'] ?? '') && ($afterAssignment['course_id'] ?? '') === 'cam-p1', 'Paper assignment changed the occurrence or schedule identity.');
+    [$unassigned, $unassignMessage] = mmh_live_unassign_occurrence_course($admin, $firstUnassigned);
+    $assert($unassigned, 'A safe future Cambridge group occurrence could not be unassigned: ' . $unassignMessage);
+    $afterUnassign = $admin->query("SELECT occurrence_id,schedule_id,scheduled_start_at,scheduled_end_at,teams_url_snapshot,course_id,status FROM live_session_occurrences WHERE occurrence_id='" . $admin->real_escape_string($firstUnassigned) . "'")->fetch_assoc();
+    $assert(($afterUnassign['occurrence_id'] ?? '') === ($firstIdentity['occurrence_id'] ?? '') && ($afterUnassign['schedule_id'] ?? '') === ($firstIdentity['schedule_id'] ?? '') && $afterUnassign['scheduled_start_at'] === $firstIdentity['scheduled_start_at'] && $afterUnassign['scheduled_end_at'] === $firstIdentity['scheduled_end_at'] && $afterUnassign['teams_url_snapshot'] === $firstIdentity['teams_url_snapshot'] && $afterUnassign['course_id'] === null && ($afterUnassign['status'] ?? '') === 'scheduled', 'Unassign changed occurrence identity, time, meeting details or status, or did not set SQL NULL.');
+    $assert(($admin->query("SELECT course_id FROM live_session_occurrences WHERE occurrence_id='" . $admin->real_escape_string($secondUnassigned) . "'")->fetch_assoc()['course_id'] ?? '') === 'cam-m1', 'Unassign affected another occurrence.');
+    $query($admin, "INSERT INTO course_logs (user_id,course_id) VALUES (22,'cam-p1')");
+    $assert(!in_array($firstUnassigned, array_column(mmh_live_occurrences($admin, '', 0, 45, 22), 'occurrence_id'), true), 'An unassigned occurrence remained visible to a Student.');
+    $assert(!mmh_live_record_join($admin, 22, mmh_live_occurrence($admin, $firstUnassigned), 'test'), 'A Student could join after the Paper was unassigned.');
+    $assert(mmh_live_students_for_occurrence($admin, mmh_live_occurrence($admin, $firstUnassigned)) === [], 'An unassigned occurrence exposed its attendance roster.');
+    $assert(!mmh_live_save_attendance($admin, mmh_live_occurrence($admin, $firstUnassigned), 22, 'present_live', '', 1), 'Attendance was saved after the Paper was unassigned.');
     mmh_live_generate_occurrences($admin, 0, 45, '', 'cambridge_a_level');
-    $assert(($admin->query("SELECT course_id FROM live_session_occurrences WHERE occurrence_id='" . $admin->real_escape_string($firstUnassigned) . "'")->fetch_assoc()['course_id'] ?? '') === 'cam-p1', 'Repeated group generation overwrote an explicitly assigned Paper.');
-    $courseSpecificGroupRows = mmh_live_occurrences($admin, 'cam-p1', 0, 45);
+    $assert($admin->query("SELECT course_id FROM live_session_occurrences WHERE occurrence_id='" . $admin->real_escape_string($firstUnassigned) . "'")->fetch_assoc()['course_id'] === null, 'Repeated group generation restored a Paper after explicit unassignment.');
+    [$reassignedAfterUnassign, $reassignAfterUnassignMessage] = mmh_live_reassign_occurrence_course($admin, $firstUnassigned, 'cam-m1');
+    $assert($reassignedAfterUnassign, 'An explicitly unassigned occurrence could not be assigned a different Paper: ' . $reassignAfterUnassignMessage);
+    $assert(($admin->query("SELECT course_id FROM live_session_occurrences WHERE occurrence_id='" . $admin->real_escape_string($firstUnassigned) . "'")->fetch_assoc()['course_id'] ?? '') === 'cam-m1', 'Reassignment after unassign did not persist the selected Paper.');
+    mmh_live_generate_occurrences($admin, 0, 45, '', 'cambridge_a_level');
+    $assert(($admin->query("SELECT course_id FROM live_session_occurrences WHERE occurrence_id='" . $admin->real_escape_string($firstUnassigned) . "'")->fetch_assoc()['course_id'] ?? '') === 'cam-m1', 'Regeneration overwrote a Paper assigned after unassign.');
+    $courseSpecificGroupRows = mmh_live_occurrences($admin, 'cam-m1', 0, 45);
     $assert(in_array($firstUnassigned, array_column($courseSpecificGroupRows, 'occurrence_id'), true), 'Course-specific retrieval lost an assigned group occurrence.');
     $unenrolledGroupRows = mmh_live_occurrences($admin, 'cam-m1', 0, 45, 99);
     $assert(!in_array($firstUnassigned, array_column($unenrolledGroupRows, 'occurrence_id'), true), 'A student was granted group access without actual Paper enrollment.');
@@ -147,8 +162,8 @@ try {
     $assert(!mmh_live_record_join($admin, 31, $groupOccurrence, 'test'), 'An unassigned occurrence created a join record.');
     $assert(mmh_live_students_for_occurrence($admin, $groupOccurrence) === [], 'Unassigned occurrence exposed an attendance roster.');
     $assert(!mmh_live_save_attendance($admin, $groupOccurrence, 31, 'present_live', '', 1), 'Attendance was saved for an unassigned occurrence.');
-    $assert(!mmh_live_course_group_change_allowed($admin, 'cam-p1', 'edexcel_a_level'), 'Paper group metadata was allowed to drift while a future Cambridge occurrence was assigned.');
-    $assert(mmh_live_course_group_change_allowed($admin, 'cam-p1', 'cambridge_a_level'), 'Unchanged Paper group was incorrectly blocked.');
+    $assert(!mmh_live_course_group_change_allowed($admin, 'cam-m1', 'edexcel_a_level'), 'Paper group metadata was allowed to drift while a future Cambridge occurrence was assigned.');
+    $assert(mmh_live_course_group_change_allowed($admin, 'cam-m1', 'cambridge_a_level'), 'Unchanged Paper group was incorrectly blocked.');
     [$ownerDrift] = mmh_live_save_schedule($admin, [
         'schedule_id' => (string) $unassignedRows[0]['schedule_id'], 'schedule_owner' => 'edexcel_a_level', 'group_key' => 'edexcel_a_level',
         'day_of_week' => $day, 'start_time' => '23:00', 'duration_minutes' => 90, 'timezone' => 'Asia/Riyadh',
@@ -168,6 +183,81 @@ try {
     $unassignedStudentRows = mmh_live_occurrences($admin, '', 0, 45, 31);
     $assert(!in_array($unassignedRows[2]['occurrence_id'], array_column($unassignedStudentRows, 'occurrence_id'), true), 'Unassigned occurrence was visible in a Student schedule query.');
 
+    // Unassign is limited to clean future occurrences on explicitly group-owned schedules.
+    $insertOccurrence($admin, 'course-owned-unassign', 'cam-slot', 'cam-p1');
+    [$courseOwnedUnassign] = mmh_live_unassign_occurrence_course($admin, 'course-owned-unassign');
+    $assert(!$courseOwnedUnassign, 'A Course-owned Cambridge Paper schedule allowed unassign.');
+    $insertOccurrence($admin, 'olevel-unassign', (string) $savedCourseData['schedule_id'], 'olevel');
+    [$olevelUnassign] = mmh_live_unassign_occurrence_course($admin, 'olevel-unassign');
+    $assert(!$olevelUnassign, 'An O-Level occurrence allowed unassign.');
+    $insertOccurrence($admin, 'completed-unassign', 'cam-group-slot-0', 'cam-p1', 'completed');
+    [$completedUnassign] = mmh_live_unassign_occurrence_course($admin, 'completed-unassign');
+    $assert(!$completedUnassign, 'A completed occurrence allowed unassign.');
+    $insertOccurrence($admin, 'started-unassign', 'cam-group-slot-0', 'cam-p1', 'scheduled', $tomorrowSql);
+    [$startedUnassign] = mmh_live_unassign_occurrence_course($admin, 'started-unassign');
+    $assert(!$startedUnassign, 'An occurrence with an actual start allowed unassign.');
+    $insertOccurrence($admin, 'join-history-unassign', 'cam-group-slot-0', 'cam-p1');
+    $query($admin, "INSERT INTO live_session_join_events (user_id,course_id,occurrence_id) VALUES (11,'cam-p1','join-history-unassign')");
+    [$joinHistoryUnassign] = mmh_live_unassign_occurrence_course($admin, 'join-history-unassign');
+    $assert(!$joinHistoryUnassign, 'An occurrence with join history allowed unassign.');
+    $insertOccurrence($admin, 'attendance-history-unassign', 'cam-group-slot-0', 'cam-p1');
+    $query($admin, "INSERT INTO live_session_attendance (user_id,course_id,occurrence_id) VALUES (11,'cam-p1','attendance-history-unassign')");
+    [$attendanceHistoryUnassign] = mmh_live_unassign_occurrence_course($admin, 'attendance-history-unassign');
+    $assert(!$attendanceHistoryUnassign, 'An occurrence with attendance history allowed unassign.');
+    $insertOccurrence($admin, 'section-history-unassign', 'cam-group-slot-0', 'cam-p1');
+    $query($admin, "INSERT INTO course_sections (section_id,release_occurrence_id) VALUES ('unassign-linked-section','section-history-unassign')");
+    [$sectionHistoryUnassign] = mmh_live_unassign_occurrence_course($admin, 'section-history-unassign');
+    $assert(!$sectionHistoryUnassign, 'An occurrence referenced by a Course Section allowed unassign.');
+    $insertOccurrence($admin, 'imported-history-unassign', 'cam-group-slot-0', 'cam-p1');
+    $query($admin, "UPDATE live_session_occurrences SET teams_attendance_report_id='imported-report' WHERE occurrence_id='imported-history-unassign'");
+    [$importedHistoryUnassign] = mmh_live_unassign_occurrence_course($admin, 'imported-history-unassign');
+    $assert(!$importedHistoryUnassign, 'An occurrence with imported attendance allowed unassign.');
+    $insertOccurrence($admin, 'deleted-occurrence-unassign', 'cam-group-slot-0', 'cam-p1', 'deleted');
+    [$deletedOccurrenceUnassign] = mmh_live_unassign_occurrence_course($admin, 'deleted-occurrence-unassign');
+    $assert(!$deletedOccurrenceUnassign, 'A deleted occurrence allowed unassign.');
+    $query($admin, "INSERT INTO course_live_schedules (schedule_id,course_id,group_key,title,day_of_week,start_time,duration_minutes,timezone,teams_url,effective_start_date,deleted_at) VALUES ('deleted-group-slot',NULL,'cambridge_a_level','Deleted group slot',{$day},'23:00:00',90,'Asia/Riyadh','https://teams.microsoft.com/l/meetup-join/test','{$tomorrowDate}',UTC_TIMESTAMP())");
+    $insertOccurrence($admin, 'deleted-series-unassign', 'deleted-group-slot', 'cam-p1');
+    [$deletedSeriesUnassign] = mmh_live_unassign_occurrence_course($admin, 'deleted-series-unassign');
+    $assert(!$deletedSeriesUnassign, 'An occurrence on a deleted group schedule allowed unassign.');
+
+    // Simulate Join holding the occurrence row lock while the Admin unassign request arrives.
+    if (!function_exists('pcntl_fork') || !function_exists('posix_kill')) throw new RuntimeException('Process control is required for the Live Session lock-contention regression.');
+    $insertOccurrence($admin, 'concurrent-unassign', 'cam-group-slot-0', 'cam-p1');
+    $query($admin, "INSERT INTO course_logs (user_id,course_id) VALUES (42,'cam-p1')");
+    $assert($admin->begin_transaction(), 'Unable to start the simulated Join transaction.');
+    $joinLock = $admin->prepare('SELECT occurrence_id FROM live_session_occurrences WHERE occurrence_id = ? FOR UPDATE');
+    $concurrentId = 'concurrent-unassign';
+    $joinLock->bind_param('s', $concurrentId);
+    $joinLock->execute();
+    $joinLock->get_result()->fetch_assoc();
+    $joinLock->close();
+    $pipes = stream_socket_pair(STREAM_PF_UNIX, STREAM_SOCK_STREAM, STREAM_IPPROTO_IP);
+    if ($pipes === false) throw new RuntimeException('Unable to create the lock-contention test pipe.');
+    $workerPid = pcntl_fork();
+    if ($workerPid === -1) throw new RuntimeException('Unable to start the lock-contention test worker.');
+    if ($workerPid === 0) {
+        fclose($pipes[0]);
+        $worker = mysqli_connect($hostValue, $userValue, $passValue, $database);
+        if (!$worker instanceof mysqli) {
+            fwrite($pipes[1], 'ERROR|worker database connection failed');
+            fflush($pipes[1]);
+            posix_kill(getmypid(), SIGKILL);
+        }
+        [$workerUnassigned] = mmh_live_unassign_occurrence_course($worker, 'concurrent-unassign');
+        fwrite($pipes[1], $workerUnassigned ? 'UNASSIGNED' : 'BLOCKED');
+        fflush($pipes[1]);
+        posix_kill(getmypid(), SIGKILL);
+    }
+    fclose($pipes[1]);
+    usleep(200000);
+    $query($admin, "INSERT INTO live_session_join_events (user_id,course_id,occurrence_id) VALUES (42,'cam-p1','concurrent-unassign')");
+    $assert($admin->commit(), 'Unable to commit the simulated Join transaction.');
+    $concurrentResult = stream_get_contents($pipes[0]);
+    fclose($pipes[0]);
+    pcntl_waitpid($workerPid, $workerStatus);
+    $assert($concurrentResult === 'BLOCKED', 'Concurrent Unassign did not wait for the Join lock and reject the occurrence history.');
+    $assert(($admin->query("SELECT course_id FROM live_session_occurrences WHERE occurrence_id='concurrent-unassign'")->fetch_assoc()['course_id'] ?? '') === 'cam-p1', 'Concurrent Unassign changed the occurrence despite Join history.');
+
     $groupJoinStart = gmdate('Y-m-d H:i:s', time() + 1200);
     $groupJoinEnd = gmdate('Y-m-d H:i:s', time() + 6600);
     $query($admin, "INSERT INTO course_logs (user_id,course_id) VALUES (31,'cam-p1')");
@@ -183,6 +273,11 @@ try {
 
     $groupStatusEndpoint = (string) file_get_contents($root . '/views/admin/requests/update-occurrence-live-session.php');
     $assert(str_contains($groupStatusEndpoint, 'Assign a Paper before marking this session Live or Completed.'), 'Admin Update endpoint does not block Live/Completed status on unassigned occurrences.');
+    $assert(str_contains($groupStatusEndpoint, "unassign_paper") && strpos($groupStatusEndpoint, "unassign_paper") < strpos($groupStatusEndpoint, "array_key_exists"), 'Admin Update endpoint does not require the explicit Unassign action before handling Paper updates.');
+    [$emptyTargetUnassign] = mmh_live_reassign_occurrence_course($admin, 'course-owned-unassign', '');
+    $assert(!$emptyTargetUnassign, 'An empty target Course implicitly triggered Paper unassignment.');
+    $joinEndpoint = (string) file_get_contents($root . '/views/user/requests/join-live-session.php');
+    $assert(strpos($joinEndpoint, 'if (trim((string)') !== false && strpos($joinEndpoint, 'if (trim((string)') < strpos($joinEndpoint, '$target ='), 'Direct Student Join endpoint does not block an unassigned occurrence before exposing its Teams URL.');
 
     $joinStart = gmdate('Y-m-d H:i:s', time() + 600);
     $joinEnd = gmdate('Y-m-d H:i:s', time() + 600 + 5400);

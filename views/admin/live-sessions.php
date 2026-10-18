@@ -208,6 +208,8 @@ function live_admin_html($value)
                                                         $canChoosePaper = in_array($scheduleGroup, ['cambridge_a_level', 'edexcel_a_level'], true)
                                                             && in_array((string) $occurrence['status'], ['scheduled', 'rescheduled'], true)
                                                             && strtotime((string) $occurrence['scheduled_start_at'] . ' UTC') > time();
+                                                        $canUnassignPaper = $canChoosePaper && !empty($occurrence['course_id'])
+                                                            && mmh_live_occurrence_unassign_block_reason($conn, $occurrence['occurrence_id']) === '';
                                                     ?>
                                                     <?php if ($canChoosePaper): ?>
                                                         <form action="<?=live_admin_html($liveRequestBase)?>/update-occurrence" method="POST" class="live-admin-ajax d-flex flex-wrap gap-2 align-items-end mt-2">
@@ -224,6 +226,13 @@ function live_admin_html($value)
                                                             </div>
                                                             <button class="btn btn-outline-primary btn-sm" type="submit">Save Paper</button>
                                                         </form>
+                                                        <?php if ($canUnassignPaper): ?>
+                                                            <form action="<?=live_admin_html($liveRequestBase)?>/update-occurrence" method="POST" class="live-admin-ajax d-inline-block mt-2">
+                                                                <input type="hidden" name="occurrence_id" value="<?=live_admin_html($occurrence['occurrence_id'])?>">
+                                                                <input type="hidden" name="live_action" value="unassign_paper">
+                                                                <button class="btn btn-outline-secondary btn-sm" type="submit" data-confirm="Remove the assigned Paper from this session? Students will no longer see or join this session until a Paper is assigned again.">Unassign Paper</button>
+                                                            </form>
+                                                        <?php endif; ?>
                                                     <?php endif; ?>
                                                 </td>
                                                 <td><?=live_admin_html(mmh_live_display_time($occurrence))?><br><small class="ds-text-muted"><?=live_admin_html($occurrence['timezone'])?></small></td>
