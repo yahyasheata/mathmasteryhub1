@@ -52,6 +52,7 @@ if (!function_exists('mmh_live_ensure_schema')) {
                 `effective_start_date` DATE NOT NULL,
                 `effective_end_date` DATE NULL,
                 `enabled` TINYINT(1) NOT NULL DEFAULT 1,
+                `deleted_at` DATETIME NULL DEFAULT NULL,
                 `sort_order` INT UNSIGNED NOT NULL DEFAULT 0,
                 `admin_notes` TEXT NULL,
                 `created_at` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
@@ -212,13 +213,13 @@ if (!function_exists('mmh_live_schedule_rows')) {
     {
         mmh_live_ensure_schema($conn);
         if ($courseId !== '') {
-            $stmt = $conn->prepare('SELECT s.*, c.course_title FROM course_live_schedules AS s INNER JOIN courses AS c ON c.course_id = s.course_id WHERE s.course_id = ? ORDER BY s.day_of_week ASC, s.start_time ASC, s.sort_order ASC');
+            $stmt = $conn->prepare('SELECT s.*, c.course_title FROM course_live_schedules AS s INNER JOIN courses AS c ON c.course_id = s.course_id WHERE s.course_id = ? AND s.deleted_at IS NULL ORDER BY s.day_of_week ASC, s.start_time ASC, s.sort_order ASC');
             if (!$stmt) {
                 return [];
             }
             $stmt->bind_param('s', $courseId);
         } else {
-            $stmt = $conn->prepare('SELECT s.*, c.course_title FROM course_live_schedules AS s INNER JOIN courses AS c ON c.course_id = s.course_id ORDER BY c.course_title ASC, s.day_of_week ASC, s.start_time ASC');
+            $stmt = $conn->prepare('SELECT s.*, c.course_title FROM course_live_schedules AS s INNER JOIN courses AS c ON c.course_id = s.course_id WHERE s.deleted_at IS NULL ORDER BY c.course_title ASC, s.day_of_week ASC, s.start_time ASC');
             if (!$stmt) {
                 return [];
             }
@@ -258,15 +259,32 @@ if (!function_exists('mmh_live_save_schedule')) {
 
         $scheduleId = trim((string) ($data['schedule_id'] ?? ''));
         if ($scheduleId !== '') {
-            $stmt = $conn->prepare('UPDATE course_live_schedules SET course_id=?, title=?, day_of_week=?, start_time=?, duration_minutes=?, timezone=?, teams_url=?, teams_meeting_ref=?, academic_period=?, effective_start_date=?, effective_end_date=?, enabled=?, sort_order=?, admin_notes=? WHERE schedule_id=?');
+            $stmt = $conn->prepare('UPDATE course_live_schedules SET course_id=?, title=?, day_of_week=?, start_time=?, duration_minutes=?, timezone=?, teams_url=?, teams_meeting_ref=?, academic_period=?, effective_start_date=?, effective_end_date=?, enabled=?, sort_order=?, admin_notes=? WHERE schedule_id=? AND deleted_at IS NULL');
             if (!$stmt) {
                 return [false, 'Unable to prepare schedule update: ' . $conn->error];
             }
             $endDateParam = $endDate !== '' ? $endDate : null;
             $stmt->bind_param('ssisissssssiiss', $courseId, $title, $day, $startTime, $duration, $timezone, $teamsUrl, $meetingRef, $period, $startDate, $endDateParam, $enabled, $sortOrder, $notes, $scheduleId);
             $ok = $stmt->execute();
+            $affected = $stmt->affected_rows;
             $stmt->close();
-            return [$ok, $ok ? 'Schedule updated successfully.' : 'Schedule update failed.'];
+            if (!$ok) {
+                return [false, 'Schedule update failed.'];
+            }
+            if ($affected === 0) {
+                $exists = $conn->prepare('SELECT 1 FROM course_live_schedules WHERE schedule_id = ? AND deleted_at IS NULL LIMIT 1');
+                if (!$exists) {
+                    return [false, 'Unable to verify schedule update.'];
+                }
+                $exists->bind_param('s', $scheduleId);
+                $exists->execute();
+                $active = $exists->get_result()->num_rows > 0;
+                $exists->close();
+                if (!$active) {
+                    return [false, 'Schedule not found or has been deleted.'];
+                }
+            }
+            return [true, 'Schedule updated successfully.'];
         }
 
         $scheduleId = mmh_live_id('sched');
@@ -462,36 +480,44 @@ if (!function_exists('mmh_live_delete_schedule')) {
             return [false, 'Schedule not found.'];
         }
 
-        $conn->begin_transaction();
+        if (!$conn->begin_transaction()) {
+            return [false, 'Unable to start recurring schedule deletion transaction.'];
+        }
         try {
-            $schedule = $conn->prepare('UPDATE course_live_schedules SET enabled = 0 WHERE schedule_id = ?');
+            $exists = $conn->prepare('SELECT id FROM course_live_schedules WHERE schedule_id = ? FOR UPDATE');
+            if (!$exists) {
+                throw new RuntimeException('Unable to prepare schedule lookup.');
+            }
+            $exists->bind_param('s', $scheduleId);
+            $exists->execute();
+            $scheduleFound = $exists->get_result()->num_rows > 0;
+            $exists->close();
+            if (!$scheduleFound) {
+                throw new RuntimeException('Schedule not found.');
+            }
+
+            $schedule = $conn->prepare('UPDATE course_live_schedules SET enabled = 0, deleted_at = COALESCE(deleted_at, UTC_TIMESTAMP()) WHERE schedule_id = ?');
             if (!$schedule) {
                 throw new RuntimeException('Unable to prepare schedule deletion.');
             }
             $schedule->bind_param('s', $scheduleId);
-            $schedule->execute();
-            $scheduleFound = $schedule->affected_rows > 0;
+            if (!$schedule->execute()) {
+                throw new RuntimeException('Unable to delete recurring schedule.');
+            }
             $schedule->close();
-
-            if (!$scheduleFound) {
-                $exists = $conn->prepare('SELECT id FROM course_live_schedules WHERE schedule_id = ? LIMIT 1');
-                $exists->bind_param('s', $scheduleId);
-                $exists->execute();
-                $scheduleFound = $exists->get_result()->num_rows > 0;
-                $exists->close();
-            }
-            if (!$scheduleFound) {
-                throw new RuntimeException('Schedule not found.');
-            }
 
             $occurrences = $conn->prepare("UPDATE live_session_occurrences SET status = 'deleted', change_note = 'Recurring series deleted by administrator' WHERE schedule_id = ? AND scheduled_start_at >= UTC_TIMESTAMP() AND status NOT IN ('completed', 'deleted')");
             if (!$occurrences) {
                 throw new RuntimeException('Unable to prepare future occurrence deletion.');
             }
             $occurrences->bind_param('s', $scheduleId);
-            $occurrences->execute();
+            if (!$occurrences->execute()) {
+                throw new RuntimeException('Unable to remove future occurrences for the recurring schedule.');
+            }
             $occurrences->close();
-            $conn->commit();
+            if (!$conn->commit()) {
+                throw new RuntimeException('Unable to commit recurring schedule deletion.');
+            }
             return [true, 'Recurring series deleted successfully. Past sessions and records were preserved.'];
         } catch (Throwable $exception) {
             $conn->rollback();
