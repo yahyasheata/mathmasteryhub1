@@ -125,6 +125,11 @@ try {
     $originalHas = in_array((string) $generated['occurrence_id'], array_column($originalVisible, 'occurrence_id'), true);
     $assert($targetHas && !$originalHas, 'Student visibility did not follow enrollment in the occurrence actual Course (target=' . count($targetVisible) . ', original=' . count($originalVisible) . ', assigned=' . (string) ($afterGeneration['course_id'] ?? 'missing') . ').');
 
+    $query($admin, "INSERT INTO course_live_schedules (schedule_id,course_id,title,day_of_week,start_time,duration_minutes,timezone,teams_url,effective_start_date,deleted_at) VALUES ('deleted-slot','cam-p1','Deleted slot',{$day},'23:00:00',90,'Asia/Riyadh','https://teams.microsoft.com/l/meetup-join/test','{$tomorrowDate}',UTC_TIMESTAMP())");
+    $insertOccurrence($admin, 'deleted-series-reassignment', 'deleted-slot', 'cam-p1');
+    [$deletedSeriesReassigned] = mmh_live_reassign_occurrence_course($admin, 'deleted-series-reassignment', 'cam-m1');
+    $assert(!$deletedSeriesReassigned, 'An occurrence from a soft-deleted schedule was reassigned through the shared Admin update route.');
+
     $coursePage = (string) file_get_contents($root . '/views/user/course.php');
     $assert(str_contains($coursePage, 'Upcoming Live Session') && str_contains($coursePage, '/user/live-session/join/'), 'Course page is missing the protected Upcoming Live Session join link.');
 

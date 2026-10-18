@@ -37,6 +37,9 @@ $occurrence = mmh_live_occurrence($conn, $occurrenceId);
 if (!$occurrence) {
     mmh_live_response(false, 'Occurrence not found.', [], 404);
 }
+if (!mmh_live_occurrence_is_editable($occurrence)) {
+    mmh_live_response(false, 'Deleted occurrences or recurring schedules cannot be updated.', [], 409);
+}
 $scheduledStart = trim((string) ($_POST['scheduled_start_at'] ?? ''));
 $scheduledEnd = trim((string) ($_POST['scheduled_end_at'] ?? ''));
 $startUtc = null;
@@ -61,12 +64,22 @@ if ($scheduledStart !== '') {
     }
 }
 
-$stmt = $conn->prepare('UPDATE live_session_occurrences SET status = ?, replacement_url = COALESCE(?, replacement_url), change_note = COALESCE(NULLIF(?, \'\'), change_note), scheduled_start_at = COALESCE(?, scheduled_start_at), scheduled_end_at = COALESCE(?, scheduled_end_at) WHERE occurrence_id = ?');
+$stmt = $conn->prepare('UPDATE live_session_occurrences AS o INNER JOIN course_live_schedules AS s ON s.schedule_id = o.schedule_id SET o.status = ?, o.replacement_url = COALESCE(?, o.replacement_url), o.change_note = COALESCE(NULLIF(?, \'\'), o.change_note), o.scheduled_start_at = COALESCE(?, o.scheduled_start_at), o.scheduled_end_at = COALESCE(?, o.scheduled_end_at) WHERE o.occurrence_id = ? AND o.status <> \'deleted\' AND s.deleted_at IS NULL');
 if (!$stmt) {
     mmh_live_response(false, 'Unable to prepare occurrence update.', [], 500);
 }
 $stmt->bind_param('ssssss', $status, $replacementUrl, $note, $startUtc, $endUtc, $occurrenceId);
 $ok = $stmt->execute();
+$changed = $stmt->affected_rows;
 $stmt->close();
-mmh_live_response($ok, $ok ? 'Occurrence updated successfully.' : 'Occurrence update failed.', [], $ok ? 200 : 500);
+if (!$ok) {
+    mmh_live_response(false, 'Occurrence update failed.', [], 500);
+}
+if ($changed < 1) {
+    $currentOccurrence = mmh_live_occurrence($conn, $occurrenceId);
+    if (!$currentOccurrence || !mmh_live_occurrence_is_editable($currentOccurrence)) {
+        mmh_live_response(false, 'Deleted occurrences or recurring schedules cannot be updated.', [], 409);
+    }
+}
+mmh_live_response(true, 'Occurrence updated successfully.', [], 200);
 ?>

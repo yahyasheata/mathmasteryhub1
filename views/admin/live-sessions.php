@@ -15,6 +15,7 @@ $attendanceOccurrenceId = isset($_GET['occurrence']) ? trim((string) $_GET['occu
 $courses = mmh_live_course_options($conn);
 $schedules = mmh_live_schedule_rows($conn, $selectedCourse);
 $occurrences = mmh_live_occurrences($conn, $selectedCourse, -3, 45);
+$upcomingOccurrences = mmh_live_admin_upcoming_occurrences($occurrences, 25);
 $attendanceOccurrence = $attendanceOccurrenceId !== '' ? mmh_live_occurrence($conn, $attendanceOccurrenceId) : null;
 $attendanceRows = $attendanceOccurrence ? mmh_live_students_for_occurrence($conn, $attendanceOccurrence) : [];
 $days = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
@@ -175,7 +176,7 @@ function live_admin_html($value)
                                     <table class="table table-hover align-middle">
                                         <thead><tr><th>Session</th><th>Time</th><th>Status</th><th>Actions</th></tr></thead>
                                         <tbody>
-                                        <?php if ($occurrences): foreach (array_slice($occurrences, 0, 25) as $occurrence): ?>
+                                        <?php if ($upcomingOccurrences): foreach ($upcomingOccurrences as $occurrence): ?>
                                             <tr>
                                                 <td><?=live_admin_html($occurrence['course_title'])?><br><small class="ds-text-muted">Recurring slot: <?=live_admin_html($occurrence['schedule_course_title'] ?? $occurrence['course_title'])?> · <?=live_admin_html($occurrence['schedule_title'] ?: 'Live session')?></small>
                                                     <?php

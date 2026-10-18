@@ -85,6 +85,55 @@ try {
     $assert(($remaining['status'] ?? '') === 'deleted', 'The future scheduled occurrence was not removed safely.');
     $deletedOccurrence = $admin->query("SELECT occurrence_id,scheduled_start_at,scheduled_end_at,status,teams_url_snapshot FROM live_session_occurrences WHERE occurrence_id='" . $admin->real_escape_string((string) $future['occurrence_id']) . "'")->fetch_assoc();
     $assert(empty(mmh_live_join_state($deletedOccurrence)['active']), 'A future occurrence from a deleted series remained joinable.');
+    $deletedSeriesLookup = mmh_live_occurrence($admin, (string) $future['occurrence_id']);
+    $assert(is_array($deletedSeriesLookup) && !empty($deletedSeriesLookup['schedule_deleted_at']), 'Occurrence lookup did not expose its soft-deleted parent schedule.');
+    $assert(!mmh_live_occurrence_is_editable($deletedSeriesLookup), 'An occurrence from a deleted schedule remained editable.');
+    $courseAUpcoming = mmh_live_admin_upcoming_occurrences(mmh_live_occurrences($admin, 'course-a', 0, 45), 25);
+    $assert(!in_array((string) $future['occurrence_id'], array_column($courseAUpcoming, 'occurrence_id'), true), 'A deleted recurring series occurrence remained visible after reloading the Admin list.');
+
+    $visibleBeforeLimit = [];
+    for ($index = 0; $index < 25; $index++) {
+        $visibleBeforeLimit[] = ['occurrence_id' => 'deleted-' . $index, 'status' => 'deleted', 'schedule_deleted_at' => null];
+    }
+    $visibleBeforeLimit[] = ['occurrence_id' => 'deleted-series', 'status' => 'scheduled', 'schedule_deleted_at' => gmdate('Y-m-d H:i:s')];
+    $visibleBeforeLimit[] = ['occurrence_id' => 'visible-session', 'status' => 'scheduled', 'schedule_deleted_at' => null];
+    $adminUpcoming = mmh_live_admin_upcoming_occurrences($visibleBeforeLimit, 25);
+    $assert(count($adminUpcoming) === 1 && ($adminUpcoming[0]['occurrence_id'] ?? '') === 'visible-session', 'Deleted rows consumed the first-25 limit or a deleted-series occurrence remained visible.');
+
+    $individualStart = gmdate('Y-m-d H:i:s', time() + 86400);
+    $individualEnd = gmdate('Y-m-d H:i:s', time() + 91800);
+    $query($admin, "INSERT INTO live_session_occurrences (occurrence_id,schedule_id,course_id,scheduled_start_at,scheduled_end_at,timezone,status,teams_url_snapshot) VALUES ('individual-deleted','other-active','course-b','{$individualStart}','{$individualEnd}','UTC','scheduled','https://teams.microsoft.com/l/meetup-join/test')");
+    [$individualDeleted] = mmh_live_delete_occurrence($admin, 'individual-deleted');
+    $assert($individualDeleted, 'Deleting one active occurrence failed.');
+    $courseBOccurrences = mmh_live_occurrences($admin, 'course-b', 0, 45);
+    $courseBUpcoming = mmh_live_admin_upcoming_occurrences($courseBOccurrences, 25);
+    $assert(!in_array('individual-deleted', array_column($courseBUpcoming, 'occurrence_id'), true), 'An individually deleted occurrence remained visible in Upcoming generated sessions.');
+    $assert(count($courseBUpcoming) > 0, 'Deleting one occurrence hid other upcoming sessions.');
+    $deletedIndividual = mmh_live_occurrence($admin, 'individual-deleted');
+    $assert(is_array($deletedIndividual) && !mmh_live_occurrence_is_editable($deletedIndividual), 'An individually deleted occurrence remained editable.');
+
+    $reactivation = $admin->prepare("UPDATE live_session_occurrences AS o INNER JOIN course_live_schedules AS s ON s.schedule_id = o.schedule_id SET o.status = 'scheduled' WHERE o.occurrence_id = ? AND o.status <> 'deleted' AND s.deleted_at IS NULL");
+    $assert($reactivation instanceof mysqli_stmt, 'Unable to prepare isolated update guard test.');
+    foreach ([(string) $future['occurrence_id'], 'individual-deleted'] as $deletedId) {
+        $reactivation->bind_param('s', $deletedId);
+        $assert($reactivation->execute() && $reactivation->affected_rows === 0, 'A direct update reactivated a deleted occurrence.');
+    }
+    $reactivation->close();
+
+    $orphanStart = gmdate('Y-m-d H:i:s', time() + 172800);
+    $orphanEnd = gmdate('Y-m-d H:i:s', time() + 178200);
+    $query($admin, "INSERT INTO live_session_occurrences (occurrence_id,schedule_id,course_id,scheduled_start_at,scheduled_end_at,timezone,status,teams_url_snapshot) VALUES ('deleted-series-row','to-delete','course-a','{$orphanStart}','{$orphanEnd}','UTC','cancelled','https://teams.microsoft.com/l/meetup-join/test')");
+    $deletedSeriesRow = mmh_live_occurrence($admin, 'deleted-series-row');
+    $assert(is_array($deletedSeriesRow) && !mmh_live_occurrence_is_editable($deletedSeriesRow), 'A non-deleted-status occurrence from a deleted series was considered editable.');
+    $reactivation = $admin->prepare("UPDATE live_session_occurrences AS o INNER JOIN course_live_schedules AS s ON s.schedule_id = o.schedule_id SET o.status = 'scheduled' WHERE o.occurrence_id = ? AND o.status <> 'deleted' AND s.deleted_at IS NULL");
+    $assert($reactivation instanceof mysqli_stmt, 'Unable to prepare deleted-series direct update guard test.');
+    $seriesOccurrenceId = 'deleted-series-row';
+    $reactivation->bind_param('s', $seriesOccurrenceId);
+    $assert($reactivation->execute() && $reactivation->affected_rows === 0, 'A direct update changed an occurrence from a soft-deleted series.');
+    $reactivation->close();
+    $adminUpdateSource = (string) file_get_contents($root . '/views/admin/requests/update-occurrence-live-session.php');
+    $assert(str_contains($adminUpdateSource, 'mmh_live_occurrence_is_editable') && str_contains($adminUpdateSource, "o.status <> \\'deleted\\'") && str_contains($adminUpdateSource, 's.deleted_at IS NULL'), 'Admin Update endpoint is missing its deleted occurrence/series guard.');
+
     $assert((int) $admin->query("SELECT COUNT(*) AS n FROM live_session_occurrences WHERE schedule_id='to-delete' AND scheduled_start_at >= UTC_TIMESTAMP() AND status='scheduled'")->fetch_assoc()['n'] === 0, 'A deleted schedule generated a future session.');
     $assert((int) $admin->query("SELECT COUNT(*) AS n FROM live_session_occurrences WHERE schedule_id='other-active' AND scheduled_start_at >= UTC_TIMESTAMP() AND status='scheduled'")->fetch_assoc()['n'] > 0, 'Another active schedule stopped generating occurrences.');
     $history = $admin->query("SELECT o.replacement_url, a.status AS attendance_status, j.id AS join_event_id FROM live_session_occurrences o LEFT JOIN live_session_attendance a ON a.occurrence_id=o.occurrence_id LEFT JOIN live_session_join_events j ON j.occurrence_id=o.occurrence_id WHERE o.occurrence_id='past-completed'")->fetch_assoc();

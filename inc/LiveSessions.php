@@ -412,7 +412,7 @@ if (!function_exists('mmh_live_occurrences')) {
         $to = gmdate('Y-m-d H:i:s', strtotime('+' . (int) $toDays . ' days'));
         $params = [];
         $types = '';
-        $sql = 'SELECT o.*, s.title AS schedule_title, s.academic_period, s.course_id AS schedule_course_id, s.enabled AS schedule_enabled, base.course_title AS schedule_course_title, base.my_courses_group_key AS schedule_group_key, c.course_title';
+        $sql = 'SELECT o.*, s.title AS schedule_title, s.academic_period, s.course_id AS schedule_course_id, s.enabled AS schedule_enabled, s.deleted_at AS schedule_deleted_at, base.course_title AS schedule_course_title, base.my_courses_group_key AS schedule_group_key, c.course_title';
         if ($onlyEnrolledUserId !== null) {
             $sql .= ', a.status AS attendance_status, a.first_join_clicked_at, a.last_join_clicked_at, a.confirmed_source';
         }
@@ -447,6 +447,26 @@ if (!function_exists('mmh_live_occurrences')) {
         $rows = $stmt->get_result()->fetch_all(MYSQLI_ASSOC);
         $stmt->close();
         return $rows;
+    }
+}
+
+if (!function_exists('mmh_live_admin_upcoming_occurrences')) {
+    function mmh_live_admin_upcoming_occurrences(array $occurrences, $limit = 25)
+    {
+        $visible = array_values(array_filter($occurrences, static function ($occurrence) {
+            return is_array($occurrence)
+                && strtolower(trim((string) ($occurrence['status'] ?? ''))) !== 'deleted'
+                && empty($occurrence['schedule_deleted_at']);
+        }));
+        return array_slice($visible, 0, max(0, (int) $limit));
+    }
+}
+
+if (!function_exists('mmh_live_occurrence_is_editable')) {
+    function mmh_live_occurrence_is_editable(array $occurrence)
+    {
+        return strtolower(trim((string) ($occurrence['status'] ?? ''))) !== 'deleted'
+            && empty($occurrence['schedule_deleted_at']);
     }
 }
 
@@ -530,7 +550,7 @@ if (!function_exists('mmh_live_occurrence')) {
     function mmh_live_occurrence(mysqli $conn, $occurrenceId)
     {
         mmh_live_ensure_schema($conn);
-        $stmt = $conn->prepare('SELECT o.*, s.title AS schedule_title, s.enabled AS schedule_enabled, s.course_id AS schedule_course_id, base.course_title AS schedule_course_title, base.my_courses_group_key AS schedule_group_key, c.course_title FROM live_session_occurrences AS o INNER JOIN course_live_schedules AS s ON s.schedule_id = o.schedule_id INNER JOIN courses AS base ON base.course_id = s.course_id INNER JOIN courses AS c ON c.course_id = o.course_id WHERE o.occurrence_id = ? LIMIT 1');
+        $stmt = $conn->prepare('SELECT o.*, s.title AS schedule_title, s.enabled AS schedule_enabled, s.deleted_at AS schedule_deleted_at, s.course_id AS schedule_course_id, base.course_title AS schedule_course_title, base.my_courses_group_key AS schedule_group_key, c.course_title FROM live_session_occurrences AS o INNER JOIN course_live_schedules AS s ON s.schedule_id = o.schedule_id INNER JOIN courses AS base ON base.course_id = s.course_id INNER JOIN courses AS c ON c.course_id = o.course_id WHERE o.occurrence_id = ? LIMIT 1');
         if (!$stmt) {
             return null;
         }
@@ -554,14 +574,14 @@ if (!function_exists('mmh_live_reassign_occurrence_course')) {
 
         try {
             $conn->begin_transaction();
-            $stmt = $conn->prepare("SELECT o.occurrence_id, o.course_id, o.schedule_id, o.scheduled_start_at, o.status, o.actual_start_at, s.course_id AS schedule_course_id, (o.scheduled_start_at > UTC_TIMESTAMP()) AS is_future FROM live_session_occurrences o INNER JOIN course_live_schedules s ON s.schedule_id = o.schedule_id WHERE o.occurrence_id = ? FOR UPDATE");
+            $stmt = $conn->prepare("SELECT o.occurrence_id, o.course_id, o.schedule_id, o.scheduled_start_at, o.status, o.actual_start_at, s.course_id AS schedule_course_id, s.deleted_at AS schedule_deleted_at, (o.scheduled_start_at > UTC_TIMESTAMP()) AS is_future FROM live_session_occurrences o INNER JOIN course_live_schedules s ON s.schedule_id = o.schedule_id WHERE o.occurrence_id = ? FOR UPDATE");
             if (!$stmt) throw new RuntimeException('Unable to check the session occurrence.');
             $stmt->bind_param('s', $occurrenceId);
             $stmt->execute();
             $occurrence = $stmt->get_result()->fetch_assoc();
             $stmt->close();
             if (!$occurrence) throw new RuntimeException('Occurrence or recurring schedule not found.');
-            if (!(int) $occurrence['is_future'] || !empty($occurrence['actual_start_at']) || !in_array(strtolower((string) $occurrence['status']), ['scheduled', 'rescheduled'], true)) {
+            if (!empty($occurrence['schedule_deleted_at']) || !(int) $occurrence['is_future'] || !empty($occurrence['actual_start_at']) || !in_array(strtolower((string) $occurrence['status']), ['scheduled', 'rescheduled'], true)) {
                 throw new RuntimeException('Only a not-yet-started future session can be reassigned.');
             }
 
