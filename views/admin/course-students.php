@@ -23,11 +23,12 @@ if (!$course) {
 }
 $unitAccessState = mmh_enrollment_course_unit_state($conn, $courseId);
 if ($unitAccessState === null) { http_response_code(503); exit('Course access configuration is unavailable.'); }
-$unitAccessReady = !empty($unitAccessState['ready']);
-$unitAccessCandidate = !empty($unitAccessState['candidate']);
+$unitAccessSupported = mmh_course_supports_unit_section_access($courseId);
+$unitAccessReady = !empty($unitAccessState['ready']) && $unitAccessSupported;
+$unitAccessCandidate = !empty($unitAccessState['candidate']) && $unitAccessSupported;
 
 $students = [];
-$unitSelect = !empty($unitAccessState['ready']) ? 'MAX(cl.unit_access) AS unit_access' : 'NULL AS unit_access';
+$unitSelect = $unitAccessReady ? 'MAX(cl.unit_access) AS unit_access' : 'NULL AS unit_access';
 $studentsStmt = $conn->prepare("SELECT u.user_id, u.full_name, u.username, u.status, MIN(cl.purchase_date) AS enrolled_at, COUNT(cl.id) AS enrollment_rows, {$unitSelect} FROM course_logs cl INNER JOIN users u ON u.user_id = cl.user_id WHERE cl.course_id = ? AND u.role = 'user' GROUP BY u.user_id, u.full_name, u.username, u.status ORDER BY u.full_name ASC, u.username ASC");
 if ($studentsStmt) {
     $studentsStmt->bind_param('s', $courseId);
@@ -46,8 +47,8 @@ if ($targetStmt) {
 }
 foreach ($targetCourses as &$targetCourse) {
     $state = mmh_enrollment_course_unit_state($conn, (string) $targetCourse['course_id']);
-    $targetCourse['unit_candidate'] = !empty($state['candidate']);
-    $targetCourse['unit_restricted'] = !empty($state['restricted']);
+    $targetCourse['unit_candidate'] = mmh_course_supports_unit_section_access((string) $targetCourse['course_id']) && !empty($state['candidate']);
+    $targetCourse['unit_restricted'] = mmh_course_supports_unit_section_access((string) $targetCourse['course_id']) && !empty($state['restricted']);
 }
 unset($targetCourse);
 $hasRestrictedTarget = count(array_filter($targetCourses, static fn(array $target): bool => !empty($target['unit_restricted']))) > 0;

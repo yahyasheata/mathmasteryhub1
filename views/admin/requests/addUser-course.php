@@ -141,6 +141,9 @@ function add_user_course_transaction_exists(mysqli $conn, $course_id, $user_id)
 
 function add_user_course_enroll_student(mysqli $conn, array $course, $user_id, ?string $unitAccess = null)
 {
+    if (!mmh_course_unit_access_assignment_allowed((string) $course['course_id'], $unitAccess)) {
+        return ['status' => 0, 'message' => 'Error', 'reason' => 'Unit Access can only be assigned for Math OL Full Course.'];
+    }
     $unitState = mmh_enrollment_course_unit_state($conn, (string) $course['course_id']);
     if ($unitState === null) return ['status' => 0, 'message' => 'Error', 'reason' => 'Course Unit Access could not be verified.'];
     if (!empty($unitState['candidate']) && !mmh_enrollment_unit_access_valid($unitAccess)) {
@@ -190,7 +193,7 @@ if($_SERVER['REQUEST_METHOD'] == "POST" ){
             $course = add_user_course_fetch_course($conn, (string) $course_id);
             $section_options = add_user_course_section_options(db(), $course_id);
             $unitState = $course ? mmh_enrollment_course_unit_state($conn, (string) $course['course_id']) : null;
-            $unitAccessOptions = !empty($unitState['ready'])
+            $unitAccessOptions = $course && mmh_course_supports_unit_section_access((string) $course['course_id']) && !empty($unitState['ready'])
                 ? "<div class='col-12 col-lg-6 p-2'><details" . (!empty($unitState['candidate']) ? ' open' : '') . "><summary>" . (!empty($unitState['candidate']) ? 'Required Unit Access' : 'Optional Unit Access') . "</summary><label class='col-12 pt-2' for='enrollment-unit-access'>Unit Access</label><div class='col-12 pt-2'><select class='form-control' id='enrollment-unit-access' name='unit_access'" . (!empty($unitState['candidate']) ? ' required' : '') . "><option value=''>" . (!empty($unitState['candidate']) ? 'Select Unit Access' : 'Leave unset for a non-modular Course') . "</option><option value='unit1'>Unit 1</option><option value='unit2'>Unit 2</option><option value='both'>Both Units</option></select><small class='text-muted'>Set this before restricting any Course Sections. Existing students are not classified automatically.</small></div></details></div>"
                 : '';
     

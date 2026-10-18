@@ -2,6 +2,7 @@
 declare(strict_types=1);
 
 require_once __DIR__ . '/AssignmentIdentity.php';
+require_once __DIR__ . '/EnrollmentService.php';
 
 /**
  * Transactional, configuration-only copying for Course Content.
@@ -42,6 +43,15 @@ final class CourseContentCopyService
         $conn->begin_transaction();
         try {
             $newCourseId = self::uniqueCourseId($conn);
+            if (mmh_course_supports_unit_section_access($newCourseId)) {
+                throw new RuntimeException('A duplicated Course cannot claim the reserved Math OL Full Course identifier.');
+            }
+            $sections = self::fetchAll($conn, 'SELECT * FROM course_sections WHERE course_id = ? ORDER BY sort_order ASC, id ASC', 's', [$sourceCourseId]);
+            $items = self::fetchAll($conn, 'SELECT ci.*, COALESCE(cs.sort_order, 2147483647) AS source_section_sort, COALESCE(cs.id, 2147483647) AS source_section_id FROM course_items ci LEFT JOIN course_sections cs ON cs.course_id = ci.course_id AND cs.section_id = ci.section_id WHERE ci.course_id = ? ORDER BY source_section_sort ASC, source_section_id ASC, ci.page_order ASC, ci.sort_order ASC, ci.id ASC', 's', [$sourceCourseId]);
+            $sections = array_values(array_filter($sections, static fn(array $row): bool => self::isActiveCopySource($row)));
+            $items = array_values(array_filter($items, static fn(array $row): bool => self::isActiveCopySource($row)));
+            foreach ($sections as $section) self::assertSectionAccessCopyAllowed($section, $newCourseId);
+
             $isPublished = $courseState === 'draft' ? '0' : '1';
             $legacyVisibility = $courseState === 'public' ? 'public' : 'private';
             $courseValues = [
@@ -67,11 +77,6 @@ final class CourseContentCopyService
             ];
             $courseValues = array_intersect_key($courseValues, array_flip($courseColumns));
             self::insertRow($conn, 'courses', $courseValues);
-
-            $sections = self::fetchAll($conn, 'SELECT * FROM course_sections WHERE course_id = ? ORDER BY sort_order ASC, id ASC', 's', [$sourceCourseId]);
-            $items = self::fetchAll($conn, 'SELECT ci.*, COALESCE(cs.sort_order, 2147483647) AS source_section_sort, COALESCE(cs.id, 2147483647) AS source_section_id FROM course_items ci LEFT JOIN course_sections cs ON cs.course_id = ci.course_id AND cs.section_id = ci.section_id WHERE ci.course_id = ? ORDER BY source_section_sort ASC, source_section_id ASC, ci.page_order ASC, ci.sort_order ASC, ci.id ASC', 's', [$sourceCourseId]);
-            $sections = array_values(array_filter($sections, static fn(array $row): bool => self::isActiveCopySource($row)));
-            $items = array_values(array_filter($items, static fn(array $row): bool => self::isActiveCopySource($row)));
 
             $maps = ['sections' => [], 'items' => [], 'assignments' => [], 'assignment_refs' => []];
             $warnings = [];
@@ -210,6 +215,7 @@ final class CourseContentCopyService
         if (!$source) {
             throw new RuntimeException('The source section was not found.');
         }
+        self::assertSectionAccessCopyAllowed($source, $destinationCourseId);
         $items = self::fetchAll($conn, 'SELECT * FROM course_items WHERE course_id = ? AND section_id = ? ORDER BY page_order ASC, sort_order ASC, id ASC', 'ss', [$sourceCourseId, $sourceSectionId]);
 
         $conn->begin_transaction();
@@ -247,6 +253,17 @@ final class CourseContentCopyService
     {
         if ($courseId === '' || !self::fetchOne($conn, 'SELECT course_id FROM courses WHERE course_id = ? LIMIT 1', 's', [$courseId])) {
             throw new RuntimeException('The selected course is not available.');
+        }
+    }
+
+    private static function assertSectionAccessCopyAllowed(array $section, string $destinationCourseId): void
+    {
+        $accessUnit = strtolower(trim((string) ($section['access_unit'] ?? 'shared')));
+        if (!in_array($accessUnit, ['shared', 'unit1', 'unit2'], true)) {
+            throw new RuntimeException('The Section has an invalid access setting and cannot be copied safely.');
+        }
+        if ($accessUnit !== 'shared' && !mmh_course_supports_unit_section_access($destinationCourseId)) {
+            throw new RuntimeException('Unit-restricted Sections can only be copied into Math OL Full Course.');
         }
     }
 

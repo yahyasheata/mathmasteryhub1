@@ -24,7 +24,7 @@ try {
     $query($admin, "CREATE TABLE course_logs (id INT AUTO_INCREMENT PRIMARY KEY, course_id VARCHAR(20) NOT NULL, user_id INT NOT NULL, course_title VARCHAR(190) NULL, purchase_date DATETIME NULL, KEY idx_enrollment(course_id,user_id))");
     $query($admin, "CREATE TABLE course_live_schedules (id INT AUTO_INCREMENT PRIMARY KEY, course_id VARCHAR(20) NOT NULL, scheduled_start_at DATETIME NULL)");
     $query($admin, "CREATE TABLE timed_exams (id INT AUTO_INCREMENT PRIMARY KEY, course_id VARCHAR(20) NOT NULL, item_id VARCHAR(20) NOT NULL, title VARCHAR(190) NOT NULL, instructions TEXT, status VARCHAR(16) NOT NULL DEFAULT 'draft', timing_mode VARCHAR(24) NOT NULL DEFAULT 'fixed_window', scheduled_start_at_utc DATETIME NULL, duration_minutes INT NOT NULL DEFAULT 60, grace_minutes INT NOT NULL DEFAULT 0, max_attempts INT NOT NULL DEFAULT 1, allowed_answer_types VARCHAR(255) NOT NULL DEFAULT 'pdf', max_file_size_bytes BIGINT NOT NULL DEFAULT 10485760, paper_source VARCHAR(24) NOT NULL DEFAULT 'external_link', paper_external_url VARCHAR(1000), paper_external_preview_url VARCHAR(1000), paper_external_download_url VARCHAR(1000), paper_fallback_instructions TEXT, paper_storage_key VARCHAR(255), paper_original_name VARCHAR(255), paper_mime VARCHAR(120), paper_size_bytes BIGINT NULL, paper_view_allowed TINYINT NOT NULL DEFAULT 1, paper_download_allowed TINYINT NOT NULL DEFAULT 1, late_submission_allowed TINYINT NOT NULL DEFAULT 1, expiry_policy VARCHAR(32) NOT NULL DEFAULT 'auto_submit_latest', max_marks DECIMAL(10,2), results_release_at_utc DATETIME NULL, recovery_window_start_at_utc DATETIME NULL, recovery_window_end_at_utc DATETIME NULL, recovery_allowed TINYINT NOT NULL DEFAULT 0, attempt_generation INT UNSIGNED NOT NULL DEFAULT 1, deleted_at DATETIME NULL, roster_finalized_at_utc DATETIME NULL, roster_finalized_generation INT UNSIGNED NULL, created_by INT NULL, updated_by INT NULL, created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP, updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP)");
-    $query($admin, "INSERT INTO courses (course_id,course_title,course_state) VALUES ('source','Source','public'),('destination','Destination','draft')");
+    $query($admin, "INSERT INTO courses (course_id,course_title,course_state) VALUES ('source','Source','public'),('destination','Destination','draft'),('3078','Math OL Full Course','private')");
     $query($admin, "UPDATE courses SET course_title_en='Source',course_description='Source description',course_image='uploads/source-cover.jpg',course_price=125,preDiscount_course_price=150,course_category=2,sequential_learning=1,default_homework_score_mode='disabled',username='teacher' WHERE course_id='source'");
     $query($admin, "UPDATE courses SET my_courses_group_key='cambridge_a_level' WHERE course_id='source'");
     $query($admin, "INSERT INTO course_logs (course_id,user_id) VALUES ('source',7)");
@@ -55,9 +55,17 @@ try {
     $assert((int) $admin->query("SELECT COUNT(*) AS n FROM assignment_submissions")->fetch_assoc()['n'] === 1, 'Submission data changed.');
     $assert((int) $admin->query("SELECT COUNT(*) AS n FROM assignment_model_answer_access")->fetch_assoc()['n'] === 1, 'Student model-answer access was copied or changed.');
 
+    try {
+        CourseContentCopyService::copySection($admin, 'source', 's1', 'destination');
+        throw new RuntimeException('Unit-restricted Section copied into an unsupported Course.');
+    } catch (RuntimeException $e) {
+        $assert(str_contains($e->getMessage(), 'only be copied into Math OL Full Course'), 'Unexpected error while rejecting a restricted Section copy.');
+    }
+    $assert((int) $admin->query("SELECT COUNT(*) AS n FROM course_sections WHERE course_id='destination'")->fetch_assoc()['n'] === 0, 'Rejected restricted Section copy wrote partial destination rows.');
+    $query($admin, "UPDATE course_sections SET access_unit='shared' WHERE course_id='source' AND section_id='s1'");
     $section = CourseContentCopyService::copySection($admin, 'source', 's1', 'destination');
     $assert($section['section_id'] !== 's1', 'Copied section reused the source section ID.');
-    $assert((string) $admin->query("SELECT access_unit FROM course_sections WHERE course_id='destination' AND section_id='" . $admin->real_escape_string($section['section_id']) . "'")->fetch_assoc()['access_unit'] === 'unit1', 'Copied Section did not retain its Unit access classification.');
+    $assert((string) $admin->query("SELECT access_unit FROM course_sections WHERE course_id='destination' AND section_id='" . $admin->real_escape_string($section['section_id']) . "'")->fetch_assoc()['access_unit'] === 'shared', 'Shared Section did not remain shared after copying.');
     $assert(count($section['item_ids']) === 4, 'Section copy did not preserve all items.');
     $orders = $admin->query("SELECT page_order FROM course_items WHERE course_id='destination' AND section_id='" . $admin->real_escape_string($section['section_id']) . "' ORDER BY page_order ASC")->fetch_all(MYSQLI_ASSOC);
     $assert(array_column($orders, 'page_order') === ['1','2','3','4'], 'Section item order was not preserved.');
@@ -66,6 +74,11 @@ try {
     $assert(($exam['status'] ?? '') === 'draft' && ($copiedExamItem['status'] ?? '') === 'draft' && ($exam['scheduled_start_at_utc'] ?? null) === null, 'Copied Timed Exam and its course item were not safely drafted.');
     $assert((int) ($exam['attempt_generation'] ?? 1) === 1 && ($exam['roster_finalized_at_utc'] ?? null) === null, 'Copied Timed Exam retained historical lifecycle state.');
     $assert((int) $admin->query("SELECT COUNT(*) AS n FROM course_items WHERE course_id='source'")->fetch_assoc()['n'] === 4, 'Source items changed.');
+
+    $query($admin, "INSERT INTO course_sections (section_id,course_id,title,section_type,sort_order,status,access_unit,unlock_mode,completion_rule,release_mode,release_override,release_delay_minutes) VALUES ('full-unit','3078','Unit 1','unit',1,'published','unit1','always','manual_completion','inherit','inherit',0)");
+    $fullCourseDuplicate = CourseContentCopyService::copySection($admin, '3078', 'full-unit', '3078');
+    $duplicateAccess = $admin->query("SELECT access_unit FROM course_sections WHERE course_id='3078' AND section_id='" . $admin->real_escape_string($fullCourseDuplicate['section_id']) . "'")->fetch_assoc();
+    $assert(($duplicateAccess['access_unit'] ?? '') === 'unit1', 'Restricted Section duplication within Math OL Full Course did not preserve access.');
     $sourceHomework = $admin->query("SELECT item_description,template_data,assignment_id FROM course_items WHERE course_id='source' AND item_id='homework1'")->fetch_assoc();
     $assert(str_contains((string) $sourceHomework['item_description'], 'data-assignment-id="777"') && str_contains((string) $sourceHomework['item_description'], 'value="888"') && (int) $sourceHomework['assignment_id'] === 42, 'Source Homework HTML or canonical identity was modified during copy.');
     $assert((int) $admin->query("SELECT COUNT(*) AS n FROM course_sections WHERE course_id='source'")->fetch_assoc()['n'] === 1, 'Source section changed.');
@@ -112,6 +125,16 @@ try {
     $assert((int) $admin->query("SELECT COUNT(*) AS n FROM assignment_submissions")->fetch_assoc()['n'] === 1, 'Student submission state changed during session creation.');
     $assert((int) $admin->query("SELECT COUNT(*) AS n FROM course_logs WHERE course_id='{$nextCourseId}'")->fetch_assoc()['n'] === 0, 'Enrollment was copied to the new Course.');
     $assert((int) $admin->query("SELECT COUNT(*) AS n FROM course_live_schedules WHERE course_id='{$nextCourseId}'")->fetch_assoc()['n'] === 0, 'Old live schedules were copied to the new Course.');
+    $query($admin, "UPDATE course_sections SET access_unit='unit2' WHERE course_id='source' AND section_id='s1'");
+    $coursesBeforeRestrictedClone = (int) $admin->query('SELECT COUNT(*) AS n FROM courses')->fetch_assoc()['n'];
+    try {
+        CourseContentCopyService::createNextSession($admin, 'source', 'Restricted clone should fail', 100, 'draft', 'teacher');
+        throw new RuntimeException('Whole-Course copy accepted restricted Sections for an unsupported destination.');
+    } catch (RuntimeException $e) {
+        $assert(str_contains($e->getMessage(), 'only be copied into Math OL Full Course'), 'Unexpected error while rejecting a restricted whole-Course copy.');
+    }
+    $assert((int) $admin->query('SELECT COUNT(*) AS n FROM courses')->fetch_assoc()['n'] === $coursesBeforeRestrictedClone, 'Rejected whole-Course copy wrote a partial Course.');
+    $query($admin, "UPDATE course_sections SET access_unit='shared' WHERE course_id='source' AND section_id='s1'");
     $admin->query("UPDATE courses SET course_title='Edited new session',course_image='uploads/new-cover.jpg',course_price=300,course_state='private' WHERE course_id='{$nextCourseId}'");
     $sourceAfter = $admin->query("SELECT course_title,course_image,course_price,course_state FROM courses WHERE course_id='source'")->fetch_assoc();
     $assert(($sourceAfter['course_title'] ?? '') === 'Source' && ($sourceAfter['course_image'] ?? '') === 'uploads/source-cover.jpg' && (int) $sourceAfter['course_price'] === 125 && ($sourceAfter['course_state'] ?? '') === 'public', 'Editing the new session changed the source Course.');
@@ -123,7 +146,7 @@ try {
     $query($admin, 'DROP TRIGGER mmh_fail_next_session_item');
     $assert($rollbackObserved, 'Forced Course Item copy failure did not propagate.');
     $assert((int) $admin->query('SELECT COUNT(*) AS n FROM courses')->fetch_assoc()['n'] === $coursesBeforeFailedClone, 'Failed Next Session left a partial Course row.');
-    $assert((int) $admin->query("SELECT COUNT(*) AS n FROM course_sections WHERE course_id NOT IN ('source','destination','{$nextCourseId}')")->fetch_assoc()['n'] === 0, 'Failed Next Session left partial Sections.');
+    $assert((int) $admin->query("SELECT COUNT(*) AS n FROM course_sections WHERE course_id NOT IN ('source','destination','3078','{$nextCourseId}')")->fetch_assoc()['n'] === 0, 'Failed Next Session left partial Sections.');
 
     // The Admin's Add Student flow intentionally excludes Draft Courses.
     // A newly-created session should therefore default to Private while its

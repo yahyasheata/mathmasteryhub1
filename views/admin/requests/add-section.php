@@ -191,22 +191,32 @@ mmh_ensure_learning_schema($conn);
 $course_id = add_section_post('course_id');
 $unitAccessSchema = mmh_enrollment_course_unit_state($conn, $course_id);
 if ($unitAccessSchema === null) add_section_response(false, 'Section Access could not be verified.');
+$unitAccessSupported = mmh_course_supports_unit_section_access($course_id);
 $access_unit = isset($_POST['access_unit']) ? trim((string) $_POST['access_unit']) : null;
 if ($access_unit !== null && !in_array($access_unit, ['shared', 'unit1', 'unit2'], true)) {
     add_section_response(false, 'Invalid Section Access. Choose Shared, Unit 1, or Unit 2.');
 }
 $section_id_for_access = add_section_post('section_id');
+$storedAccessUnit = null;
+if ($method === 'UPDATE' && !empty($unitAccessSchema['ready'])) {
+    $accessLookup = $conn->prepare('SELECT access_unit FROM course_sections WHERE section_id = ? AND course_id = ? LIMIT 1');
+    if (!$accessLookup) add_section_response(false, 'Section Access could not be verified.');
+    $accessLookup->bind_param('ss', $section_id_for_access, $course_id); $accessLookup->execute();
+    $storedAccessUnit = $accessLookup->get_result()->fetch_assoc()['access_unit'] ?? null; $accessLookup->close();
+    if ($storedAccessUnit === null && !empty($unitAccessSchema['ready'])) add_section_response(false, 'Section not found.');
+}
 if (empty($unitAccessSchema['ready'])) {
     if ($access_unit !== null && $access_unit !== 'shared') add_section_response(false, 'Unit access is not ready yet. Please try again shortly.');
     $access_unit = 'shared';
 } elseif ($access_unit === null && $method === 'UPDATE') {
-    $accessLookup = $conn->prepare('SELECT access_unit FROM course_sections WHERE section_id = ? AND course_id = ? LIMIT 1');
-    if (!$accessLookup) add_section_response(false, 'Section Access could not be verified.');
-    $accessLookup->bind_param('ss', $section_id_for_access, $course_id); $accessLookup->execute();
-    $access_unit = $accessLookup->get_result()->fetch_assoc()['access_unit'] ?? null; $accessLookup->close();
+    $access_unit = $storedAccessUnit;
     if (!in_array($access_unit, ['shared', 'unit1', 'unit2'], true)) add_section_response(false, 'Invalid stored Section Access. Review the Section before saving.');
 }
 $access_unit ??= 'shared';
+if ($access_unit !== 'shared' && !$unitAccessSupported) {
+    add_section_response(false, 'Unit-restricted Sections are available only in Math OL Full Course.');
+}
+$unitActivationRequired = $access_unit !== 'shared' && ($method !== 'UPDATE' || $access_unit !== $storedAccessUnit);
 $title = add_section_post('title');
 $section_type = add_section_normalize_type(add_section_post('section_type', 'lecture'));
 $custom_type = $section_type === 'custom' ? add_section_post('custom_type') : '';
@@ -295,7 +305,7 @@ if (!$course_exists) {
 try {
     $section_id = $method === 'UPDATE' ? add_section_post('section_id') : add_section_generate_id($conn, $course_id);
     $unitActivationTransaction = false;
-    if ($access_unit !== 'shared') {
+    if ($unitActivationRequired) {
         if (empty($unitAccessSchema['ready'])) add_section_response(false, 'Unit access is not ready yet. Please try again shortly.');
         if (!$conn->begin_transaction()) add_section_response(false, 'Unit access could not be activated. Please try again.');
         $unitActivationTransaction = true;
