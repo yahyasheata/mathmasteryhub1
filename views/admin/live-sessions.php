@@ -11,11 +11,12 @@ $conn = db();
 mmh_live_ensure_schema($conn);
 
 $selectedCourse = isset($_GET['course']) ? trim((string) $_GET['course']) : '';
+$selectedGroup = in_array((string) ($_GET['group'] ?? ''), ['cambridge_a_level', 'edexcel_a_level'], true) ? (string) $_GET['group'] : '';
 $attendanceOccurrenceId = isset($_GET['occurrence']) ? trim((string) $_GET['occurrence']) : '';
 $courses = mmh_live_course_options($conn);
-$schedules = mmh_live_schedule_rows($conn, $selectedCourse);
-$occurrences = mmh_live_occurrences($conn, $selectedCourse, -3, 45);
-$upcomingOccurrences = mmh_live_admin_upcoming_occurrences($occurrences, 25);
+$schedules = mmh_live_schedule_rows($conn, $selectedCourse, $selectedGroup);
+$occurrences = mmh_live_occurrences($conn, $selectedCourse, -3, 45, null, $selectedGroup);
+$upcomingOccurrences = mmh_live_admin_upcoming_occurrences($occurrences);
 $attendanceOccurrence = $attendanceOccurrenceId !== '' ? mmh_live_occurrence($conn, $attendanceOccurrenceId) : null;
 $attendanceRows = $attendanceOccurrence ? mmh_live_students_for_occurrence($conn, $attendanceOccurrence) : [];
 $days = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
@@ -55,6 +56,12 @@ function live_admin_html($value)
                                     <option value="<?=live_admin_html($course['course_id'])?>" <?=$selectedCourse === (string) $course['course_id'] ? 'selected' : ''?>><?=live_admin_html($course['course_title'])?></option>
                                 <?php endforeach; ?>
                             </select>
+                            <select name="group" class="form-control" aria-label="Filter by A-Level group">
+                                <option value="">All A-Level groups</option>
+                                <?php foreach (['cambridge_a_level' => 'Cambridge A-Level', 'edexcel_a_level' => 'Edexcel A-Level'] as $groupKey => $groupLabel): ?>
+                                    <option value="<?=live_admin_html($groupKey)?>" <?=$selectedGroup === $groupKey ? 'selected' : ''?>><?=live_admin_html($groupLabel)?></option>
+                                <?php endforeach; ?>
+                            </select>
                             <button class="btn btn-outline-primary" type="submit">Filter</button>
                         </form>
                     </div>
@@ -67,8 +74,16 @@ function live_admin_html($value)
                                 <h2 class="h5 mb-3">Add weekly session</h2>
                                 <form action="<?=live_admin_html($liveRequestBase)?>/save-schedule" method="POST" class="live-admin-ajax">
                                     <div class="mb-3">
+                                        <label class="form-label">Schedule for</label>
+                                        <select name="schedule_owner" class="form-control" data-live-schedule-owner>
+                                            <option value="course">Individual Course</option>
+                                            <option value="cambridge_a_level">Cambridge A-Level</option>
+                                            <option value="edexcel_a_level">Edexcel A-Level</option>
+                                        </select>
+                                    </div>
+                                    <div class="mb-3">
                                         <label class="form-label">Course</label>
-                                        <select name="course_id" class="form-control" required>
+                                        <select name="course_id" class="form-control" data-live-course-owner>
                                             <?php foreach ($courses as $course): ?>
                                                 <option value="<?=live_admin_html($course['course_id'])?>" <?=$selectedCourse === (string) $course['course_id'] ? 'selected' : ''?>><?=live_admin_html($course['course_title'])?></option>
                                             <?php endforeach; ?>
@@ -115,9 +130,10 @@ function live_admin_html($value)
                                                 <td><span class="badge <?=((int)$schedule['enabled'] === 1 ? 'text-bg-success' : 'text-bg-secondary')?>"><?=((int)$schedule['enabled'] === 1 ? 'Enabled' : 'Disabled')?></span></td>
                                                 <td>
                                                     <form action="<?=live_admin_html($liveRequestBase)?>/save-schedule" method="POST" class="live-admin-ajax d-inline-block">
-                                                        <?php foreach (['schedule_id','course_id','title','day_of_week','start_time','duration_minutes','timezone','teams_url','teams_meeting_ref','academic_period','effective_start_date','effective_end_date','sort_order','admin_notes'] as $field): ?>
+                                                        <?php foreach (['schedule_id','course_id','group_key','title','day_of_week','start_time','duration_minutes','timezone','teams_url','teams_meeting_ref','academic_period','effective_start_date','effective_end_date','sort_order','admin_notes'] as $field): ?>
                                                             <input type="hidden" name="<?=$field?>" value="<?=live_admin_html($schedule[$field] ?? '')?>">
                                                         <?php endforeach; ?>
+                                                        <input type="hidden" name="schedule_owner" value="<?=live_admin_html(!empty($schedule['group_key']) ? $schedule['group_key'] : 'course')?>">
                                                         <input type="hidden" name="enabled" value="<?=((int)$schedule['enabled'] === 1 ? '0' : '1')?>">
                                                         <button class="btn btn-outline-secondary btn-sm" type="submit"><?=((int)$schedule['enabled'] === 1 ? 'Disable' : 'Enable')?></button>
                                                     </form>
@@ -126,9 +142,10 @@ function live_admin_html($value)
                                                         <button class="btn btn-outline-danger btn-sm" type="submit" data-confirm="Delete this recurring series? All future occurrences will disappear, while past sessions, attendance, and recordings remain.">Delete series</button>
                                                     </form>
                                                     <form action="<?=live_admin_html($liveRequestBase)?>/save-schedule" method="POST" class="live-admin-ajax d-inline-block">
-                                                        <?php foreach (['course_id','title','day_of_week','start_time','duration_minutes','timezone','teams_url','teams_meeting_ref','sort_order','admin_notes'] as $field): ?>
+                                                        <?php foreach (['course_id','group_key','title','day_of_week','start_time','duration_minutes','timezone','teams_url','teams_meeting_ref','sort_order','admin_notes'] as $field): ?>
                                                             <input type="hidden" name="<?=$field?>" value="<?=live_admin_html($schedule[$field] ?? '')?>">
                                                         <?php endforeach; ?>
+                                                        <input type="hidden" name="schedule_owner" value="<?=live_admin_html(!empty($schedule['group_key']) ? $schedule['group_key'] : 'course')?>">
                                                         <input type="hidden" name="academic_period" value="<?=live_admin_html(($schedule['academic_period'] ?: 'Copied') . ' copy')?>">
                                                         <input type="hidden" name="effective_start_date" value="<?=date('Y-m-d')?>">
                                                         <input type="hidden" name="effective_end_date" value="">
@@ -143,7 +160,14 @@ function live_admin_html($value)
                                                         <summary class="fw-bold" style="cursor: pointer">Edit schedule details</summary>
                                                         <form action="<?=live_admin_html($liveRequestBase)?>/save-schedule" method="POST" class="live-admin-ajax row g-2 mt-2">
                                                             <input type="hidden" name="schedule_id" value="<?=live_admin_html($schedule['schedule_id'])?>">
-                                                            <div class="col-12 col-lg-3"><label class="form-label">Course</label><select name="course_id" class="form-control"><?php foreach ($courses as $course): ?><option value="<?=live_admin_html($course['course_id'])?>" <?=$course['course_id'] === $schedule['course_id'] ? 'selected' : ''?>><?=live_admin_html($course['course_title'])?></option><?php endforeach; ?></select></div>
+                                                            <?php if (!empty($schedule['group_key'])): ?>
+                                                                <input type="hidden" name="schedule_owner" value="<?=live_admin_html($schedule['group_key'])?>">
+                                                                <input type="hidden" name="group_key" value="<?=live_admin_html($schedule['group_key'])?>">
+                                                                <div class="col-12 col-lg-3"><label class="form-label">Schedule for</label><input class="form-control" value="<?=live_admin_html(mmh_live_group_label($schedule['group_key']))?>" disabled></div>
+                                                            <?php else: ?>
+                                                                <input type="hidden" name="schedule_owner" value="course">
+                                                                <div class="col-12 col-lg-3"><label class="form-label">Course</label><select name="course_id" class="form-control"><?php foreach ($courses as $course): ?><option value="<?=live_admin_html($course['course_id'])?>" <?=$course['course_id'] === $schedule['course_id'] ? 'selected' : ''?>><?=live_admin_html($course['course_title'])?></option><?php endforeach; ?></select></div>
+                                                            <?php endif; ?>
                                                             <div class="col-12 col-lg-3"><label class="form-label">Title</label><input class="form-control" name="title" value="<?=live_admin_html($schedule['title'])?>"></div>
                                                             <div class="col-6 col-lg-2"><label class="form-label">Day</label><select class="form-control" name="day_of_week"><?php foreach ($days as $i => $day): ?><option value="<?=$i?>" <?=$i === (int)$schedule['day_of_week'] ? 'selected' : ''?>><?=$day?></option><?php endforeach; ?></select></div>
                                                             <div class="col-6 col-lg-2"><label class="form-label">Time</label><input class="form-control" type="time" name="start_time" value="<?=live_admin_html(substr((string)$schedule['start_time'], 0, 5))?>"></div>
@@ -178,7 +202,7 @@ function live_admin_html($value)
                                         <tbody>
                                         <?php if ($upcomingOccurrences): foreach ($upcomingOccurrences as $occurrence): ?>
                                             <tr>
-                                                <td><?=live_admin_html($occurrence['course_title'])?><br><small class="ds-text-muted">Recurring slot: <?=live_admin_html($occurrence['schedule_course_title'] ?? $occurrence['course_title'])?> · <?=live_admin_html($occurrence['schedule_title'] ?: 'Live session')?></small>
+                                                <td><?=live_admin_html($occurrence['course_title'] ?: 'Not Assigned Yet')?><br><small class="ds-text-muted">Recurring slot: <?=live_admin_html($occurrence['schedule_course_title'] ?? $occurrence['course_title'])?> · <?=live_admin_html($occurrence['schedule_title'] ?: 'Live session')?></small>
                                                     <?php
                                                         $scheduleGroup = (string) ($occurrence['schedule_group_key'] ?? '');
                                                         $canChoosePaper = in_array($scheduleGroup, ['cambridge_a_level', 'edexcel_a_level'], true)
@@ -191,6 +215,7 @@ function live_admin_html($value)
                                                             <div>
                                                                 <label class="form-label small mb-1" for="paper-<?=live_admin_html($occurrence['occurrence_id'])?>">Teaching Course / Paper</label>
                                                                 <select id="paper-<?=live_admin_html($occurrence['occurrence_id'])?>" name="target_course_id" class="form-control form-control-sm" required>
+                                                                    <?php if (empty($occurrence['course_id'])): ?><option value="" selected disabled>Not Assigned Yet</option><?php endif; ?>
                                                                     <?php foreach ($courses as $course): ?>
                                                                         <?php if ((string) ($course['my_courses_group_key'] ?? '') !== $scheduleGroup || !in_array((string) ($course['course_state'] ?? ''), ['public', 'private'], true) || !empty($course['archived_at'])) continue; ?>
                                                                         <option value="<?=live_admin_html($course['course_id'])?>" <?=((string) $course['course_id'] === (string) $occurrence['course_id'] ? 'selected' : '')?>><?=live_admin_html($course['course_title'])?></option>
@@ -204,11 +229,11 @@ function live_admin_html($value)
                                                 <td><?=live_admin_html(mmh_live_display_time($occurrence))?><br><small class="ds-text-muted"><?=live_admin_html($occurrence['timezone'])?></small></td>
                                                 <td><span class="badge text-bg-light"><?=live_admin_html(ucwords(str_replace('_', ' ', $occurrence['status'])))?></span></td>
                                                 <td style="min-width: 330px">
-                                                    <a class="btn btn-outline-primary btn-sm" href="live-sessions?occurrence=<?=live_admin_html($occurrence['occurrence_id'])?>&course=<?=live_admin_html($occurrence['course_id'])?>">Attendance</a>
+                                                    <?php if (!empty($occurrence['course_id'])): ?><a class="btn btn-outline-primary btn-sm" href="live-sessions?occurrence=<?=live_admin_html($occurrence['occurrence_id'])?>&course=<?=live_admin_html($occurrence['course_id'])?>">Attendance</a><?php else: ?><span class="ds-text-muted small">Assign a Paper to manage attendance</span><?php endif; ?>
                                                     <form action="<?=live_admin_html($liveRequestBase)?>/update-occurrence" method="POST" class="live-admin-ajax d-inline-flex gap-1 flex-wrap">
                                                         <input type="hidden" name="occurrence_id" value="<?=live_admin_html($occurrence['occurrence_id'])?>">
                                                         <select name="status" class="form-control form-control-sm" style="width: 125px">
-                                                            <?php foreach (['scheduled','live','completed','cancelled','rescheduled'] as $status): ?><option value="<?=$status?>" <?=$status === $occurrence['status'] ? 'selected' : ''?>><?=ucwords($status)?></option><?php endforeach; ?>
+                                                            <?php foreach ((!empty($occurrence['course_id']) ? ['scheduled','live','completed','cancelled','rescheduled'] : ['scheduled','cancelled','rescheduled']) as $status): ?><option value="<?=$status?>" <?=$status === $occurrence['status'] ? 'selected' : ''?>><?=ucwords($status)?></option><?php endforeach; ?>
                                                         </select>
                                                         <input class="form-control form-control-sm" type="datetime-local" name="scheduled_start_at" title="Optional reschedule start" style="width: 185px">
                                                         <input class="form-control form-control-sm" type="url" name="replacement_url" placeholder="Replacement Teams URL" style="width: 210px">
@@ -231,7 +256,7 @@ function live_admin_html($value)
                         </div>
                     </div>
 
-                    <?php if ($attendanceOccurrence): ?>
+                    <?php if ($attendanceOccurrence && !empty($attendanceOccurrence['course_id'])): ?>
                         <section class="ds-card mt-4 live-attendance-panel" id="live-attendance-panel">
                             <div class="d-flex flex-wrap justify-content-between gap-3 align-items-start mb-3">
                                 <div>
@@ -368,6 +393,20 @@ function live_admin_html($value)
     });
   });
 })();
+</script>
+<script>
+document.querySelectorAll('[data-live-schedule-owner]').forEach(function (owner) {
+    const form = owner.closest('form');
+    const course = form ? form.querySelector('[data-live-course-owner]') : null;
+    if (!course) return;
+    const syncOwner = function () {
+        const individual = owner.value === 'course';
+        course.disabled = !individual;
+        course.required = individual;
+    };
+    owner.addEventListener('change', syncOwner);
+    syncOwner();
+});
 </script>
 </body>
 </html>

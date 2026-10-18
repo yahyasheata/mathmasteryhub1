@@ -7,6 +7,10 @@ require_once $root . '/connection/config.php';
 require_once $root . '/inc/LiveSessions.php';
 
 $admin = db();
+$identity = $admin->query('SELECT @@hostname AS server_host, DATABASE() AS database_name')->fetch_assoc();
+if (($identity['server_host'] ?? '') !== 'pcs-MacBook-Air-2.local' || ($identity['database_name'] ?? '') !== 'mathmsgv_lms') {
+    throw new RuntimeException('Refusing isolated Live Session test setup outside the verified local development database.');
+}
 $hostValue = (string) $host;
 $userValue = (string) $user;
 $passValue = (string) $pass;
@@ -26,8 +30,9 @@ try {
     $query($admin, "CREATE TABLE courses (id INT AUTO_INCREMENT PRIMARY KEY, course_id VARCHAR(40) NOT NULL UNIQUE, course_title VARCHAR(190) NOT NULL, course_state VARCHAR(20) NOT NULL DEFAULT 'public', archived_at DATETIME NULL, my_courses_group_key VARCHAR(32) NULL)");
     $query($admin, "INSERT INTO courses (course_id,course_title) VALUES ('course-a','Course A'),('course-b','Course B')");
     // Begin with the pre-release shape so the migration is exercised against an existing table.
-    $query($admin, "CREATE TABLE course_live_schedules (id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY, schedule_id VARCHAR(40) NOT NULL UNIQUE, course_id VARCHAR(40) NOT NULL, title VARCHAR(190) NULL, day_of_week TINYINT UNSIGNED NOT NULL, start_time TIME NOT NULL, duration_minutes INT UNSIGNED NOT NULL DEFAULT 90, timezone VARCHAR(80) NOT NULL DEFAULT 'Asia/Riyadh', teams_url TEXT NOT NULL, teams_meeting_ref VARCHAR(190) NULL, academic_period VARCHAR(120) NULL, effective_start_date DATE NOT NULL, effective_end_date DATE NULL, enabled TINYINT(1) NOT NULL DEFAULT 1, sort_order INT UNSIGNED NOT NULL DEFAULT 0, admin_notes TEXT NULL, created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP, updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP) ENGINE=InnoDB");
+    $query($admin, "CREATE TABLE course_live_schedules (id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY, schedule_id VARCHAR(40) NOT NULL UNIQUE, course_id VARCHAR(40) NOT NULL, group_key VARCHAR(32) NULL DEFAULT NULL, title VARCHAR(190) NULL, day_of_week TINYINT UNSIGNED NOT NULL, start_time TIME NOT NULL, duration_minutes INT UNSIGNED NOT NULL DEFAULT 90, timezone VARCHAR(80) NOT NULL DEFAULT 'Asia/Riyadh', teams_url TEXT NOT NULL, teams_meeting_ref VARCHAR(190) NULL, academic_period VARCHAR(120) NULL, effective_start_date DATE NOT NULL, effective_end_date DATE NULL, enabled TINYINT(1) NOT NULL DEFAULT 1, sort_order INT UNSIGNED NOT NULL DEFAULT 0, admin_notes TEXT NULL, created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP, updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP) ENGINE=InnoDB");
     ob_start();
+    $conn = $admin;
     require $root . '/database/migrations/20261018_add_live_schedule_deleted_at.php';
     require $root . '/database/migrations/20261018_add_live_schedule_deleted_at.php';
     ob_end_clean();

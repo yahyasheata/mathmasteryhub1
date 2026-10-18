@@ -42,22 +42,35 @@ jobs:
                 exit 1
               fi
               mysqldump --defaults-extra-file="$dump_defaults" "$DB_NAME" $table_list > "$backup_dir/tables.sql"
+              if [ ! -s "$backup_dir/tables.sql" ] || [ ! -r "$backup_dir/tables.sql" ]; then
+                echo "Database backup failed: the dump file is empty or unreadable." >&2
+                rm -f "$dump_defaults"
+                exit 1
+              fi
               rm -f "$dump_defaults"
             else
               echo "Database backup could not be created: mysqldump or DB settings are unavailable." >&2
               exit 1
             fi
             git fetch origin main
+            preflight_script="$(mktemp)"
+            trap 'rm -f "$preflight_script"' EXIT
+            chmod 600 "$preflight_script"
+            git show origin/main:scripts/preflight_a_level_live_session_schema.php > "$preflight_script"
+            MMH_PROJECT_ROOT="$PWD" php "$preflight_script"
             git show origin/main:database/migrations/20261018_add_live_schedule_deleted_at.php > database/migrations/20261018_add_live_schedule_deleted_at.php
             php database/migrations/20261018_add_live_schedule_deleted_at.php
             git show origin/main:database/migrations/20261018_add_my_courses_group_key.php > database/migrations/20261018_add_my_courses_group_key.php
             php database/migrations/20261018_add_my_courses_group_key.php
+            git show origin/main:database/migrations/20261018_add_a_level_live_schedule_ownership.php > database/migrations/20261018_add_a_level_live_schedule_ownership.php
+            php database/migrations/20261018_add_a_level_live_schedule_ownership.php
             git reset --hard origin/main
             php -r 'if (function_exists("opcache_reset")) { opcache_reset(); echo "OPcache reset.\n"; }'
             php database/migrations/20260807_finalize_runtime_schema.php
             php database/migrations/20261018_add_live_schedule_deleted_at.php
             php database/migrations/20261017_add_modular_section_access.php
             php database/migrations/20261018_add_my_courses_group_key.php
+            php database/migrations/20261018_add_a_level_live_schedule_ownership.php
             php database/migrations/20260806_add_admin_archive_markers.php
             php database/migrations/20260806_enforce_course_log_uniqueness.php
             php database/migrations/20260801_create_student_learning_evidence.php

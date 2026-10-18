@@ -22,6 +22,11 @@ if (!$occurrence || in_array($occurrence['status'], ['cancelled', 'deleted'], tr
     echo 'Live session is unavailable.';
     exit;
 }
+if (trim((string) ($occurrence['course_id'] ?? '')) === '') {
+    http_response_code(404);
+    echo 'Live session is unavailable.';
+    exit;
+}
 
 $occurrenceStart = mmh_live_occurrence_timestamp($occurrence, 'scheduled_start_at');
 if ($occurrenceStart !== false && $occurrenceStart > time() && (int) ($occurrence['schedule_enabled'] ?? 0) !== 1) {

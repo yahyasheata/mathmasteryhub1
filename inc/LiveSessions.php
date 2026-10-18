@@ -40,7 +40,8 @@ if (!function_exists('mmh_live_ensure_schema')) {
             $conn->query("CREATE TABLE IF NOT EXISTS `course_live_schedules` (
                 `id` BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
                 `schedule_id` VARCHAR(40) NOT NULL,
-                `course_id` VARCHAR(40) NOT NULL,
+                `course_id` VARCHAR(40) NULL DEFAULT NULL,
+                `group_key` VARCHAR(32) NULL DEFAULT NULL,
                 `title` VARCHAR(190) NULL,
                 `day_of_week` TINYINT UNSIGNED NOT NULL,
                 `start_time` TIME NOT NULL,
@@ -60,7 +61,8 @@ if (!function_exists('mmh_live_ensure_schema')) {
                 PRIMARY KEY (`id`),
                 UNIQUE KEY `uniq_schedule_id` (`schedule_id`),
                 KEY `idx_course_effective` (`course_id`, `enabled`, `effective_start_date`, `effective_end_date`),
-                KEY `idx_course_day_sort` (`course_id`, `day_of_week`, `start_time`, `sort_order`)
+                KEY `idx_course_day_sort` (`course_id`, `day_of_week`, `start_time`, `sort_order`),
+                KEY `idx_group_effective` (`group_key`, `enabled`, `effective_start_date`, `effective_end_date`)
             ) ENGINE=InnoDB DEFAULT CHARSET=utf8 COLLATE=utf8_unicode_ci");
         }
 
@@ -69,7 +71,7 @@ if (!function_exists('mmh_live_ensure_schema')) {
                 `id` BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
                 `occurrence_id` VARCHAR(40) NOT NULL,
                 `schedule_id` VARCHAR(40) NOT NULL,
-                `course_id` VARCHAR(40) NOT NULL,
+                `course_id` VARCHAR(40) NULL DEFAULT NULL,
                 `scheduled_start_at` DATETIME NOT NULL,
                 `scheduled_end_at` DATETIME NOT NULL,
                 `timezone` VARCHAR(80) NOT NULL DEFAULT 'Asia/Riyadh',
@@ -208,18 +210,54 @@ if (!function_exists('mmh_live_course_options')) {
     }
 }
 
+if (!function_exists('mmh_live_group_label')) {
+    function mmh_live_group_label($groupKey)
+    {
+        return [
+            'cambridge_a_level' => 'Cambridge A-Level',
+            'edexcel_a_level' => 'Edexcel A-Level',
+        ][(string) $groupKey] ?? '';
+    }
+}
+
+if (!function_exists('mmh_live_course_group_change_allowed')) {
+    /** Prevent changing a Paper's group while future active occurrences still rely on its current group. */
+    function mmh_live_course_group_change_allowed(mysqli $conn, $courseId, $newGroupKey)
+    {
+        $courseId = trim((string) $courseId);
+        $newGroupKey = trim((string) $newGroupKey);
+        if ($courseId === '' || !mmh_table_exists($conn, 'live_session_occurrences') || !mmh_table_exists($conn, 'course_live_schedules')) return true;
+        $stmt = $conn->prepare("SELECT 1 FROM live_session_occurrences o INNER JOIN course_live_schedules s ON s.schedule_id = o.schedule_id WHERE o.course_id = ? AND s.group_key IN ('cambridge_a_level','edexcel_a_level') AND s.group_key <> ? AND s.deleted_at IS NULL AND o.status NOT IN ('cancelled','deleted') AND o.scheduled_start_at > UTC_TIMESTAMP() LIMIT 1");
+        if (!$stmt) return false;
+        $stmt->bind_param('ss', $courseId, $newGroupKey);
+        $stmt->execute();
+        $conflict = $stmt->get_result()->num_rows > 0;
+        $stmt->close();
+        return !$conflict;
+    }
+}
+
 if (!function_exists('mmh_live_schedule_rows')) {
-    function mmh_live_schedule_rows(mysqli $conn, $courseId = '')
+    function mmh_live_schedule_rows(mysqli $conn, $courseId = '', $groupKey = '')
     {
         mmh_live_ensure_schema($conn);
-        if ($courseId !== '') {
-            $stmt = $conn->prepare('SELECT s.*, c.course_title FROM course_live_schedules AS s INNER JOIN courses AS c ON c.course_id = s.course_id WHERE s.course_id = ? AND s.deleted_at IS NULL ORDER BY s.day_of_week ASC, s.start_time ASC, s.sort_order ASC');
+        $groupKey = in_array((string) $groupKey, ['cambridge_a_level', 'edexcel_a_level'], true) ? (string) $groupKey : '';
+        if ($courseId !== '' && $groupKey !== '') {
+            $stmt = $conn->prepare('SELECT s.*, COALESCE(c.course_title, CASE s.group_key WHEN \'cambridge_a_level\' THEN \'Cambridge A-Level\' WHEN \'edexcel_a_level\' THEN \'Edexcel A-Level\' END) AS course_title FROM course_live_schedules AS s LEFT JOIN courses AS c ON c.course_id = s.course_id WHERE (s.course_id = ? OR s.group_key = ?) AND s.deleted_at IS NULL ORDER BY s.day_of_week ASC, s.start_time ASC, s.sort_order ASC');
+            if (!$stmt) return [];
+            $stmt->bind_param('ss', $courseId, $groupKey);
+        } elseif ($courseId !== '') {
+            $stmt = $conn->prepare('SELECT s.*, COALESCE(c.course_title, CASE s.group_key WHEN \'cambridge_a_level\' THEN \'Cambridge A-Level\' WHEN \'edexcel_a_level\' THEN \'Edexcel A-Level\' END) AS course_title FROM course_live_schedules AS s LEFT JOIN courses AS c ON c.course_id = s.course_id WHERE s.course_id = ? AND s.deleted_at IS NULL ORDER BY s.day_of_week ASC, s.start_time ASC, s.sort_order ASC');
             if (!$stmt) {
                 return [];
             }
             $stmt->bind_param('s', $courseId);
+        } elseif ($groupKey !== '') {
+            $stmt = $conn->prepare('SELECT s.*, COALESCE(c.course_title, CASE s.group_key WHEN \'cambridge_a_level\' THEN \'Cambridge A-Level\' WHEN \'edexcel_a_level\' THEN \'Edexcel A-Level\' END) AS course_title FROM course_live_schedules AS s LEFT JOIN courses AS c ON c.course_id = s.course_id WHERE s.group_key = ? AND s.deleted_at IS NULL ORDER BY s.day_of_week ASC, s.start_time ASC, s.sort_order ASC');
+            if (!$stmt) return [];
+            $stmt->bind_param('s', $groupKey);
         } else {
-            $stmt = $conn->prepare('SELECT s.*, c.course_title FROM course_live_schedules AS s INNER JOIN courses AS c ON c.course_id = s.course_id WHERE s.deleted_at IS NULL ORDER BY c.course_title ASC, s.day_of_week ASC, s.start_time ASC');
+            $stmt = $conn->prepare('SELECT s.*, COALESCE(c.course_title, CASE s.group_key WHEN \'cambridge_a_level\' THEN \'Cambridge A-Level\' WHEN \'edexcel_a_level\' THEN \'Edexcel A-Level\' END) AS course_title FROM course_live_schedules AS s LEFT JOIN courses AS c ON c.course_id = s.course_id WHERE s.deleted_at IS NULL ORDER BY c.course_title ASC, s.group_key ASC, s.day_of_week ASC, s.start_time ASC');
             if (!$stmt) {
                 return [];
             }
@@ -236,6 +274,21 @@ if (!function_exists('mmh_live_save_schedule')) {
     {
         mmh_live_ensure_schema($conn);
         $courseId = trim((string) ($data['course_id'] ?? ''));
+        $groupKey = trim((string) ($data['group_key'] ?? ''));
+        $groupKey = $groupKey === '' ? null : $groupKey;
+        $scheduleOwner = trim((string) ($data['schedule_owner'] ?? ''));
+        if (($courseId !== '' && $groupKey !== null)
+            || (in_array($scheduleOwner, ['cambridge_a_level', 'edexcel_a_level'], true) && $courseId !== '')
+            || ($scheduleOwner === 'course' && $groupKey !== null)
+            || (in_array($scheduleOwner, ['cambridge_a_level', 'edexcel_a_level'], true) && $groupKey !== null && $groupKey !== $scheduleOwner)) {
+            return [false, 'Choose exactly one matching schedule owner: an Individual Course or one A-Level group.'];
+        }
+        if (in_array($scheduleOwner, ['cambridge_a_level', 'edexcel_a_level'], true)) {
+            $courseId = '';
+            $groupKey = $scheduleOwner;
+        } elseif ($scheduleOwner === 'course') {
+            $groupKey = null;
+        }
         $title = trim((string) ($data['title'] ?? ''));
         $day = (int) ($data['day_of_week'] ?? -1);
         $startTime = trim((string) ($data['start_time'] ?? ''));
@@ -250,8 +303,17 @@ if (!function_exists('mmh_live_save_schedule')) {
         $sortOrder = max(0, (int) ($data['sort_order'] ?? 0));
         $notes = trim((string) ($data['admin_notes'] ?? ''));
 
-        if ($courseId === '' || $day < 0 || $day > 6 || !preg_match('/^\d{2}:\d{2}$/', $startTime) || $teamsUrl === null || strtotime($startDate) === false) {
-            return [false, 'Please provide a valid course, weekday, time, effective date, and Microsoft Teams HTTPS URL.'];
+        if (($courseId === '') === ($groupKey === null) || ($groupKey !== null && !in_array($groupKey, ['cambridge_a_level', 'edexcel_a_level'], true)) || $day < 0 || $day > 6 || !preg_match('/^\d{2}:\d{2}$/', $startTime) || $teamsUrl === null || strtotime($startDate) === false) {
+            return [false, 'Choose exactly one valid Course or A-Level schedule owner, then provide a weekday, time, effective date, and Microsoft Teams HTTPS URL.'];
+        }
+        if ($courseId !== '') {
+            $courseExists = $conn->prepare('SELECT 1 FROM courses WHERE course_id = ? LIMIT 1');
+            if (!$courseExists) return [false, 'Unable to verify the selected Course.'];
+            $courseExists->bind_param('s', $courseId);
+            $courseExists->execute();
+            $validCourse = $courseExists->get_result()->num_rows > 0;
+            $courseExists->close();
+            if (!$validCourse) return [false, 'Select an existing Course for this schedule.'];
         }
         if ($endDate !== '' && strtotime($endDate) === false) {
             return [false, 'Effective end date is invalid.'];
@@ -259,12 +321,25 @@ if (!function_exists('mmh_live_save_schedule')) {
 
         $scheduleId = trim((string) ($data['schedule_id'] ?? ''));
         if ($scheduleId !== '') {
-            $stmt = $conn->prepare('UPDATE course_live_schedules SET course_id=?, title=?, day_of_week=?, start_time=?, duration_minutes=?, timezone=?, teams_url=?, teams_meeting_ref=?, academic_period=?, effective_start_date=?, effective_end_date=?, enabled=?, sort_order=?, admin_notes=? WHERE schedule_id=? AND deleted_at IS NULL');
+            $owner = $conn->prepare('SELECT course_id, group_key FROM course_live_schedules WHERE schedule_id = ? AND deleted_at IS NULL LIMIT 1');
+            if (!$owner) return [false, 'Unable to verify schedule ownership.'];
+            $owner->bind_param('s', $scheduleId);
+            $owner->execute();
+            $currentOwner = $owner->get_result()->fetch_assoc();
+            $owner->close();
+            if (!$currentOwner) return [false, 'Schedule not found or has been deleted.'];
+            if (!empty($currentOwner['group_key'])) {
+                if ($courseId !== '' || $groupKey !== (string) $currentOwner['group_key']) return [false, 'A group schedule owner cannot be changed after creation.'];
+            } elseif ($groupKey !== null) {
+                return [false, 'An existing Course schedule cannot be changed to a group schedule. Create a separate schedule instead.'];
+            }
+            $stmt = $conn->prepare('UPDATE course_live_schedules SET course_id=?, group_key=?, title=?, day_of_week=?, start_time=?, duration_minutes=?, timezone=?, teams_url=?, teams_meeting_ref=?, academic_period=?, effective_start_date=?, effective_end_date=?, enabled=?, sort_order=?, admin_notes=? WHERE schedule_id=? AND deleted_at IS NULL');
             if (!$stmt) {
                 return [false, 'Unable to prepare schedule update: ' . $conn->error];
             }
             $endDateParam = $endDate !== '' ? $endDate : null;
-            $stmt->bind_param('ssisissssssiiss', $courseId, $title, $day, $startTime, $duration, $timezone, $teamsUrl, $meetingRef, $period, $startDate, $endDateParam, $enabled, $sortOrder, $notes, $scheduleId);
+            $courseIdParam = $courseId !== '' ? $courseId : null;
+            $stmt->bind_param('sssisissssssiiss', $courseIdParam, $groupKey, $title, $day, $startTime, $duration, $timezone, $teamsUrl, $meetingRef, $period, $startDate, $endDateParam, $enabled, $sortOrder, $notes, $scheduleId);
             $ok = $stmt->execute();
             $affected = $stmt->affected_rows;
             $stmt->close();
@@ -288,12 +363,13 @@ if (!function_exists('mmh_live_save_schedule')) {
         }
 
         $scheduleId = mmh_live_id('sched');
-        $stmt = $conn->prepare('INSERT INTO course_live_schedules (schedule_id, course_id, title, day_of_week, start_time, duration_minutes, timezone, teams_url, teams_meeting_ref, academic_period, effective_start_date, effective_end_date, enabled, sort_order, admin_notes) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)');
+        $stmt = $conn->prepare('INSERT INTO course_live_schedules (schedule_id, course_id, group_key, title, day_of_week, start_time, duration_minutes, timezone, teams_url, teams_meeting_ref, academic_period, effective_start_date, effective_end_date, enabled, sort_order, admin_notes) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)');
         if (!$stmt) {
             return [false, 'Unable to prepare schedule insert: ' . $conn->error];
         }
         $endDateParam = $endDate !== '' ? $endDate : null;
-        $stmt->bind_param('sssisissssssiis', $scheduleId, $courseId, $title, $day, $startTime, $duration, $timezone, $teamsUrl, $meetingRef, $period, $startDate, $endDateParam, $enabled, $sortOrder, $notes);
+        $courseIdParam = $courseId !== '' ? $courseId : null;
+        $stmt->bind_param('ssssisissssssiis', $scheduleId, $courseIdParam, $groupKey, $title, $day, $startTime, $duration, $timezone, $teamsUrl, $meetingRef, $period, $startDate, $endDateParam, $enabled, $sortOrder, $notes);
         $ok = $stmt->execute();
         $stmt->close();
         return [$ok, $ok ? 'Schedule added successfully.' : 'Schedule insert failed.', ['schedule_id' => $scheduleId]];
@@ -355,12 +431,22 @@ if (!function_exists('mmh_live_generate_occurrences')) {
         return $deleted;
     }
 
-    function mmh_live_generate_occurrences(mysqli $conn, $fromDays = -3, $toDays = 45, $courseId = '')
+    function mmh_live_generate_occurrences(mysqli $conn, $fromDays = -3, $toDays = 45, $courseId = '', $groupKey = '')
     {
         mmh_live_ensure_schema($conn);
         $from = new DateTime('today ' . ((int) $fromDays) . ' days', new DateTimeZone('UTC'));
         $to = new DateTime('today +' . ((int) $toDays) . ' days', new DateTimeZone('UTC'));
-        $schedules = mmh_live_schedule_rows($conn, $courseId);
+        $groupKey = in_array((string) $groupKey, ['cambridge_a_level', 'edexcel_a_level'], true) ? (string) $groupKey : '';
+        if ($courseId !== '' && $groupKey === '') {
+            $course = $conn->prepare('SELECT my_courses_group_key FROM courses WHERE course_id = ? LIMIT 1');
+            if ($course) {
+                $course->bind_param('s', $courseId);
+                $course->execute();
+                $groupKey = (string) ($course->get_result()->fetch_assoc()['my_courses_group_key'] ?? '');
+                $course->close();
+            }
+        }
+        $schedules = mmh_live_schedule_rows($conn, $courseId, $groupKey);
         $inserted = 0;
 
         foreach ($schedules as $schedule) {
@@ -389,8 +475,13 @@ if (!function_exists('mmh_live_generate_occurrences')) {
                         if ($stmt) {
                             $start = $utcStart->format('Y-m-d H:i:s');
                             $endAt = $utcEnd->format('Y-m-d H:i:s');
-                            $stmt->bind_param('sssssss', $occurrenceId, $schedule['schedule_id'], $schedule['course_id'], $start, $endAt, $schedule['timezone'], $schedule['teams_url']);
-                            $stmt->execute();
+                            $scheduleCourseId = !empty($schedule['course_id']) ? (string) $schedule['course_id'] : null;
+                            $stmt->bind_param('sssssss', $occurrenceId, $schedule['schedule_id'], $scheduleCourseId, $start, $endAt, $schedule['timezone'], $schedule['teams_url']);
+                            if (!$stmt->execute()) {
+                                $generationError = $stmt->error;
+                                $stmt->close();
+                                throw new RuntimeException('Unable to generate Live Session occurrence: ' . $generationError);
+                            }
                             $inserted += $stmt->affected_rows > 0 ? 1 : 0;
                             $stmt->close();
                         }
@@ -405,18 +496,18 @@ if (!function_exists('mmh_live_generate_occurrences')) {
 }
 
 if (!function_exists('mmh_live_occurrences')) {
-    function mmh_live_occurrences(mysqli $conn, $courseId = '', $fromDays = -3, $toDays = 45, $onlyEnrolledUserId = null)
+    function mmh_live_occurrences(mysqli $conn, $courseId = '', $fromDays = -3, $toDays = 45, $onlyEnrolledUserId = null, $groupKey = '')
     {
-        mmh_live_generate_occurrences($conn, $fromDays, $toDays, $courseId);
+        mmh_live_generate_occurrences($conn, $fromDays, $toDays, $courseId, $groupKey);
         $from = gmdate('Y-m-d H:i:s', strtotime((int) $fromDays . ' days'));
         $to = gmdate('Y-m-d H:i:s', strtotime('+' . (int) $toDays . ' days'));
         $params = [];
         $types = '';
-        $sql = 'SELECT o.*, s.title AS schedule_title, s.academic_period, s.course_id AS schedule_course_id, s.enabled AS schedule_enabled, s.deleted_at AS schedule_deleted_at, base.course_title AS schedule_course_title, base.my_courses_group_key AS schedule_group_key, c.course_title';
+        $sql = 'SELECT o.*, s.title AS schedule_title, s.academic_period, s.course_id AS schedule_course_id, COALESCE(s.group_key, base.my_courses_group_key) AS schedule_group_key, s.enabled AS schedule_enabled, s.deleted_at AS schedule_deleted_at, COALESCE(base.course_title, CASE s.group_key WHEN \'cambridge_a_level\' THEN \'Cambridge A-Level\' WHEN \'edexcel_a_level\' THEN \'Edexcel A-Level\' END) AS schedule_course_title, c.course_title';
         if ($onlyEnrolledUserId !== null) {
             $sql .= ', a.status AS attendance_status, a.first_join_clicked_at, a.last_join_clicked_at, a.confirmed_source';
         }
-        $sql .= ' FROM live_session_occurrences AS o INNER JOIN course_live_schedules AS s ON s.schedule_id = o.schedule_id INNER JOIN courses AS base ON base.course_id = s.course_id INNER JOIN courses AS c ON c.course_id = o.course_id';
+        $sql .= ' FROM live_session_occurrences AS o INNER JOIN course_live_schedules AS s ON s.schedule_id = o.schedule_id LEFT JOIN courses AS base ON base.course_id = s.course_id LEFT JOIN courses AS c ON c.course_id = o.course_id';
         if ($onlyEnrolledUserId !== null) {
             $sql .= ' INNER JOIN (SELECT DISTINCT course_id FROM course_logs WHERE user_id = ?) AS cl ON cl.course_id = o.course_id';
             $types .= 'i';
@@ -430,12 +521,17 @@ if (!function_exists('mmh_live_occurrences')) {
         $params[] = $from;
         $params[] = $to;
         if ($onlyEnrolledUserId !== null) {
-            $sql .= " AND c.course_state IN ('public', 'private') AND o.status NOT IN ('cancelled', 'deleted') AND (o.scheduled_start_at < UTC_TIMESTAMP() OR s.enabled = 1)";
+            $sql .= " AND o.course_id IS NOT NULL AND o.course_id <> '' AND c.course_state IN ('public', 'private') AND o.status NOT IN ('cancelled', 'deleted') AND (o.scheduled_start_at < UTC_TIMESTAMP() OR s.enabled = 1)";
         }
         if ($courseId !== '') {
             $sql .= ' AND o.course_id = ?';
             $types .= 's';
             $params[] = $courseId;
+        }
+        if ($groupKey !== '' && in_array((string) $groupKey, ['cambridge_a_level', 'edexcel_a_level'], true)) {
+            $sql .= ' AND s.group_key = ?';
+            $types .= 's';
+            $params[] = $groupKey;
         }
         $sql .= ' ORDER BY o.scheduled_start_at ASC, s.sort_order ASC';
         $stmt = $conn->prepare($sql);
@@ -451,14 +547,14 @@ if (!function_exists('mmh_live_occurrences')) {
 }
 
 if (!function_exists('mmh_live_admin_upcoming_occurrences')) {
-    function mmh_live_admin_upcoming_occurrences(array $occurrences, $limit = 25)
+    function mmh_live_admin_upcoming_occurrences(array $occurrences, $limit = null)
     {
         $visible = array_values(array_filter($occurrences, static function ($occurrence) {
             return is_array($occurrence)
                 && strtolower(trim((string) ($occurrence['status'] ?? ''))) !== 'deleted'
                 && empty($occurrence['schedule_deleted_at']);
         }));
-        return array_slice($visible, 0, max(0, (int) $limit));
+        return $limit === null ? $visible : array_slice($visible, 0, max(0, (int) $limit));
     }
 }
 
@@ -550,7 +646,7 @@ if (!function_exists('mmh_live_occurrence')) {
     function mmh_live_occurrence(mysqli $conn, $occurrenceId)
     {
         mmh_live_ensure_schema($conn);
-        $stmt = $conn->prepare('SELECT o.*, s.title AS schedule_title, s.enabled AS schedule_enabled, s.deleted_at AS schedule_deleted_at, s.course_id AS schedule_course_id, base.course_title AS schedule_course_title, base.my_courses_group_key AS schedule_group_key, c.course_title FROM live_session_occurrences AS o INNER JOIN course_live_schedules AS s ON s.schedule_id = o.schedule_id INNER JOIN courses AS base ON base.course_id = s.course_id INNER JOIN courses AS c ON c.course_id = o.course_id WHERE o.occurrence_id = ? LIMIT 1');
+        $stmt = $conn->prepare('SELECT o.*, s.title AS schedule_title, s.enabled AS schedule_enabled, s.deleted_at AS schedule_deleted_at, s.course_id AS schedule_course_id, COALESCE(base.course_title, CASE s.group_key WHEN \'cambridge_a_level\' THEN \'Cambridge A-Level\' WHEN \'edexcel_a_level\' THEN \'Edexcel A-Level\' END) AS schedule_course_title, COALESCE(s.group_key, base.my_courses_group_key) AS schedule_group_key, c.course_title FROM live_session_occurrences AS o INNER JOIN course_live_schedules AS s ON s.schedule_id = o.schedule_id LEFT JOIN courses AS base ON base.course_id = s.course_id LEFT JOIN courses AS c ON c.course_id = o.course_id WHERE o.occurrence_id = ? LIMIT 1');
         if (!$stmt) {
             return null;
         }
@@ -574,7 +670,7 @@ if (!function_exists('mmh_live_reassign_occurrence_course')) {
 
         try {
             $conn->begin_transaction();
-            $stmt = $conn->prepare("SELECT o.occurrence_id, o.course_id, o.schedule_id, o.scheduled_start_at, o.status, o.actual_start_at, s.course_id AS schedule_course_id, s.deleted_at AS schedule_deleted_at, (o.scheduled_start_at > UTC_TIMESTAMP()) AS is_future FROM live_session_occurrences o INNER JOIN course_live_schedules s ON s.schedule_id = o.schedule_id WHERE o.occurrence_id = ? FOR UPDATE");
+            $stmt = $conn->prepare("SELECT o.occurrence_id, o.course_id, o.schedule_id, o.scheduled_start_at, o.status, o.actual_start_at, s.course_id AS schedule_course_id, s.group_key AS schedule_group_key, s.deleted_at AS schedule_deleted_at, (o.scheduled_start_at > UTC_TIMESTAMP()) AS is_future FROM live_session_occurrences o INNER JOIN course_live_schedules s ON s.schedule_id = o.schedule_id WHERE o.occurrence_id = ? FOR UPDATE");
             if (!$stmt) throw new RuntimeException('Unable to check the session occurrence.');
             $stmt->bind_param('s', $occurrenceId);
             $stmt->execute();
@@ -585,21 +681,22 @@ if (!function_exists('mmh_live_reassign_occurrence_course')) {
                 throw new RuntimeException('Only a not-yet-started future session can be reassigned.');
             }
 
-            $courseStmt = $conn->prepare("SELECT course_id, course_state, archived_at, my_courses_group_key FROM courses WHERE course_id IN (?, ?) FOR UPDATE");
+            $courseStmt = $conn->prepare("SELECT course_id, course_state, archived_at, my_courses_group_key FROM courses WHERE course_id = ? OR course_id = ? FOR UPDATE");
             if (!$courseStmt) throw new RuntimeException('Unable to check Course availability.');
-            $scheduleCourseId = (string) $occurrence['schedule_course_id'];
+            $scheduleCourseId = !empty($occurrence['schedule_course_id']) ? (string) $occurrence['schedule_course_id'] : null;
             $courseStmt->bind_param('ss', $scheduleCourseId, $targetCourseId);
             $courseStmt->execute();
             $courseRows = $courseStmt->get_result()->fetch_all(MYSQLI_ASSOC);
             $courseStmt->close();
             $courseById = [];
             foreach ($courseRows as $course) $courseById[(string) $course['course_id']] = $course;
-            $baseCourse = $courseById[$scheduleCourseId] ?? null;
+            $baseCourse = $scheduleCourseId !== null ? ($courseById[$scheduleCourseId] ?? null) : null;
             $targetCourse = $courseById[$targetCourseId] ?? null;
-            if (!$baseCourse || !$targetCourse || !in_array((string) $targetCourse['course_state'], ['public', 'private'], true) || !empty($targetCourse['archived_at'])) {
+            $scheduleGroup = (string) ($occurrence['schedule_group_key'] ?? '');
+            if (($scheduleCourseId !== null && !$baseCourse) || ($scheduleCourseId === null && !in_array($scheduleGroup, ['cambridge_a_level', 'edexcel_a_level'], true)) || !$targetCourse || !in_array((string) $targetCourse['course_state'], ['public', 'private'], true) || !empty($targetCourse['archived_at'])) {
                 throw new RuntimeException('The selected Course is unavailable.');
             }
-            $group = (string) ($baseCourse['my_courses_group_key'] ?? '');
+            $group = $scheduleGroup !== '' ? $scheduleGroup : (string) ($baseCourse['my_courses_group_key'] ?? '');
             if (!in_array($group, ['cambridge_a_level', 'edexcel_a_level'], true) || (string) ($targetCourse['my_courses_group_key'] ?? '') !== $group) {
                 throw new RuntimeException('Choose a Paper in the same Cambridge or Edexcel A-Level group as the recurring slot.');
             }
@@ -682,6 +779,9 @@ if (!function_exists('mmh_live_join_state')) {
     {
         $now = $now === null ? time() : (int) $now;
         $status = strtolower(trim((string) ($occurrence['status'] ?? 'scheduled')));
+        if (trim((string) ($occurrence['course_id'] ?? '')) === '') {
+            return ['active' => false, 'state' => 'unassigned', 'label' => 'Paper not assigned yet'];
+        }
         $target = mmh_live_sanitize_teams_url((string) (($occurrence['replacement_url'] ?? '') ?: ($occurrence['teams_url_snapshot'] ?? '')));
         $window = mmh_live_join_window($occurrence);
 
@@ -785,7 +885,7 @@ if (!function_exists('mmh_live_record_join')) {
         mmh_live_ensure_schema($conn);
         $userId = (int) $userId;
         $occurrenceId = (string) ($occurrence['occurrence_id'] ?? '');
-        if ($occurrenceId === '') return false;
+        if ($occurrenceId === '' || trim((string) ($occurrence['course_id'] ?? '')) === '') return false;
         try {
             $conn->begin_transaction();
             $stmt = $conn->prepare('SELECT o.*, s.enabled AS schedule_enabled FROM live_session_occurrences o INNER JOIN course_live_schedules s ON s.schedule_id = o.schedule_id WHERE o.occurrence_id = ? FOR UPDATE');
@@ -794,7 +894,7 @@ if (!function_exists('mmh_live_record_join')) {
             $stmt->execute();
             $currentOccurrence = $stmt->get_result()->fetch_assoc();
             $stmt->close();
-            if (!$currentOccurrence || (string) $currentOccurrence['course_id'] !== (string) ($occurrence['course_id'] ?? '')) {
+            if (!$currentOccurrence || empty($currentOccurrence['course_id']) || (string) $currentOccurrence['course_id'] !== (string) ($occurrence['course_id'] ?? '')) {
                 throw new RuntimeException('The live session Course changed. Refresh the page and try again.');
             }
             $enrollment = $conn->prepare('SELECT 1 FROM course_logs WHERE user_id = ? AND course_id = ? LIMIT 1 FOR UPDATE');
@@ -947,6 +1047,7 @@ if (!function_exists('mmh_live_join_evidence')) {
 if (!function_exists('mmh_live_students_for_occurrence')) {
     function mmh_live_students_for_occurrence(mysqli $conn, array $occurrence)
     {
+        if (trim((string) ($occurrence['course_id'] ?? '')) === '') return [];
         $stmt = $conn->prepare("SELECT u.user_id, u.full_name, u.username,
                 COALESCE(a.status, 'unknown') AS status,
                 COALESCE(a.first_join_clicked_at, je.first_join_clicked_at) AS first_join_clicked_at,
@@ -983,7 +1084,7 @@ if (!function_exists('mmh_live_save_attendance')) {
         $status = in_array($status, $allowed, true) ? $status : 'unknown';
         $source = $status === 'unknown' ? 'none' : 'manual';
         $occurrenceId = (string) ($occurrence['occurrence_id'] ?? '');
-        if ($occurrenceId === '') return false;
+        if ($occurrenceId === '' || trim((string) ($occurrence['course_id'] ?? '')) === '') return false;
         try {
             $conn->begin_transaction();
             $lock = $conn->prepare('SELECT course_id FROM live_session_occurrences WHERE occurrence_id = ? FOR UPDATE');
@@ -992,7 +1093,7 @@ if (!function_exists('mmh_live_save_attendance')) {
             $lock->execute();
             $current = $lock->get_result()->fetch_assoc();
             $lock->close();
-            if (!$current || (string) $current['course_id'] !== (string) ($occurrence['course_id'] ?? '')) throw new RuntimeException('The assigned Course changed; refresh the attendance page.');
+            if (!$current || empty($current['course_id']) || (string) $current['course_id'] !== (string) ($occurrence['course_id'] ?? '')) throw new RuntimeException('The assigned Course changed; refresh the attendance page.');
 
             $stmt = $conn->prepare('INSERT INTO live_session_attendance (user_id, course_id, occurrence_id, status, confirmed_source, teacher_note, confirmed_by, confirmed_at) VALUES (?, ?, ?, ?, ?, ?, ?, NOW()) ON DUPLICATE KEY UPDATE status = VALUES(status), confirmed_source = VALUES(confirmed_source), teacher_note = VALUES(teacher_note), confirmed_by = VALUES(confirmed_by), confirmed_at = NOW()');
             if (!$stmt) throw new RuntimeException('Unable to prepare the attendance update.');

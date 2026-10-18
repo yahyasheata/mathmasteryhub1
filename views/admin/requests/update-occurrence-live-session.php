@@ -40,6 +40,9 @@ if (!$occurrence) {
 if (!mmh_live_occurrence_is_editable($occurrence)) {
     mmh_live_response(false, 'Deleted occurrences or recurring schedules cannot be updated.', [], 409);
 }
+if (empty($occurrence['course_id']) && in_array($status, ['live', 'completed'], true)) {
+    mmh_live_response(false, 'Assign a Paper before marking this session Live or Completed.', [], 422);
+}
 $scheduledStart = trim((string) ($_POST['scheduled_start_at'] ?? ''));
 $scheduledEnd = trim((string) ($_POST['scheduled_end_at'] ?? ''));
 $startUtc = null;

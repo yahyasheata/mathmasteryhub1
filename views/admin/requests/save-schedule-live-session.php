@@ -10,7 +10,10 @@ $conn = db();
 try {
     [$ok, $message, $data] = array_pad(mmh_live_save_schedule($conn, $_POST), 3, []);
     if ($ok) {
-        mmh_live_generate_occurrences($conn, -3, 45, trim((string) ($_POST['course_id'] ?? '')));
+        $scheduleOwner = trim((string) ($_POST['schedule_owner'] ?? ''));
+        $groupKey = in_array($scheduleOwner, ['cambridge_a_level', 'edexcel_a_level'], true) ? $scheduleOwner : '';
+        $courseId = $groupKey === '' ? trim((string) ($_POST['course_id'] ?? '')) : '';
+        mmh_live_generate_occurrences($conn, -3, 45, $courseId, $groupKey);
     }
     mmh_live_response($ok, $message, is_array($data) ? $data : [], $ok ? 200 : 422);
 } catch (Throwable $exception) {

@@ -5,6 +5,7 @@ $root = dirname(__DIR__);
 require_once $root . '/inc/LiveSessions.php';
 
 $occurrence = [
+    'course_id' => 'course-test',
     'scheduled_start_at' => '2026-08-09 19:00:00',
     'scheduled_end_at' => '2026-08-09 21:00:00',
     'status' => 'scheduled',

@@ -12,6 +12,9 @@ $occurrence = $occurrenceId !== '' ? mmh_live_occurrence($conn, $occurrenceId) :
 if (!$occurrence) {
     mmh_live_response(false, 'Live session occurrence not found.', [], 404);
 }
+if (trim((string) ($occurrence['course_id'] ?? '')) === '') {
+    mmh_live_response(false, 'Assign a Paper before recording attendance.', [], 409);
+}
 
 $adminId = mmh_live_admin_id($conn, $_SESSION['admin'] ?? '');
 $rows = mmh_live_students_for_occurrence($conn, $occurrence);

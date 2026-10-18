@@ -4,6 +4,7 @@ require_once '__init.php';
 require_once 'inc/functions.php';
 require_once 'inc/AcademicMetadata.php';
 require_once 'inc/CourseGroups.php';
+require_once 'inc/LiveSessions.php';
 
 if($_SERVER['REQUEST_METHOD'] == "POST" ){
     if(isset($_POST['_method']) && $_POST['_method'] == 'GET' ){
@@ -247,6 +248,15 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && (string) ($_POST['_method'] ?? '') 
         $imagePath = (string) ($upload['file_path'] ?? '');
     }
     $conn = db();
+    $existingCourse = $conn->prepare('SELECT my_courses_group_key FROM courses WHERE course_id = ? LIMIT 1');
+    if (!$existingCourse) exit(json_encode(['status' => 0, 'message' => 'Unable to verify the current Course group.']));
+    $existingCourse->bind_param('i', $courseId);
+    $existingCourse->execute();
+    $currentGroup = (string) ($existingCourse->get_result()->fetch_assoc()['my_courses_group_key'] ?? '');
+    $existingCourse->close();
+    if ($currentGroup !== (string) $courseGroup && !mmh_live_course_group_change_allowed($conn, $courseId, $courseGroup)) {
+        exit(json_encode(['status' => 0, 'message' => 'This Paper has future Live Sessions assigned through its current A-Level group. Reassign or cancel those future sessions before changing the Course group.']));
+    }
     if ($imagePath !== null && $imagePath !== '') {
         $stmt = $conn->prepare('UPDATE courses SET course_title = ?, course_title_en = ?, course_description = ?, course_image = ?, course_price = ?, preDiscount_course_price = ?, course_category = ?, sequential_learning = ?, default_homework_score_mode = ?, my_courses_group_key = ? WHERE course_id = ?');
         $stmt->bind_param('ssssddiissi', $title, $title, $description, $imagePath, $price, $preDiscount, $category, $sequential, $scoreMode, $courseGroup, $courseId);

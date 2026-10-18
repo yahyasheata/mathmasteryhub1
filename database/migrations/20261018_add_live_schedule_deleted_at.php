@@ -3,7 +3,7 @@ declare(strict_types=1);
 
 if (PHP_SAPI !== 'cli') { http_response_code(403); exit("This migration can only run from the command line.\n"); }
 require_once dirname(__DIR__, 2) . '/connection/config.php';
-$conn = db();
+if (!isset($conn) || !$conn instanceof mysqli) $conn = db();
 
 $table = $conn->query("SELECT 1 FROM INFORMATION_SCHEMA.TABLES WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'course_live_schedules' LIMIT 1");
 if (!$table) throw new RuntimeException('Unable to inspect course_live_schedules: ' . $conn->error);
