@@ -1,21 +1,60 @@
 <?php
-/** Canonical, idempotent enrollment writer. */
-if (!defined('MMH_UNIT_SECTION_ACCESS_COURSE_ID')) {
-    define('MMH_UNIT_SECTION_ACCESS_COURSE_ID', '3078');
+if (!function_exists('mmh_course_unit_access_capability_schema_ready')) {
+    function mmh_course_unit_access_capability_schema_ready(mysqli $conn): bool
+    {
+        $stmt = $conn->prepare("SELECT 1 FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'courses' AND COLUMN_NAME = 'supports_unit_section_access' LIMIT 1");
+        if (!$stmt) return false;
+        $stmt->execute();
+        $ready = (bool) $stmt->get_result()->fetch_assoc();
+        $stmt->close();
+        return $ready;
+    }
 }
 
 if (!function_exists('mmh_course_supports_unit_section_access')) {
-    /** Unit Section Access is explicitly enabled only for Math OL Full Course. */
-    function mmh_course_supports_unit_section_access(string $courseId): bool
+    /** Unit Section Access is available only when explicitly enabled on the Course row. */
+    function mmh_course_supports_unit_section_access(string $courseId, ?mysqli $conn = null): bool
     {
-        return trim($courseId) === MMH_UNIT_SECTION_ACCESS_COURSE_ID;
+        $courseId = trim($courseId);
+        $conn ??= function_exists('db') ? db() : null;
+        if ($courseId === '' || !$conn instanceof mysqli) return false;
+        $stmt = $conn->prepare('SELECT supports_unit_section_access FROM courses WHERE course_id = ? LIMIT 1');
+        if (!$stmt) return false;
+        $stmt->bind_param('s', $courseId);
+        if (!$stmt->execute()) { $stmt->close(); return false; }
+        $row = $stmt->get_result()->fetch_assoc();
+        $stmt->close();
+        return (int) ($row['supports_unit_section_access'] ?? 0) === 1;
     }
 }
 
 if (!function_exists('mmh_course_unit_access_assignment_allowed')) {
-    function mmh_course_unit_access_assignment_allowed(string $courseId, ?string $unitAccess): bool
+    function mmh_course_unit_access_assignment_allowed(string $courseId, ?string $unitAccess, ?mysqli $conn = null): bool
     {
-        return $unitAccess === null || (mmh_course_supports_unit_section_access($courseId) && mmh_enrollment_unit_access_valid($unitAccess));
+        return $unitAccess === null || (mmh_course_supports_unit_section_access($courseId, $conn) && mmh_enrollment_unit_access_valid($unitAccess));
+    }
+}
+
+if (!function_exists('mmh_course_unit_access_disable_blocker')) {
+    /** Return a safe reason when disabling would strand existing access data. */
+    function mmh_course_unit_access_disable_blocker(mysqli $conn, string $courseId): string
+    {
+        $sections = $conn->prepare("SELECT COUNT(*) AS total FROM course_sections WHERE course_id = ? AND COALESCE(access_unit, 'shared') <> 'shared'");
+        if (!$sections) return 'Existing Section access could not be verified.';
+        $sections->bind_param('s', $courseId);
+        if (!$sections->execute()) { $sections->close(); return 'Existing Section access could not be verified.'; }
+        $restrictedCount = (int) ($sections->get_result()->fetch_assoc()['total'] ?? 0);
+        $sections->close();
+
+        $enrollments = $conn->prepare("SELECT COUNT(*) AS total FROM course_logs WHERE course_id = ? AND unit_access IS NOT NULL AND unit_access <> ''");
+        if (!$enrollments) return 'Existing student Unit classifications could not be verified.';
+        $enrollments->bind_param('s', $courseId);
+        if (!$enrollments->execute()) { $enrollments->close(); return 'Existing student Unit classifications could not be verified.'; }
+        $classifiedCount = (int) ($enrollments->get_result()->fetch_assoc()['total'] ?? 0);
+        $enrollments->close();
+        return ($restrictedCount > 0 || $classifiedCount > 0)
+            ? 'Unit Section Access cannot be disabled while restricted Sections or classified student enrollments remain.'
+            : '';
     }
 }
 
@@ -67,7 +106,7 @@ if (!function_exists('mmh_enrollment_course_unit_state')) {
         $schema->execute();
         $ready = (int) (($schema->get_result()->fetch_assoc()['total'] ?? 0)) === 2;
         $schema->close();
-        $supported = mmh_course_supports_unit_section_access($courseId);
+        $supported = mmh_course_supports_unit_section_access($courseId, $conn);
         if (!$ready) return ['ready' => false, 'candidate' => false, 'restricted' => false, 'supported' => $supported];
 
         $stmt = $conn->prepare('SELECT title, section_type, access_unit FROM course_sections WHERE course_id = ?');
@@ -100,7 +139,7 @@ if (!function_exists('mmh_enrollment_course_unit_state')) {
 if (!function_exists('mmh_enrollment_ensure')) {
     function mmh_enrollment_ensure(mysqli $conn, int $userId, string $courseId, string $courseTitle, ?string $purchaseDate = null, bool $manageTransaction = true, ?string $unitAccess = null): bool
     {
-        if ($userId <= 0 || trim($courseId) === '' || !mmh_course_unit_access_assignment_allowed($courseId, $unitAccess)) return false;
+        if ($userId <= 0 || trim($courseId) === '' || !mmh_course_unit_access_assignment_allowed($courseId, $unitAccess, $conn)) return false;
         $courseCheck = $conn->prepare("SELECT course_id FROM courses WHERE course_id = ? AND archived_at IS NULL AND course_state IN ('public', 'private') LIMIT 1");
         if (!$courseCheck) return false;
         $courseCheck->bind_param('s', $courseId);
@@ -120,6 +159,7 @@ if (!function_exists('mmh_enrollment_ensure')) {
             $courseAvailable = (bool) $courseLock->get_result()->fetch_assoc();
             $courseLock->close();
             if (!$courseAvailable) throw new RuntimeException('Course is unavailable.');
+            if (!mmh_course_unit_access_assignment_allowed($courseId, $unitAccess, $conn)) throw new RuntimeException('Unit Access requires this Course capability to be enabled.');
             $unitState = mmh_enrollment_course_unit_state($conn, $courseId);
             if ($unitState === null) throw new RuntimeException('Course access could not be checked.');
             if ($unitAccess !== null && !mmh_enrollment_unit_access_valid($unitAccess)) throw new RuntimeException('Choose Unit 1, Unit 2, or Both Units.');
@@ -195,7 +235,7 @@ if (!function_exists('mmh_enrollment_move')) {
     {
         $sourceCourseId = trim($sourceCourseId);
         $targetCourseId = trim($targetCourseId);
-        if ($userId <= 0 || $sourceCourseId === '' || $targetCourseId === '' || $sourceCourseId === $targetCourseId || !mmh_course_unit_access_assignment_allowed($targetCourseId, $targetUnitAccess)) return false;
+        if ($userId <= 0 || $sourceCourseId === '' || $targetCourseId === '' || $sourceCourseId === $targetCourseId || !mmh_course_unit_access_assignment_allowed($targetCourseId, $targetUnitAccess, $conn)) return false;
 
         $target = $conn->prepare("SELECT course_id, course_title FROM courses WHERE course_id = ? AND archived_at IS NULL AND course_state IN ('public', 'private') LIMIT 1");
         if (!$target) return false;
@@ -218,6 +258,7 @@ if (!function_exists('mmh_enrollment_move')) {
             $targetCourse = $targetLock->get_result()->fetch_assoc();
             $targetLock->close();
             if (!$targetCourse) throw new RuntimeException('Target course is unavailable.');
+            if (!mmh_course_unit_access_assignment_allowed($targetCourseId, $targetUnitAccess, $conn)) throw new RuntimeException('Unit Access requires this Course capability to be enabled.');
             $unitState = mmh_enrollment_course_unit_state($conn, $targetCourseId);
             if ($unitState === null) throw new RuntimeException('Target course access could not be checked.');
             if ($targetUnitAccess !== null && !mmh_enrollment_unit_access_valid($targetUnitAccess)) throw new RuntimeException('Choose Unit 1, Unit 2, or Both Units.');
@@ -313,7 +354,7 @@ if (!function_exists('mmh_enrollment_set_unit_access_batch')) {
     function mmh_enrollment_set_unit_access_batch(mysqli $conn, array $userIds, string $courseId, string $unitAccess): bool
     {
         $userIds = array_values(array_unique(array_filter(array_map('intval', $userIds), static fn($id) => $id > 0)));
-        if (!$userIds || trim($courseId) === '' || !mmh_course_supports_unit_section_access($courseId) || !mmh_enrollment_unit_access_valid($unitAccess)) return false;
+        if (!$userIds || trim($courseId) === '' || !mmh_course_supports_unit_section_access($courseId, $conn) || !mmh_enrollment_unit_access_valid($unitAccess)) return false;
         if (!$conn->begin_transaction()) return false;
         try {
             $courseLock = $conn->prepare('SELECT course_id FROM courses WHERE course_id = ? LIMIT 1 FOR UPDATE');
@@ -322,6 +363,7 @@ if (!function_exists('mmh_enrollment_set_unit_access_batch')) {
             $courseLock->execute();
             $courseExists = (bool) $courseLock->get_result()->fetch_assoc();
             $courseLock->close();
+            if (!$courseExists || !mmh_course_supports_unit_section_access($courseId, $conn)) throw new RuntimeException('Unit Section Access is not enabled for this Course.');
             $unitState = $courseExists ? mmh_enrollment_course_unit_state($conn, $courseId) : null;
             if ($unitState === null || empty($unitState['ready'])) throw new RuntimeException('Unit access is not available for this Course.');
 

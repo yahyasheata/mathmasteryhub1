@@ -4,6 +4,7 @@ require_once '__init.php';
 require_once 'inc/CourseContentCopyService.php';
 
 $conn = db();
+$unitCapabilitySchemaReady = mmh_course_unit_access_capability_schema_ready($conn);
 $sourceCourseId = trim((string) ($courseId ?? ''));
 $escape = static fn($value): string => htmlspecialchars((string) $value, ENT_QUOTES, 'UTF-8');
 $base = rtrim((string) ($baseUrl ?? ''), '/');
@@ -19,15 +20,20 @@ $error = '';
 $titleValue = trim((string) ($_POST['session_title'] ?? ''));
 $priceValue = (string) ($_POST['course_price'] ?? $source['course_price'] ?? '0');
 $stateValue = strtolower(trim((string) ($_POST['course_state'] ?? 'private')));
+$unitCapabilityRaw = $_POST['supports_unit_section_access'] ?? '0';
+$unitCapabilityInput = is_array($unitCapabilityRaw) ? '' : (string) $unitCapabilityRaw;
+$supportsUnitSectionAccess = $unitCapabilityInput === '1';
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     try {
+        if (!in_array($unitCapabilityInput, ['0', '1'], true)) throw new InvalidArgumentException('Choose a valid Unit Section Access setting.');
         $result = CourseContentCopyService::createNextSession(
             $conn,
             $sourceCourseId,
             $titleValue,
             is_numeric($priceValue) ? (float) $priceValue : -1,
             $stateValue,
-            (string) ($_SESSION['admin'] ?? '')
+            (string) ($_SESSION['admin'] ?? ''),
+            $supportsUnitSectionAccess
         );
         header('Location: ' . $base . '/admin/courses/' . rawurlencode($result['course_id']) . '/content');
         exit;
@@ -83,6 +89,15 @@ $subPageName = 'courses';
                         </select>
                         <span class="next-session-state-note">This uses the current Course visibility model. Existing students keep access to a Private course; Public courses are listed and open to enrollment.</span>
                     </label>
+                    <?php if ($unitCapabilitySchemaReady): ?>
+                    <div>
+                        <input type="hidden" name="supports_unit_section_access" value="0">
+                        <label class="d-flex align-items-start gap-2">
+                            <input type="checkbox" name="supports_unit_section_access" value="1" <?= $supportsUnitSectionAccess ? 'checked' : '' ?>>
+                            <span><strong>Enable Unit 1 / Unit 2 Section Access for this new Course</strong><br><span class="next-session-state-note">This is a separate choice. The source Course’s capability is never inherited automatically.</span></span>
+                        </label>
+                    </div>
+                    <?php endif; ?>
                     <div>
                         <strong>Cover image</strong>
                         <div class="next-session-cover">

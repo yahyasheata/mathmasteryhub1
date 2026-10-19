@@ -191,7 +191,7 @@ mmh_ensure_learning_schema($conn);
 $course_id = add_section_post('course_id');
 $unitAccessSchema = mmh_enrollment_course_unit_state($conn, $course_id);
 if ($unitAccessSchema === null) add_section_response(false, 'Section Access could not be verified.');
-$unitAccessSupported = mmh_course_supports_unit_section_access($course_id);
+$unitAccessSupported = mmh_course_supports_unit_section_access($course_id, $conn);
 $access_unit = isset($_POST['access_unit']) ? trim((string) $_POST['access_unit']) : null;
 if ($access_unit !== null && !in_array($access_unit, ['shared', 'unit1', 'unit2'], true)) {
     add_section_response(false, 'Invalid Section Access. Choose Shared, Unit 1, or Unit 2.');
@@ -213,8 +213,15 @@ if (empty($unitAccessSchema['ready'])) {
     if (!in_array($access_unit, ['shared', 'unit1', 'unit2'], true)) add_section_response(false, 'Invalid stored Section Access. Review the Section before saving.');
 }
 $access_unit ??= 'shared';
-if ($access_unit !== 'shared' && !$unitAccessSupported) {
-    add_section_response(false, 'Unit-restricted Sections are available only in Math OL Full Course.');
+$preservingExistingUnsupportedRestriction = $method === 'UPDATE'
+    && $storedAccessUnit !== null
+    && $storedAccessUnit !== 'shared'
+    && !$unitAccessSupported;
+if ($preservingExistingUnsupportedRestriction && $access_unit !== $storedAccessUnit) {
+    add_section_response(false, 'This existing Unit restriction cannot be changed while Unit Section Access is disabled for this Course.');
+}
+if ($access_unit !== 'shared' && !$unitAccessSupported && !$preservingExistingUnsupportedRestriction) {
+    add_section_response(false, 'Unit-restricted Sections are available only in a Course with Unit Section Access enabled.');
 }
 $unitActivationRequired = $access_unit !== 'shared' && ($method !== 'UPDATE' || $access_unit !== $storedAccessUnit);
 $title = add_section_post('title');
@@ -314,6 +321,7 @@ try {
         $courseLock->bind_param('s', $course_id); $courseLock->execute();
         $lockedCourseExists = (bool) $courseLock->get_result()->fetch_assoc(); $courseLock->close();
         if (!$lockedCourseExists) { $conn->rollback(); add_section_response(false, 'Course not found.'); }
+        if (!mmh_course_supports_unit_section_access($course_id, $conn)) { $conn->rollback(); add_section_response(false, 'Unit Section Access is not enabled for this Course.'); }
         $activationBlocker = add_section_activation_blocker($conn, $course_id, $section_id, $access_unit);
         if ($activationBlocker !== '') { $conn->rollback(); add_section_response(false, $activationBlocker); }
     }

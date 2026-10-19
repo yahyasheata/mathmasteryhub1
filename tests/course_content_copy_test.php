@@ -15,7 +15,7 @@ $query = static function (mysqli $conn, string $sql) use ($assert): void { if (!
 try {
     $query($admin, 'CREATE DATABASE `' . $database . '` CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci');
     $assert($admin->select_db($database), 'Unable to select isolated copy database.');
-    $query($admin, "CREATE TABLE courses (id INT AUTO_INCREMENT PRIMARY KEY, course_id VARCHAR(20) NOT NULL, course_title VARCHAR(190) NOT NULL, course_title_en VARCHAR(190), course_description TEXT, course_image VARCHAR(255), course_price INT, preDiscount_course_price INT, course_category INT, my_courses_group_key VARCHAR(32) NULL DEFAULT NULL, whatsapp_group TEXT NULL, sequential_learning TINYINT DEFAULT 0, default_homework_score_mode VARCHAR(32) DEFAULT 'disabled', username VARCHAR(50), course_status CHAR(1) DEFAULT '1', course_visibility VARCHAR(20) DEFAULT 'public', course_state VARCHAR(16) NOT NULL, archived_at DATETIME NULL)");
+    $query($admin, "CREATE TABLE courses (id INT AUTO_INCREMENT PRIMARY KEY, course_id VARCHAR(20) NOT NULL, course_title VARCHAR(190) NOT NULL, course_title_en VARCHAR(190), course_description TEXT, course_image VARCHAR(255), course_price INT, preDiscount_course_price INT, course_category INT, my_courses_group_key VARCHAR(32) NULL DEFAULT NULL, whatsapp_group TEXT NULL, sequential_learning TINYINT DEFAULT 0, default_homework_score_mode VARCHAR(32) DEFAULT 'disabled', username VARCHAR(50), course_status CHAR(1) DEFAULT '1', course_visibility VARCHAR(20) DEFAULT 'public', course_state VARCHAR(16) NOT NULL, supports_unit_section_access TINYINT(1) NOT NULL DEFAULT 0, archived_at DATETIME NULL)");
     $query($admin, "CREATE TABLE course_sections (id INT AUTO_INCREMENT PRIMARY KEY, section_id VARCHAR(20) NOT NULL, course_id VARCHAR(20) NOT NULL, title VARCHAR(190) NOT NULL, section_type VARCHAR(50), custom_type VARCHAR(80), icon VARCHAR(50), description TEXT, metadata TEXT, sort_order INT NOT NULL DEFAULT 0, status VARCHAR(16) NOT NULL DEFAULT 'published', access_unit VARCHAR(10) NOT NULL DEFAULT 'shared', unlock_mode VARCHAR(50), completion_rule VARCHAR(50), unlock_at DATETIME NULL, unlock_timezone VARCHAR(64), unlock_homework_id VARCHAR(20), manual_unlocked TINYINT NOT NULL DEFAULT 0, release_mode VARCHAR(32) NOT NULL DEFAULT 'inherit', release_override VARCHAR(16) NOT NULL DEFAULT 'inherit', release_at DATETIME NULL, release_timezone VARCHAR(80), release_occurrence_id VARCHAR(64), release_delay_minutes INT NOT NULL DEFAULT 0, release_updated_at DATETIME NULL)");
     $query($admin, "CREATE TABLE course_items (id INT AUTO_INCREMENT PRIMARY KEY, item_id VARCHAR(20) NOT NULL, item_title VARCHAR(255) NOT NULL, item_description TEXT, item_type VARCHAR(20) NOT NULL, section_id VARCHAR(20), template_type VARCHAR(50), template_data TEXT, metadata TEXT, duration_minutes INT NULL, assignment_id INT NULL, due_date DATETIME NULL, status VARCHAR(16) NOT NULL DEFAULT 'published', sort_order INT NOT NULL DEFAULT 0, course_id VARCHAR(20) NOT NULL, page_order INT NOT NULL DEFAULT 0)");
     $query($admin, "CREATE TABLE assignments (id INT AUTO_INCREMENT PRIMARY KEY, assignment_id VARCHAR(20) NOT NULL, assignment_title VARCHAR(255) NOT NULL, assignment_description TEXT, due_date DATETIME NOT NULL, file_path VARCHAR(255), course_id VARCHAR(20) NOT NULL, section_id VARCHAR(20), item_id VARCHAR(20), max_score DECIMAL(6,2) NULL, recommended_recording_item_id VARCHAR(40), recommended_notes_item_id VARCHAR(40), recommended_revision_item_id VARCHAR(40), archived_at DATETIME NULL)");
@@ -24,7 +24,7 @@ try {
     $query($admin, "CREATE TABLE course_logs (id INT AUTO_INCREMENT PRIMARY KEY, course_id VARCHAR(20) NOT NULL, user_id INT NOT NULL, course_title VARCHAR(190) NULL, purchase_date DATETIME NULL, KEY idx_enrollment(course_id,user_id))");
     $query($admin, "CREATE TABLE course_live_schedules (id INT AUTO_INCREMENT PRIMARY KEY, course_id VARCHAR(20) NOT NULL, scheduled_start_at DATETIME NULL)");
     $query($admin, "CREATE TABLE timed_exams (id INT AUTO_INCREMENT PRIMARY KEY, course_id VARCHAR(20) NOT NULL, item_id VARCHAR(20) NOT NULL, title VARCHAR(190) NOT NULL, instructions TEXT, status VARCHAR(16) NOT NULL DEFAULT 'draft', timing_mode VARCHAR(24) NOT NULL DEFAULT 'fixed_window', scheduled_start_at_utc DATETIME NULL, duration_minutes INT NOT NULL DEFAULT 60, grace_minutes INT NOT NULL DEFAULT 0, max_attempts INT NOT NULL DEFAULT 1, allowed_answer_types VARCHAR(255) NOT NULL DEFAULT 'pdf', max_file_size_bytes BIGINT NOT NULL DEFAULT 10485760, paper_source VARCHAR(24) NOT NULL DEFAULT 'external_link', paper_external_url VARCHAR(1000), paper_external_preview_url VARCHAR(1000), paper_external_download_url VARCHAR(1000), paper_fallback_instructions TEXT, paper_storage_key VARCHAR(255), paper_original_name VARCHAR(255), paper_mime VARCHAR(120), paper_size_bytes BIGINT NULL, paper_view_allowed TINYINT NOT NULL DEFAULT 1, paper_download_allowed TINYINT NOT NULL DEFAULT 1, late_submission_allowed TINYINT NOT NULL DEFAULT 1, expiry_policy VARCHAR(32) NOT NULL DEFAULT 'auto_submit_latest', max_marks DECIMAL(10,2), results_release_at_utc DATETIME NULL, recovery_window_start_at_utc DATETIME NULL, recovery_window_end_at_utc DATETIME NULL, recovery_allowed TINYINT NOT NULL DEFAULT 0, attempt_generation INT UNSIGNED NOT NULL DEFAULT 1, deleted_at DATETIME NULL, roster_finalized_at_utc DATETIME NULL, roster_finalized_generation INT UNSIGNED NULL, created_by INT NULL, updated_by INT NULL, created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP, updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP)");
-    $query($admin, "INSERT INTO courses (course_id,course_title,course_state) VALUES ('source','Source','public'),('destination','Destination','draft'),('3078','Math OL Full Course','private')");
+    $query($admin, "INSERT INTO courses (course_id,course_title,course_state,supports_unit_section_access) VALUES ('source','Source','public',1),('destination','Destination','draft',0),('3078','Math OL Full Course','private',1),('7656057','Math OL May/June 2027','private',1),('4359','Math OL Edexcel Course','private',0)");
     $query($admin, "UPDATE courses SET course_title_en='Source',course_description='Source description',course_image='uploads/source-cover.jpg',course_price=125,preDiscount_course_price=150,course_category=2,sequential_learning=1,default_homework_score_mode='disabled',username='teacher' WHERE course_id='source'");
     $query($admin, "UPDATE courses SET my_courses_group_key='cambridge_a_level' WHERE course_id='source'");
     $query($admin, "INSERT INTO course_logs (course_id,user_id) VALUES ('source',7)");
@@ -59,7 +59,7 @@ try {
         CourseContentCopyService::copySection($admin, 'source', 's1', 'destination');
         throw new RuntimeException('Unit-restricted Section copied into an unsupported Course.');
     } catch (RuntimeException $e) {
-        $assert(str_contains($e->getMessage(), 'only be copied into Math OL Full Course'), 'Unexpected error while rejecting a restricted Section copy.');
+        $assert(str_contains($e->getMessage(), 'Course with Unit Section Access enabled'), 'Unexpected error while rejecting a restricted Section copy.');
     }
     $assert((int) $admin->query("SELECT COUNT(*) AS n FROM course_sections WHERE course_id='destination'")->fetch_assoc()['n'] === 0, 'Rejected restricted Section copy wrote partial destination rows.');
     $query($admin, "UPDATE course_sections SET access_unit='shared' WHERE course_id='source' AND section_id='s1'");
@@ -88,7 +88,7 @@ try {
     $query($admin, "INSERT INTO course_sections (section_id,course_id,title,section_type,sort_order,status,unlock_mode,completion_rule) VALUES ('s2','source','Week 2','lecture',2,'published','always','manual_completion')");
     $query($admin, "INSERT INTO course_items (item_id,item_title,item_description,item_type,section_id,template_type,template_data,status,sort_order,course_id,page_order) VALUES ('lesson2','Lesson 2','body','file','s2','custom_lesson','{}','published',1,'source',1)");
 
-    $next = CourseContentCopyService::createNextSession($admin, 'source', 'Source May/June 2027', 200, 'public', 'admin-user');
+    $next = CourseContentCopyService::createNextSession($admin, 'source', 'Source May/June 2027', 200, 'public', 'admin-user', false);
     $nextCourseId = $admin->real_escape_string($next['course_id']);
     $assert($next['course_id'] !== 'source', 'Next Session reused the source Course ID.');
     $nextCourse = $admin->query("SELECT * FROM courses WHERE course_id='{$nextCourseId}'")->fetch_assoc();
@@ -96,6 +96,7 @@ try {
     $assert(($nextCourse['course_title'] ?? '') === 'Source May/June 2027' && (int) $nextCourse['course_price'] === 200, 'Next Session title or chosen price was not saved.');
     $assert(($nextCourse['course_image'] ?? '') === 'uploads/source-cover.jpg' && ($nextCourse['course_description'] ?? '') === 'Source description', 'Useful Course metadata was not copied.');
     $assert(($nextCourse['course_state'] ?? '') === 'public' && ($nextCourse['course_status'] ?? '') === '1', 'New Course availability state was not saved coherently.');
+    $assert((int) ($nextCourse['supports_unit_section_access'] ?? 1) === 0, 'Create Next Session silently inherited the source Course capability.');
     $assert((int) $admin->query("SELECT COUNT(*) AS n FROM course_sections WHERE course_id='{$nextCourseId}'")->fetch_assoc()['n'] === 2, 'Next Session did not copy all Sections.');
     $assert((int) $admin->query("SELECT COUNT(*) AS n FROM course_items WHERE course_id='{$nextCourseId}'")->fetch_assoc()['n'] === 5, 'Next Session did not copy all Section items.');
     $assert((int) $admin->query("SELECT COUNT(*) AS n FROM course_sections WHERE course_id='{$nextCourseId}' AND status='draft'")->fetch_assoc()['n'] === 2, 'Copied Sections are not Draft.');
@@ -128,12 +129,16 @@ try {
     $query($admin, "UPDATE course_sections SET access_unit='unit2' WHERE course_id='source' AND section_id='s1'");
     $coursesBeforeRestrictedClone = (int) $admin->query('SELECT COUNT(*) AS n FROM courses')->fetch_assoc()['n'];
     try {
-        CourseContentCopyService::createNextSession($admin, 'source', 'Restricted clone should fail', 100, 'draft', 'teacher');
+        CourseContentCopyService::createNextSession($admin, 'source', 'Restricted clone should fail', 100, 'draft', 'teacher', false);
         throw new RuntimeException('Whole-Course copy accepted restricted Sections for an unsupported destination.');
     } catch (RuntimeException $e) {
-        $assert(str_contains($e->getMessage(), 'only be copied into Math OL Full Course'), 'Unexpected error while rejecting a restricted whole-Course copy.');
+        $assert(str_contains($e->getMessage(), 'Course with Unit Section Access enabled'), 'Unexpected error while rejecting a restricted whole-Course copy.');
     }
     $assert((int) $admin->query('SELECT COUNT(*) AS n FROM courses')->fetch_assoc()['n'] === $coursesBeforeRestrictedClone, 'Rejected whole-Course copy wrote a partial Course.');
+    $designatedNext = CourseContentCopyService::createNextSession($admin, 'source', 'Designated Unit Course', 100, 'draft', 'teacher', true);
+    $designatedNextId = $admin->real_escape_string($designatedNext['course_id']);
+    $assert((int) $admin->query("SELECT supports_unit_section_access FROM courses WHERE course_id='{$designatedNextId}'")->fetch_assoc()['supports_unit_section_access'] === 1, 'Explicitly designated next Course did not persist its capability.');
+    $assert((string) $admin->query("SELECT access_unit FROM course_sections WHERE course_id='{$designatedNextId}' AND title='Week 1'")->fetch_assoc()['access_unit'] === 'unit2', 'Explicitly designated Next Session did not preserve restricted Section access.');
     $query($admin, "UPDATE course_sections SET access_unit='shared' WHERE course_id='source' AND section_id='s1'");
     $admin->query("UPDATE courses SET course_title='Edited new session',course_image='uploads/new-cover.jpg',course_price=300,course_state='private' WHERE course_id='{$nextCourseId}'");
     $sourceAfter = $admin->query("SELECT course_title,course_image,course_price,course_state FROM courses WHERE course_id='source'")->fetch_assoc();
@@ -142,16 +147,16 @@ try {
     $coursesBeforeFailedClone = (int) $admin->query('SELECT COUNT(*) AS n FROM courses')->fetch_assoc()['n'];
     $query($admin, "CREATE TRIGGER mmh_fail_next_session_item BEFORE INSERT ON course_items FOR EACH ROW BEGIN IF NEW.course_id NOT IN ('source','destination','{$nextCourseId}') THEN SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'forced next-session rollback test'; END IF; END");
     $rollbackObserved = false;
-    try { CourseContentCopyService::createNextSession($admin, 'source', 'Should roll back', 100, 'draft', 'admin-user'); } catch (Throwable $expected) { $rollbackObserved = true; }
+    try { CourseContentCopyService::createNextSession($admin, 'source', 'Should roll back', 100, 'draft', 'admin-user', false); } catch (Throwable $expected) { $rollbackObserved = true; }
     $query($admin, 'DROP TRIGGER mmh_fail_next_session_item');
     $assert($rollbackObserved, 'Forced Course Item copy failure did not propagate.');
     $assert((int) $admin->query('SELECT COUNT(*) AS n FROM courses')->fetch_assoc()['n'] === $coursesBeforeFailedClone, 'Failed Next Session left a partial Course row.');
-    $assert((int) $admin->query("SELECT COUNT(*) AS n FROM course_sections WHERE course_id NOT IN ('source','destination','3078','{$nextCourseId}')")->fetch_assoc()['n'] === 0, 'Failed Next Session left partial Sections.');
+    $assert((int) $admin->query("SELECT COUNT(*) AS n FROM course_sections WHERE course_id NOT IN ('source','destination','3078','{$nextCourseId}','{$designatedNextId}')")->fetch_assoc()['n'] === 0, 'Failed Next Session left partial Sections.');
 
     // The Admin's Add Student flow intentionally excludes Draft Courses.
     // A newly-created session should therefore default to Private while its
     // copied teaching content remains Draft/hidden.
-    $enrollableNext = CourseContentCopyService::createNextSession($admin, 'source', 'Source Private Session', 125, 'private', 'admin-user');
+    $enrollableNext = CourseContentCopyService::createNextSession($admin, 'source', 'Source Private Session', 125, 'private', 'admin-user', false);
     $enrollableCourseId = $admin->real_escape_string($enrollableNext['course_id']);
     $enrollableCourse = $admin->query("SELECT course_id,course_title,course_state,archived_at FROM courses WHERE course_id='{$enrollableCourseId}'")->fetch_assoc();
     $assert(($enrollableCourse['course_state'] ?? '') === 'private', 'Private Next Session did not retain its selected state.');

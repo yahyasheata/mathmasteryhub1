@@ -249,7 +249,7 @@ mmh_ensure_learning_schema($conn);
 $course_id = trim($_POST['course_id']);
 $unitAccessSchema = mmh_enrollment_course_unit_state($conn, $course_id);
 if ($unitAccessSchema === null) form_section_response(false, 'Section Access could not be verified.');
-$unitAccessSupported = mmh_course_supports_unit_section_access($course_id);
+$unitAccessSupported = mmh_course_supports_unit_section_access($course_id, $conn);
 
 $course_stmt = $conn->prepare('SELECT course_title FROM courses WHERE course_id = ? LIMIT 1');
 $course_stmt->bind_param('s', $course_id);

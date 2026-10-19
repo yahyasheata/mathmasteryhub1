@@ -4,11 +4,13 @@ require_once '__init.php';
 require_once 'inc/functions.php';
 require_once 'inc/Auth.php';
 require_once 'inc/CourseVisibility.php';
+require_once 'inc/EnrollmentService.php';
 $username = $_SESSION['admin'];
 $pageName = "courses";
 $subPageName = "courses";
 
 $conn = db();
+$unitCapabilitySchemaReady = mmh_course_unit_access_capability_schema_ready($conn);
 $courseSearch = trim((string) ($_GET['q'] ?? ''));
 $courseStateFilter = (string) ($_GET['state'] ?? 'all');
 $courseCategoryFilter = (string) ($_GET['category'] ?? 'all');
@@ -406,6 +408,16 @@ function admin_course_link(array $changes = []): string {
                             </select>
                           </div>
                     </div>
+
+                    <?php if ($unitCapabilitySchemaReady): ?>
+                    <div class="col-12 p-2">
+                        <input type="hidden" name="supports_unit_section_access" value="0">
+                        <label class="d-flex align-items-start gap-2">
+                            <input type="checkbox" name="supports_unit_section_access" value="1">
+                            <span><strong>Enable Unit 1 / Unit 2 Section Access</strong><br><small class="text-muted">Enable this only for a Course that should support Unit-specific Sections and explicit enrollment classification. Students are never classified automatically.</small></span>
+                        </label>
+                    </div>
+                    <?php endif; ?>
 
 
                     <div class="col-12 col-lg-6 p-2">

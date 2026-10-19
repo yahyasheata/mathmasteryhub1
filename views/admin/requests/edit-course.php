@@ -5,6 +5,7 @@ require_once 'inc/functions.php';
 require_once 'inc/AcademicMetadata.php';
 require_once 'inc/CourseGroups.php';
 require_once 'inc/LiveSessions.php';
+require_once 'inc/EnrollmentService.php';
 
 if($_SERVER['REQUEST_METHOD'] == "POST" ){
     if(isset($_POST['_method']) && $_POST['_method'] == 'GET' ){
@@ -31,6 +32,11 @@ if($_SERVER['REQUEST_METHOD'] == "POST" ){
                 $preDiscount_course_price = $course_data["preDiscount_course_price"];
                 $c_course_category = $course_data["course_category"];
                 $courseGroup = (string) ($course_data['my_courses_group_key'] ?? '');
+                $unitCapabilityControl = '';
+                if (mmh_course_unit_access_capability_schema_ready($conn)) {
+                    $unitCapabilityChecked = !empty($course_data['supports_unit_section_access']) ? ' checked' : '';
+                    $unitCapabilityControl = "<div class='col-12 col-lg-12 p-2'><input type='hidden' name='supports_unit_section_access' value='0'><label class='d-flex align-items-start gap-2'><input type='checkbox' name='supports_unit_section_access' value='1'{$unitCapabilityChecked}><span><strong>Enable Unit 1 / Unit 2 Section Access</strong><br><small class='text-muted'>Allows explicit Unit restrictions and enrollment classification for this Course. Existing students are never classified automatically.</small></span></label></div>";
+                }
                 $courseGroupOptions = "<option value=''>None</option>";
                 foreach (mmh_course_group_options() as $groupKey => $groupLabel) {
                     $selected = $courseGroup === $groupKey ? ' selected' : '';
@@ -95,6 +101,8 @@ if($_SERVER['REQUEST_METHOD'] == "POST" ){
                                     </select>
                                 </div>
                             </div>
+
+                            $unitCapabilityControl
         
         
                             <div class='col-12 col-lg-6 p-2'>
@@ -248,25 +256,58 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && (string) ($_POST['_method'] ?? '') 
         $imagePath = (string) ($upload['file_path'] ?? '');
     }
     $conn = db();
-    $existingCourse = $conn->prepare('SELECT my_courses_group_key FROM courses WHERE course_id = ? LIMIT 1');
-    if (!$existingCourse) exit(json_encode(['status' => 0, 'message' => 'Unable to verify the current Course group.']));
-    $existingCourse->bind_param('i', $courseId);
-    $existingCourse->execute();
-    $currentGroup = (string) ($existingCourse->get_result()->fetch_assoc()['my_courses_group_key'] ?? '');
-    $existingCourse->close();
-    if ($currentGroup !== (string) $courseGroup && !mmh_live_course_group_change_allowed($conn, $courseId, $courseGroup)) {
-        exit(json_encode(['status' => 0, 'message' => 'This Paper has future Live Sessions assigned through its current A-Level group. Reassign or cancel those future sessions before changing the Course group.']));
+    $capabilitySchemaReady = mmh_course_unit_access_capability_schema_ready($conn);
+    $capabilityInput = null;
+    if (array_key_exists('supports_unit_section_access', $_POST)) {
+        $rawCapability = is_array($_POST['supports_unit_section_access']) ? '' : (string) $_POST['supports_unit_section_access'];
+        if (!in_array($rawCapability, ['0', '1'], true)) exit(json_encode(['status' => 0, 'message' => 'Choose a valid Unit Section Access setting.']));
+        $capabilityInput = $rawCapability === '1' ? 1 : 0;
+        if (!$capabilitySchemaReady && $capabilityInput === 1) exit(json_encode(['status' => 0, 'message' => 'Course Unit Section Access is not ready yet. Please try again after the database update.']));
     }
-    if ($imagePath !== null && $imagePath !== '') {
-        $stmt = $conn->prepare('UPDATE courses SET course_title = ?, course_title_en = ?, course_description = ?, course_image = ?, course_price = ?, preDiscount_course_price = ?, course_category = ?, sequential_learning = ?, default_homework_score_mode = ?, my_courses_group_key = ? WHERE course_id = ?');
-        $stmt->bind_param('ssssddiissi', $title, $title, $description, $imagePath, $price, $preDiscount, $category, $sequential, $scoreMode, $courseGroup, $courseId);
-    } else {
-        $stmt = $conn->prepare('UPDATE courses SET course_title = ?, course_title_en = ?, course_description = ?, course_price = ?, preDiscount_course_price = ?, course_category = ?, sequential_learning = ?, default_homework_score_mode = ?, my_courses_group_key = ? WHERE course_id = ?');
-        $stmt->bind_param('sssddiissi', $title, $title, $description, $price, $preDiscount, $category, $sequential, $scoreMode, $courseGroup, $courseId);
+    if (!$conn->begin_transaction()) exit(json_encode(['status' => 0, 'message' => 'Course could not be updated. Please try again.']));
+    try {
+        $selectSql = $capabilitySchemaReady
+            ? 'SELECT my_courses_group_key, supports_unit_section_access FROM courses WHERE course_id = ? LIMIT 1 FOR UPDATE'
+            : 'SELECT my_courses_group_key FROM courses WHERE course_id = ? LIMIT 1 FOR UPDATE';
+        $existingCourse = $conn->prepare($selectSql);
+        if (!$existingCourse) throw new RuntimeException('Unable to verify the current Course settings.');
+        $existingCourse->bind_param('i', $courseId);
+        $existingCourse->execute();
+        $currentCourse = $existingCourse->get_result()->fetch_assoc();
+        $existingCourse->close();
+        if (!$currentCourse) throw new RuntimeException('Course not found.');
+        $currentGroup = (string) ($currentCourse['my_courses_group_key'] ?? '');
+        $currentCapability = !empty($currentCourse['supports_unit_section_access']) ? 1 : 0;
+        $nextCapability = $capabilityInput ?? $currentCapability;
+        if ($capabilitySchemaReady && $currentCapability === 1 && $nextCapability === 0) {
+            $blocker = mmh_course_unit_access_disable_blocker($conn, (string) $courseId);
+            if ($blocker !== '') throw new RuntimeException($blocker);
+        }
+        if ($currentGroup !== (string) $courseGroup && !mmh_live_course_group_change_allowed($conn, $courseId, $courseGroup)) {
+            throw new RuntimeException('This Paper has future Live Sessions assigned through its current A-Level group. Reassign or cancel those future sessions before changing the Course group.');
+        }
+        $capabilitySet = $capabilitySchemaReady ? ', supports_unit_section_access = ?' : '';
+        if ($imagePath !== null && $imagePath !== '') {
+            $sql = 'UPDATE courses SET course_title = ?, course_title_en = ?, course_description = ?, course_image = ?, course_price = ?, preDiscount_course_price = ?, course_category = ?, sequential_learning = ?, default_homework_score_mode = ?, my_courses_group_key = ?' . $capabilitySet . ' WHERE course_id = ?';
+            $stmt = $conn->prepare($sql);
+            if (!$stmt) throw new RuntimeException('Course update could not be prepared.');
+            if ($capabilitySchemaReady) $stmt->bind_param('ssssddiissii', $title, $title, $description, $imagePath, $price, $preDiscount, $category, $sequential, $scoreMode, $courseGroup, $nextCapability, $courseId);
+            else $stmt->bind_param('ssssddiissi', $title, $title, $description, $imagePath, $price, $preDiscount, $category, $sequential, $scoreMode, $courseGroup, $courseId);
+        } else {
+            $sql = 'UPDATE courses SET course_title = ?, course_title_en = ?, course_description = ?, course_price = ?, preDiscount_course_price = ?, course_category = ?, sequential_learning = ?, default_homework_score_mode = ?, my_courses_group_key = ?' . $capabilitySet . ' WHERE course_id = ?';
+            $stmt = $conn->prepare($sql);
+            if (!$stmt) throw new RuntimeException('Course update could not be prepared.');
+            if ($capabilitySchemaReady) $stmt->bind_param('sssddiissii', $title, $title, $description, $price, $preDiscount, $category, $sequential, $scoreMode, $courseGroup, $nextCapability, $courseId);
+            else $stmt->bind_param('sssddiissi', $title, $title, $description, $price, $preDiscount, $category, $sequential, $scoreMode, $courseGroup, $courseId);
+        }
+        if (!$stmt->execute()) { $stmt->close(); throw new RuntimeException('Database connection error.'); }
+        $stmt->close();
+        if (!$conn->commit()) throw new RuntimeException('Course changes could not be committed.');
+        echo json_encode(['status' => 1, 'message' => 'Course updated successfully']);
+    } catch (Throwable $exception) {
+        $conn->rollback();
+        echo json_encode(['status' => 0, 'message' => $exception->getMessage()]);
     }
-    $ok = $stmt && $stmt->execute();
-    if ($stmt) { $stmt->close(); }
-    echo json_encode(['status' => $ok ? 1 : 0, 'message' => $ok ? 'Course updated successfully' : 'Database connection error']);
 }
 
 

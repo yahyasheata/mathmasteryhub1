@@ -4,6 +4,7 @@ require_once '__init.php';
 require_once 'inc/functions.php';
 require_once 'inc/AcademicMetadata.php';
 require_once 'inc/CourseGroups.php';
+require_once 'inc/EnrollmentService.php';
 
 if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
     header('Allow: POST');
@@ -45,11 +46,24 @@ if (isset($_FILES['course_image']) && (int) ($_FILES['course_image']['error'] ??
 }
 
 $conn = db();
-$stmt = $conn->prepare("INSERT INTO courses (course_id, course_title, course_title_en, course_description, course_image, course_price, preDiscount_course_price, course_category, my_courses_group_key, whatsapp_group, sequential_learning, default_homework_score_mode, username, course_state) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'draft')");
+$capabilitySchemaReady = mmh_course_unit_access_capability_schema_ready($conn);
+$rawUnitCapability = $_POST['supports_unit_section_access'] ?? '0';
+if (is_array($rawUnitCapability) || !in_array((string) $rawUnitCapability, ['0', '1'], true)) {
+    exit(json_encode(['status' => 0, 'message' => 'Choose a valid Unit Section Access setting.']));
+}
+$supportsUnitAccess = (string) $rawUnitCapability === '1';
+if (!$capabilitySchemaReady && $supportsUnitAccess) {
+    exit(json_encode(['status' => 0, 'message' => 'Course Unit Section Access is not ready yet. Please try again after the database update.']));
+}
+$courseColumns = 'course_id, course_title, course_title_en, course_description, course_image, course_price, preDiscount_course_price, course_category, my_courses_group_key, whatsapp_group, sequential_learning, default_homework_score_mode, username';
+$courseValues = '?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?';
+if ($capabilitySchemaReady) { $courseColumns .= ', supports_unit_section_access'; $courseValues .= ', ?'; }
+$stmt = $conn->prepare("INSERT INTO courses ({$courseColumns}, course_state) VALUES ({$courseValues}, 'draft')");
 if (!$stmt) {
     exit(json_encode(['status' => 0, 'message' => 'Course could not be prepared.']));
 }
-$stmt->bind_param('issssddississ', $courseId, $courseTitle, $courseTitleEn, $courseDescription, $imagePath, $coursePrice, $preDiscountPrice, $category, $courseGroup, $whatsappGroup, $sequentialLearning, $scoreMode, $adminUsername);
+if ($capabilitySchemaReady) $stmt->bind_param('issssddississi', $courseId, $courseTitle, $courseTitleEn, $courseDescription, $imagePath, $coursePrice, $preDiscountPrice, $category, $courseGroup, $whatsappGroup, $sequentialLearning, $scoreMode, $adminUsername, $supportsUnitAccess);
+else $stmt->bind_param('issssddississ', $courseId, $courseTitle, $courseTitleEn, $courseDescription, $imagePath, $coursePrice, $preDiscountPrice, $category, $courseGroup, $whatsappGroup, $sequentialLearning, $scoreMode, $adminUsername);
 $ok = $stmt->execute();
 $stmt->close();
 

@@ -114,8 +114,8 @@ function getSiteSettings() {
 
     public function saveCourseLog($user_id, $course_id, ?string $unitAccess = null)
     {
-        if (!mmh_course_unit_access_assignment_allowed((string) $course_id, $unitAccess)) {
-            return ['status' => 0, 'message' => 'Unit Access can only be assigned for Math OL Full Course.'];
+        if (!mmh_course_unit_access_assignment_allowed((string) $course_id, $unitAccess, $this->conn)) {
+            return ['status' => 0, 'message' => 'Unit Access requires Unit Section Access to be enabled for this Course.'];
         }
         $unitState = mmh_enrollment_course_unit_state($this->conn, (string) $course_id);
         if ($unitState === null) return ['status' => 0, 'message' => 'Course access could not be verified.'];

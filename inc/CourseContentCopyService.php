@@ -19,7 +19,7 @@ final class CourseContentCopyService
      *
      * @return array{course_id:string,section_ids:array<string,string>,item_ids:array<string,string>,warnings:array<int,string>}
      */
-    public static function createNextSession(mysqli $conn, string $sourceCourseId, string $title, float $price, string $courseState, string $adminUsername): array
+    public static function createNextSession(mysqli $conn, string $sourceCourseId, string $title, float $price, string $courseState, string $adminUsername, bool $supportsUnitSectionAccess): array
     {
         $sourceCourseId = trim($sourceCourseId);
         $title = trim($title);
@@ -35,22 +35,22 @@ final class CourseContentCopyService
             throw new InvalidArgumentException('Enter a valid course price.');
         }
 
+        $courseColumns = self::tableColumns($conn, 'courses');
+        if ($supportsUnitSectionAccess && !in_array('supports_unit_section_access', $courseColumns, true)) {
+            throw new RuntimeException('Course Unit Section Access is not ready yet. Please try again after the database update.');
+        }
         $sourceCourse = self::fetchOne($conn, 'SELECT * FROM courses WHERE course_id = ? LIMIT 1', 's', [$sourceCourseId]);
         if (!$sourceCourse || !empty($sourceCourse['archived_at'])) throw new RuntimeException('The source course is not available.');
-        $courseColumns = self::tableColumns($conn, 'courses');
         $sectionColumns = self::tableColumns($conn, 'course_sections');
 
         $conn->begin_transaction();
         try {
             $newCourseId = self::uniqueCourseId($conn);
-            if (mmh_course_supports_unit_section_access($newCourseId)) {
-                throw new RuntimeException('A duplicated Course cannot claim the reserved Math OL Full Course identifier.');
-            }
             $sections = self::fetchAll($conn, 'SELECT * FROM course_sections WHERE course_id = ? ORDER BY sort_order ASC, id ASC', 's', [$sourceCourseId]);
             $items = self::fetchAll($conn, 'SELECT ci.*, COALESCE(cs.sort_order, 2147483647) AS source_section_sort, COALESCE(cs.id, 2147483647) AS source_section_id FROM course_items ci LEFT JOIN course_sections cs ON cs.course_id = ci.course_id AND cs.section_id = ci.section_id WHERE ci.course_id = ? ORDER BY source_section_sort ASC, source_section_id ASC, ci.page_order ASC, ci.sort_order ASC, ci.id ASC', 's', [$sourceCourseId]);
             $sections = array_values(array_filter($sections, static fn(array $row): bool => self::isActiveCopySource($row)));
             $items = array_values(array_filter($items, static fn(array $row): bool => self::isActiveCopySource($row)));
-            foreach ($sections as $section) self::assertSectionAccessCopyAllowed($section, $newCourseId);
+            foreach ($sections as $section) self::assertSectionAccessCopyAllowed($section, $newCourseId, $supportsUnitSectionAccess);
 
             $isPublished = $courseState === 'draft' ? '0' : '1';
             $legacyVisibility = $courseState === 'public' ? 'public' : 'private';
@@ -71,6 +71,7 @@ final class CourseContentCopyService
                 'default_homework_score_mode' => $sourceCourse['default_homework_score_mode'] ?? 'disabled',
                 'username' => $adminUsername,
                 'course_state' => $courseState,
+                'supports_unit_section_access' => $supportsUnitSectionAccess ? 1 : 0,
                 'course_status' => $isPublished,
                 'course_visibility' => $legacyVisibility,
                 'archived_at' => null,
@@ -215,11 +216,14 @@ final class CourseContentCopyService
         if (!$source) {
             throw new RuntimeException('The source section was not found.');
         }
-        self::assertSectionAccessCopyAllowed($source, $destinationCourseId);
+        self::assertSectionAccessCopyAllowed($source, $destinationCourseId, null, $conn);
         $items = self::fetchAll($conn, 'SELECT * FROM course_items WHERE course_id = ? AND section_id = ? ORDER BY page_order ASC, sort_order ASC, id ASC', 'ss', [$sourceCourseId, $sourceSectionId]);
 
         $conn->begin_transaction();
         try {
+            $destination = self::fetchOne($conn, 'SELECT course_id FROM courses WHERE course_id = ? LIMIT 1 FOR UPDATE', 's', [$destinationCourseId]);
+            if (!$destination) throw new RuntimeException('The selected Course is no longer available.');
+            self::assertSectionAccessCopyAllowed($source, $destinationCourseId, null, $conn);
             $newSectionId = self::uniqueId($conn, 'course_sections', 'section_id', $destinationCourseId, 10000, 999999);
             $newSort = self::nextOrder($conn, 'course_sections', 'sort_order', 'course_id', $destinationCourseId);
             $warnings = [];
@@ -256,14 +260,15 @@ final class CourseContentCopyService
         }
     }
 
-    private static function assertSectionAccessCopyAllowed(array $section, string $destinationCourseId): void
+    private static function assertSectionAccessCopyAllowed(array $section, string $destinationCourseId, ?bool $destinationCapability = null, ?mysqli $conn = null): void
     {
         $accessUnit = strtolower(trim((string) ($section['access_unit'] ?? 'shared')));
         if (!in_array($accessUnit, ['shared', 'unit1', 'unit2'], true)) {
             throw new RuntimeException('The Section has an invalid access setting and cannot be copied safely.');
         }
-        if ($accessUnit !== 'shared' && !mmh_course_supports_unit_section_access($destinationCourseId)) {
-            throw new RuntimeException('Unit-restricted Sections can only be copied into Math OL Full Course.');
+        $supports = $destinationCapability ?? mmh_course_supports_unit_section_access($destinationCourseId, $conn);
+        if ($accessUnit !== 'shared' && !$supports) {
+            throw new RuntimeException('Unit-restricted Sections can only be copied into a Course with Unit Section Access enabled.');
         }
     }
 

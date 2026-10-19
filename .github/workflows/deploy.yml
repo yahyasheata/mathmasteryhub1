@@ -58,6 +58,8 @@ jobs:
             chmod 600 "$preflight_script"
             git show origin/main:scripts/preflight_a_level_live_session_schema.php > "$preflight_script"
             MMH_PROJECT_ROOT="$PWD" php "$preflight_script"
+            git show origin/main:database/migrations/20261019_add_course_unit_section_capability.php > database/migrations/20261019_add_course_unit_section_capability.php
+            php database/migrations/20261019_add_course_unit_section_capability.php
             git show origin/main:database/migrations/20261018_add_live_schedule_deleted_at.php > database/migrations/20261018_add_live_schedule_deleted_at.php
             php database/migrations/20261018_add_live_schedule_deleted_at.php
             git show origin/main:database/migrations/20261018_add_my_courses_group_key.php > database/migrations/20261018_add_my_courses_group_key.php

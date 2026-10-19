@@ -17,11 +17,11 @@ $assert = static function (bool $condition, string $message): void { if (!$condi
 try {
     $query($admin, 'CREATE DATABASE `' . $testDatabase . '` CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci');
     $assert($admin->select_db($testDatabase), 'Unable to select isolated enrollment database.');
-    $query($admin, "CREATE TABLE courses (course_id VARCHAR(40) PRIMARY KEY, course_title VARCHAR(190) NOT NULL, course_state VARCHAR(16) NOT NULL, archived_at DATETIME NULL)");
+    $query($admin, "CREATE TABLE courses (course_id VARCHAR(40) PRIMARY KEY, course_title VARCHAR(190) NOT NULL, course_state VARCHAR(16) NOT NULL, archived_at DATETIME NULL, supports_unit_section_access TINYINT(1) NOT NULL DEFAULT 0)");
     $query($admin, "CREATE TABLE course_sections (id INT AUTO_INCREMENT PRIMARY KEY, section_id VARCHAR(40) NOT NULL, course_id VARCHAR(40) NOT NULL, title VARCHAR(190), section_type VARCHAR(30), access_unit VARCHAR(10) NOT NULL DEFAULT 'shared')");
     $query($admin, "CREATE TABLE course_logs (id INT AUTO_INCREMENT PRIMARY KEY, user_id INT NOT NULL, course_id VARCHAR(40) NOT NULL, course_title VARCHAR(190) NULL, purchase_date DATETIME NULL, unit_access VARCHAR(10) NULL DEFAULT NULL, KEY idx_enrollment(course_id,user_id))");
     $query($admin, "CREATE TABLE learning_events (id INT AUTO_INCREMENT PRIMARY KEY, user_id INT NOT NULL, course_id VARCHAR(40) NOT NULL)");
-    $query($admin, "INSERT INTO courses VALUES ('source','Source Course','public',NULL),('target','Target Course','public',NULL),('private','Private Course','private',NULL),('draft','Draft Course','draft',NULL),('archived','Archived Course','private',NOW()),('3078','Math OL Full Course','private',NULL),('bootstrap','Bootstrap Course','private',NULL)");
+    $query($admin, "INSERT INTO courses (course_id,course_title,course_state,archived_at,supports_unit_section_access) VALUES ('source','Source Course','public',NULL,0),('target','Target Course','public',NULL,0),('private','Private Course','private',NULL,0),('draft','Draft Course','draft',NULL,0),('archived','Archived Course','private',NOW(),0),('3078','Math OL Full Course','private',NULL,1),('7656057','Math OL May/June 2027','private',NULL,1),('4359','Math OL Edexcel Course','private',NULL,0),('cambridge-pure1','Cambridge Pure 1','private',NULL,0),('bootstrap','Bootstrap Course','private',NULL,0),('cap-section','Capability Section test','private',NULL,1),('cap-enrollment','Capability enrollment test','private',NULL,1)");
     $query($admin, "INSERT INTO course_sections (section_id,course_id,title,section_type,access_unit) VALUES ('u1','3078','Unit 1','unit','unit1'),('u2','3078','Unit 2','unit','unit2'),('shared','3078','Shared','lecture','shared')");
 
     $insert = $admin->prepare("INSERT INTO course_logs (user_id,course_id,course_title,purchase_date) VALUES (?, ?, ?, NOW())");
@@ -33,6 +33,8 @@ try {
     $query($admin, "INSERT INTO course_logs (user_id,course_id,course_title,purchase_date,unit_access) VALUES (12,'3078','Math OL Full Course',NOW(),NULL)");
     $query($admin, "INSERT INTO course_sections (section_id,course_id,title,section_type,access_unit) VALUES ('intro','bootstrap','Introduction','lecture','shared')");
     $query($admin, "INSERT INTO course_logs (user_id,course_id,course_title,purchase_date,unit_access) VALUES (21,'bootstrap','Bootstrap Course',NOW(),NULL),(22,'bootstrap','Bootstrap Course',NOW(),NULL)");
+    $query($admin, "INSERT INTO course_sections (section_id,course_id,title,section_type,access_unit) VALUES ('restricted','cap-section','Restricted','lecture','unit1')");
+    $query($admin, "INSERT INTO course_logs (user_id,course_id,course_title,purchase_date,unit_access) VALUES (31,'cap-enrollment','Capability enrollment test',NOW(),'unit2')");
     $query($admin, "INSERT INTO learning_events (user_id,course_id) VALUES (1,'source'),(4,'source')");
 
     $assert(!mmh_enrollment_ensure($admin, 13, '3078', 'Math OL Full Course'), 'Full Course enrollment accepted without an explicit entitlement after Unit Sections exist.');
@@ -59,7 +61,12 @@ try {
     $assert(student_course_access_unit_allowed('unit2', 'unit2') && !student_course_access_unit_allowed('unit1', 'unit2'), 'Unit 2 access matrix is incorrect.');
     $assert(student_course_access_unit_allowed('unit1', 'both') && student_course_access_unit_allowed('unit2', 'both'), 'Both Units entitlement is incorrect.');
     $assert(!student_course_access_unit_allowed('unit1', 'unlock_all') && !student_course_access_unit_allowed('unit2', 'unlock_all'), 'Unlock All bypassed Unit entitlement.');
-    $assert(mmh_course_supports_unit_section_access('3078') && !mmh_course_supports_unit_section_access('4359') && !mmh_course_supports_unit_section_access('source'), 'Unit Section capability does not match the canonical Course scope.');
+    $assert(mmh_course_supports_unit_section_access('3078', $admin) && mmh_course_supports_unit_section_access('7656057', $admin) && !mmh_course_supports_unit_section_access('4359', $admin) && !mmh_course_supports_unit_section_access('cambridge-pure1', $admin) && !mmh_course_supports_unit_section_access('source', $admin), 'Unit Section capability does not match the explicit Course data.');
+    $assert(mmh_course_unit_access_disable_blocker($admin, '3078') !== '', 'Disabling capability was allowed while restricted Sections and classified enrollments remain.');
+    $assert(mmh_course_unit_access_disable_blocker($admin, 'cap-section') !== '', 'Disabling capability was allowed while a restricted Section remains.');
+    $assert(mmh_course_unit_access_disable_blocker($admin, 'cap-enrollment') !== '', 'Disabling capability was allowed while a classified enrollment remains.');
+    $assert(mmh_course_unit_access_disable_blocker($admin, 'source') === '', 'Disabling capability was blocked for a Course with no Unit-specific data.');
+    $assert(!mmh_enrollment_ensure($admin, 44, '4359', 'Math OL Edexcel Course', null, true, 'unit1'), 'Edexcel O-Level Course accepted a Unit classification.');
 
     $assert(mmh_enrollment_ensure($admin, 9, 'private', 'Private Course'), 'Direct enrollment into a private course failed.');
     $assert((int) $admin->query("SELECT COUNT(*) AS total FROM course_logs WHERE user_id=9 AND course_id='private'")->fetch_assoc()['total'] === 1, 'Private enrollment row was not created.');
@@ -95,11 +102,11 @@ try {
     $assert(is_string($handler) && str_contains($handler, 'mmh_enrollment_remove_batch') && str_contains($handler, 'mmh_enrollment_move_batch'), 'Admin handler does not use canonical enrollment services.');
     $addUser = file_get_contents(dirname(__DIR__) . '/views/admin/requests/addUser-course.php');
     $assert(is_string($addUser) && str_contains($addUser, "course_state IN ('public', 'private')") && str_contains($addUser, 'mmh_enrollment_ensure'), 'Direct admin enrollment does not accept Private courses through the canonical writer.');
-    $assert(is_string($addUser) && str_contains($addUser, "name='unit_access'") && str_contains($addUser, 'mmh_course_supports_unit_section_access') && str_contains($addUser, "'unit1'") && str_contains($addUser, "'unit2'") && str_contains($addUser, "'both'"), 'Admin Add Student form is missing scoped explicit Unit entitlement choices.');
+    $assert(is_string($addUser) && str_contains($addUser, "name='unit_access'") && str_contains($addUser, "!empty(\$unitState['supported'])") && str_contains($addUser, "'unit1'") && str_contains($addUser, "'unit2'") && str_contains($addUser, "'both'"), 'Admin Add Student form is missing scoped explicit Unit entitlement choices.');
     $assert(is_string($page) && str_contains($page, 'Unclassified') && str_contains($page, 'Save Unit Access') && str_contains($page, '$unitAccessSupported'), 'Admin enrollment management does not scope Unit controls to the supported Course.');
     $assert(is_string($handler) && str_contains($handler, 'mmh_enrollment_set_unit_access_batch'), 'Admin enrollment edit does not use the canonical Unit Access service.');
     $assert(is_string($sectionForm) && str_contains($sectionForm, "name='access_unit'") && str_contains($sectionForm, 'mmh_course_supports_unit_section_access') && str_contains($sectionForm, 'unit1') && str_contains($sectionForm, 'unit2'), 'Admin Section form is missing scoped Unit Access choices.');
-    $assert(is_string($sectionSave) && str_contains($sectionSave, 'add_section_activation_blocker') && str_contains($sectionSave, 'unclassified') && str_contains($sectionSave, 'Unit-restricted Sections are available only in Math OL Full Course.'), 'Restricted Section activation is not scoped or does not prevent unsafe unresolved enrollments.');
+    $assert(is_string($sectionSave) && str_contains($sectionSave, 'add_section_activation_blocker') && str_contains($sectionSave, 'unclassified') && str_contains($sectionSave, 'Unit-restricted Sections are available only in a Course with Unit Section Access enabled.'), 'Restricted Section activation is not scoped or does not prevent unsafe unresolved enrollments.');
     $assert(is_string($index) && str_contains($index, "mmh_admin_require_mutation()"), 'Admin enrollment route is not mutation-protected.');
     $assert(is_string($page) && str_contains($page, 'mmh_admin_csrf_token()'), 'Enrollment management form is missing admin CSRF.');
     $assert(governoratesInfo(1)['governorate_name_en'] === 'Cairo' && governoratesInfo('27')['governorate_name_en'] === 'Sohag', 'Governorate lookup failed for integer/numeric-string IDs.');

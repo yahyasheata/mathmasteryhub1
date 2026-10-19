@@ -23,7 +23,7 @@ if (!$course) {
 }
 $unitAccessState = mmh_enrollment_course_unit_state($conn, $courseId);
 if ($unitAccessState === null) { http_response_code(503); exit('Course access configuration is unavailable.'); }
-$unitAccessSupported = mmh_course_supports_unit_section_access($courseId);
+$unitAccessSupported = mmh_course_supports_unit_section_access($courseId, $conn);
 $unitAccessReady = !empty($unitAccessState['ready']) && $unitAccessSupported;
 $unitAccessCandidate = !empty($unitAccessState['candidate']) && $unitAccessSupported;
 
@@ -47,8 +47,9 @@ if ($targetStmt) {
 }
 foreach ($targetCourses as &$targetCourse) {
     $state = mmh_enrollment_course_unit_state($conn, (string) $targetCourse['course_id']);
-    $targetCourse['unit_candidate'] = mmh_course_supports_unit_section_access((string) $targetCourse['course_id']) && !empty($state['candidate']);
-    $targetCourse['unit_restricted'] = mmh_course_supports_unit_section_access((string) $targetCourse['course_id']) && !empty($state['restricted']);
+    $targetSupported = !empty($state['supported']);
+    $targetCourse['unit_candidate'] = $targetSupported && !empty($state['candidate']);
+    $targetCourse['unit_restricted'] = $targetSupported && !empty($state['restricted']);
 }
 unset($targetCourse);
 $hasRestrictedTarget = count(array_filter($targetCourses, static fn(array $target): bool => !empty($target['unit_restricted']))) > 0;
