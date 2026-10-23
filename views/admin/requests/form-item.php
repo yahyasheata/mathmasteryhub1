@@ -259,8 +259,20 @@ $legacy_video_item = $is_edit
     && ($raw_template_type === 'video' || ($raw_template_type === '' && (string) ($item['item_type'] ?? '') === 'video'));
 if ($legacy_video_item) {
     $legacy_video_resolution = mmh_course_resource_resolve($item);
-    if (($legacy_video_resolution['action'] ?? '') === 'recording_external'
+    if (in_array(($legacy_video_resolution['action'] ?? ''), ['recording_external', 'recording_parts'], true)
         || (($legacy_video_resolution['action'] ?? '') === 'embed' && ($legacy_video_resolution['embed_kind'] ?? '') === 'google')) {
+        $template_type = 'recording';
+    }
+}
+
+// Keep structured legacy Resources that represent recordings in the same
+// Recording editor so editing and playback share one primary URL.
+if ($is_edit && $raw_template_type === 'resource') {
+    $resource_data = mmh_course_resource_template_data($item['template_data'] ?? '');
+    $resource_kind = strtolower(trim((string) ($resource_data['resource_type'] ?? ($resource_data['resource']['type'] ?? ''))));
+    $resource_provider = strtolower(trim((string) ($resource_data['resource_provider'] ?? ($resource_data['resource']['provider'] ?? ''))));
+    if (in_array($resource_kind, ['recording', 'video'], true)
+        || in_array($resource_provider, ['sharepoint', 'microsoft_stream', 'teams'], true)) {
         $template_type = 'recording';
     }
 }
@@ -466,7 +478,10 @@ if ($template_type === 'classified_assignment') {
 $legacy_content = $item['item_description'];
 $notes_content = $template_type === 'notes' ? ($template_data['content'] ?? $item['item_description']) : '';
 $assignment_instructions = $template_type === 'classified_assignment' ? ($template_data['instructions'] ?? $template_data['description'] ?? $assignment_record['assignment_description'] ?? '') : '';
-$recording_url = $template_type === 'recording' ? ($template_data['url'] ?? $template_data['external_url'] ?? form_item_first_href($item['item_description'])) : '';
+$recording_parts = $template_type === 'recording' ? mmh_course_resource_recording_parts($item) : [];
+$recording_part_names = $template_type === 'recording' ? mmh_course_resource_recording_part_names($item, count($recording_parts)) : [];
+$recording_url = $recording_parts[0] ?? '';
+$recording_additional_urls = array_slice($recording_parts, 1);
 $recording_link_status = $template_type === 'recording' ? mmh_course_resource_microsoft_recording_status($recording_url) : ['state' => ''];
 $recording_warning = ($recording_link_status['state'] ?? '') === 'legacy_embed'
     ? "<div class='alert alert-warning mt-2 mb-0'>This is a legacy Microsoft embed link. Replace it with a normal SharePoint / Microsoft Stream sharing link before saving.</div>"
@@ -896,8 +911,25 @@ $html_response = "
             <div class='{$pane_class['recording']}' data-template-pane='recording'>
               <div class='row'>
                 <div class='col-12 col-lg-8 p-2'>
-                  <label for='{$form_id}-recording-url'>Recording URL</label>
-                  <input id='{$form_id}-recording-url' type='url' class='form-control' name='recording_url' data-template-required='recording' value='" . form_item_json_value(['url' => $recording_url], 'url') . "' placeholder='https://...'>
+                  <div data-recording-parts>
+                    <div data-recording-parts-list>
+                      <div class='mb-2' data-recording-part>
+                        <label for='{$form_id}-recording-url' data-recording-part-label>Part 1</label>
+                        <input id='{$form_id}-recording-url' type='url' class='form-control' name='recording_url' data-template-required='recording' value='" . form_item_json_value(['url' => $recording_url], 'url') . "' placeholder='https://...'>
+                        <label for='{$form_id}-recording-name' class='form-label mt-2'>Display name (optional)</label>
+                        <input id='{$form_id}-recording-name' type='text' class='form-control' name='recording_part_names[]' maxlength='80' data-recording-part-name value='" . form_item_json_value(['name' => $recording_part_names[0] ?? ''], 'name') . "' placeholder='Part 1'>
+                      </div>";
+foreach ($recording_additional_urls as $partIndex => $partUrl) {
+    $partNumber = $partIndex + 2;
+    $safePartUrl = form_item_json_value(['url' => $partUrl], 'url');
+    $partInputId = $form_id . '-recording-url-' . $partNumber;
+    $partNameId = $form_id . '-recording-name-' . $partNumber;
+    $safePartName = form_item_json_value(['name' => $recording_part_names[$partNumber - 1] ?? ''], 'name');
+    $html_response .= "<div class='mb-2' data-recording-part data-recording-extra><label for='{$partInputId}' data-recording-part-label>Part {$partNumber}</label><div class='input-group'><input id='{$partInputId}' type='url' class='form-control' name='additional_recording_urls[]' data-template-required='recording' value='{$safePartUrl}' required placeholder='https://...'><button type='button' class='btn btn-outline-secondary' data-recording-remove aria-label='Remove Part {$partNumber}'>Remove</button></div><label for='{$partNameId}' class='form-label mt-2'>Display name (optional)</label><input id='{$partNameId}' type='text' class='form-control' name='recording_part_names[]' maxlength='80' data-recording-part-name value='{$safePartName}' placeholder='Part {$partNumber}'></div>";
+}
+$html_response .= "</div>
+                    <button type='button' class='btn btn-outline-secondary btn-sm' data-recording-add-part>+ Add Part</button>
+                  </div>
                   <small class='text-muted d-block mt-2'>Paste a supported SharePoint, Microsoft Teams, or Google Drive recording link. Do not paste iframe HTML or an embed.aspx URL.</small>
                   {$recording_warning}
                 </div>
@@ -905,6 +937,8 @@ $html_response = "
               </div>
             </div>
 
+            ";
+$html_response .= "
             <div class='{$pane_class['resource']}' data-template-pane='resource'>
               <div class='row'>
                 <div class='col-12 col-lg-4 p-2'><div>Resource Type</div><select class='form-control' name='structured_resource_type' data-template-required='resource'>{$structured_resource_type_options_html}</select></div>

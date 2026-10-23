@@ -130,7 +130,12 @@
       frame.addEventListener('load', resourcePreviewLoaded);
       frame.addEventListener('error', resourcePreviewFailed);
       diagnostic('iframe-listeners-attached');
-      beginLoad('initial');
+      if (viewer.dataset.recordingInitialMode === 'external') {
+        setState('idle');
+        announce('Choose a recording part to open.');
+      } else {
+        beginLoad('initial');
+      }
     } else {
       beginLoad('initial');
     }
@@ -169,6 +174,53 @@
     reload.addEventListener('click', function () {
       diagnostic('reload-requested');
       beginLoad('reload');
+    });
+  }
+
+  var partSelector = viewer.querySelector('[data-recording-part-selector]');
+  if (partSelector) {
+    partSelector.addEventListener('click', function (event) {
+      var button = event.target.closest('[data-recording-part-button]');
+      if (!button) return;
+      var mode = button.dataset.recordingPartMode || '';
+      var openUrl = button.dataset.recordingPartOpen || '';
+      var embedUrl = button.dataset.recordingPartEmbed || '';
+      if (!openUrl || (mode !== 'external' && (!embedUrl || mode !== 'embed'))) return;
+
+      partSelector.querySelectorAll('[data-recording-part-button]').forEach(function (item) {
+        var selected = item === button;
+        item.setAttribute('aria-pressed', selected ? 'true' : 'false');
+        item.classList.toggle('course-btn-primary', selected);
+        item.classList.toggle('course-btn-secondary', !selected);
+      });
+      var externalPanel = viewer.querySelector('[data-recording-external-panel]');
+      var embedPanel = viewer.querySelector('[data-recording-embed-panel]');
+      var externalOpen = viewer.querySelector('[data-recording-open]');
+      var iframe = viewer.querySelector('[data-resource-viewer-frame]');
+      var stageElement = viewer.querySelector('[data-resource-viewer-stage]');
+      var externalLink = viewer.querySelector('[data-resource-open-external]');
+      var downloadLink = viewer.querySelector('[data-resource-download]');
+      if (externalOpen) externalOpen.href = openUrl;
+      if (externalLink) externalLink.href = openUrl;
+      if (downloadLink) {
+        downloadLink.href = button.dataset.recordingPartDownload || openUrl;
+        downloadLink.hidden = !button.dataset.recordingPartDownload;
+      }
+      var isExternal = mode === 'external';
+      if (externalPanel) externalPanel.hidden = !isExternal;
+      if (embedPanel) embedPanel.hidden = isExternal;
+      if (stageElement) stageElement.hidden = isExternal;
+      if (iframe && !isExternal) iframe.setAttribute('data-resource-viewer-src', embedUrl);
+      if (stageElement) stageElement.dataset.resourceKind = button.dataset.recordingPartKind === 'google' ? 'recording' : 'recording';
+      viewer.dataset.resourceViewerKind = isExternal ? 'recording_external' : 'recording';
+      source = isExternal ? '' : embedUrl;
+      if (isExternal) {
+        clearFallback();
+        setState('idle');
+        announce('Part selected. Open the recording in a new tab.');
+      } else {
+        beginLoad('part');
+      }
     });
   }
 

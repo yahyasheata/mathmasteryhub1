@@ -62,7 +62,7 @@ if (!function_exists('student_course_access_active_item_sql')) {
     function student_course_access_active_item_sql(string $alias = ''): string
     {
         $prefix = $alias !== '' ? rtrim($alias, '.') . '.' : '';
-        return "({$prefix}archived_at IS NULL OR {$prefix}archived_at = '') AND ({$prefix}status IS NULL OR {$prefix}status = '' OR {$prefix}status = 'published')";
+        return "{$prefix}archived_at IS NULL AND ({$prefix}status IS NULL OR {$prefix}status = '' OR {$prefix}status = 'published')";
     }
 }
 

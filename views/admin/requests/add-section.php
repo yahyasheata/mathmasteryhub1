@@ -104,7 +104,7 @@ function add_section_activation_blocker(mysqli $conn, string $courseId, string $
     if ($unclassified > 0) return $unclassified . ' enrolled student' . ($unclassified === 1 ? ' is' : 's are') . ' still unclassified. Assign Unit Access to every student before restricting a Section.';
 
     $items = $conn->prepare("SELECT i.item_id FROM course_items i LEFT JOIN course_sections s ON s.course_id = i.course_id AND s.section_id = i.section_id
-        WHERE i.course_id = ? AND (i.archived_at IS NULL OR i.archived_at = '') AND (i.status IS NULL OR i.status = '' OR i.status = 'published')
+        WHERE i.course_id = ? AND i.archived_at IS NULL AND (i.status IS NULL OR i.status = '' OR i.status = 'published')
           AND (i.section_id IS NULL OR i.section_id = '' OR s.section_id IS NULL) LIMIT 1");
     if (!$items) return 'Course Item section integrity could not be verified.';
     $items->bind_param('s', $courseId); $items->execute();
@@ -131,7 +131,7 @@ function add_section_activation_blocker(mysqli $conn, string $courseId, string $
         $rule = (string) ($row['completion_rule'] ?? '');
         $assignmentId = trim((string) ($row['unlock_homework_id'] ?? ''));
         if ($assignmentId === '' || !in_array($mode, ['after_homework_submission', 'after_homework_approval'], true) && !in_array($rule, ['homework_submitted', 'homework_approved'], true)) continue;
-        $dependency = $conn->prepare('SELECT i.section_id, a.section_id AS assignment_section FROM course_items i INNER JOIN assignments a ON a.assignment_id = i.assignment_id AND a.course_id = i.course_id WHERE i.course_id = ? AND a.assignment_id = ? AND (i.archived_at IS NULL OR i.archived_at = \'\') AND (i.status IS NULL OR i.status = \'\' OR i.status = \'published\')');
+        $dependency = $conn->prepare('SELECT i.section_id, a.section_id AS assignment_section FROM course_items i INNER JOIN assignments a ON a.assignment_id = i.assignment_id AND a.course_id = i.course_id WHERE i.course_id = ? AND a.assignment_id = ? AND i.archived_at IS NULL AND (i.status IS NULL OR i.status = \'\' OR i.status = \'published\')');
         if (!$dependency) return 'Homework dependencies could not be verified.';
         $dependency->bind_param('ss', $courseId, $assignmentId); $dependency->execute();
         $matches = $dependency->get_result()->fetch_all(MYSQLI_ASSOC); $dependency->close();

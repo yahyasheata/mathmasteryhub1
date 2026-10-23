@@ -70,6 +70,7 @@ if (!function_exists('mmh_student_resource_adapter')) {
         return match ((string) ($resource['action'] ?? 'unavailable')) {
             'embed' => 'course_resource_viewer',
             'recording_external' => 'course_resource_viewer',
+            'recording_parts' => 'course_resource_viewer',
             'homework' => 'homework',
             'timed_exam' => 'timed_exam',
             'render' => 'course_content',

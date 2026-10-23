@@ -180,7 +180,7 @@ function form_section_homework_options(mysqli $conn, $course_id, $section_id, $s
     if (trim((string) $section_id) === '') {
         return $html;
     }
-    $itemArchiveFilter = mmh_assignment_identity_column_exists($conn, 'course_items', 'archived_at') ? " AND (archived_at IS NULL OR archived_at = '')" : '';
+    $itemArchiveFilter = mmh_assignment_identity_column_exists($conn, 'course_items', 'archived_at') ? ' AND archived_at IS NULL' : '';
     $itemStmt = $conn->prepare("SELECT * FROM course_items WHERE course_id = ? AND section_id = ?" . $itemArchiveFilter . "
         AND (status IS NULL OR status = '' OR status = 'published') ORDER BY page_order ASC, id ASC");
     if (!$itemStmt) return $html;

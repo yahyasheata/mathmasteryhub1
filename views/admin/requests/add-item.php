@@ -143,6 +143,44 @@ function item_existing_metadata()
     return is_array($decoded) ? $decoded : [];
 }
 
+function item_recording_url($value, int $partNumber): string
+{
+    $url = trim((string) $value);
+    if ($url === '') {
+        item_response(false, "Part {$partNumber} needs a recording URL.");
+    }
+    $microsoft = mmh_course_resource_microsoft_recording_status($url);
+    if (($microsoft['state'] ?? '') === 'legacy_embed') {
+        item_response(false, "Part {$partNumber} uses a legacy embed.aspx URL. Paste its normal SharePoint / Microsoft Stream sharing link.");
+    }
+    if (($microsoft['state'] ?? '') === 'external') {
+        return (string) $microsoft['url'];
+    }
+    $drive = mmh_course_resource_embed_details($url, 'recording');
+    if (($drive['kind'] ?? '') !== 'google') {
+        item_response(false, "Part {$partNumber} is not a supported SharePoint, Microsoft Teams, or Google Drive recording link.");
+    }
+    return (string) mmh_course_resource_safe_url($url);
+}
+
+function item_recording_part_name($value, int $partNumber): string
+{
+    if (!is_scalar($value)) {
+        item_response(false, "Part {$partNumber} display name is invalid.");
+    }
+    $name = trim((string) $value);
+    if (function_exists('mb_strlen')) {
+        $length = mb_strlen($name, 'UTF-8');
+    } else {
+        $matched = preg_match_all('/./us', $name, $characters);
+        $length = $matched === false ? strlen($name) : $matched;
+    }
+    if ($length > 80) {
+        item_response(false, "Part {$partNumber} display name must be 80 characters or fewer.");
+    }
+    return $name;
+}
+
 /**
  * Stores only explicit lesson values in section_overrides. Existing metadata
  * remains untouched unless the compact override panel was submitted.
@@ -664,26 +702,73 @@ function item_build_template(mysqli $conn, $template_type, $course_id, $item_tit
 
     switch ($template_type) {
         case 'recording':
-            $url = item_post('recording_url');
-            $recordingStatus = mmh_course_resource_microsoft_recording_status($url);
-            if (($recordingStatus['state'] ?? '') === 'legacy_embed') {
-                item_response(false, 'This is a legacy embed.aspx URL. Paste the normal SharePoint / Microsoft Stream sharing link students can open externally.');
+            $url = item_recording_url(item_post('recording_url'), 1);
+            $additionalInput = $_POST['additional_recording_urls'] ?? [];
+            if (!is_array($additionalInput)) {
+                item_response(false, 'Recording parts were not submitted correctly. No lesson was saved.');
             }
-            if (($recordingStatus['state'] ?? '') === 'external') {
-                $url = (string) $recordingStatus['url'];
-            } else {
-                $drivePreview = mmh_course_resource_embed_details($url, 'recording');
-                if (($drivePreview['kind'] ?? '') !== 'google') {
-                    item_response(false, 'Validation failed. Paste a supported SharePoint, Microsoft Teams, or Google Drive file recording link.');
+            $additionalUrls = [];
+            foreach (array_values($additionalInput) as $index => $partUrl) {
+                $additionalUrls[] = item_recording_url($partUrl, $index + 2);
+            }
+            $nameInput = $_POST['recording_part_names'] ?? [];
+            if (!is_array($nameInput)) {
+                item_response(false, 'Recording part names were not submitted correctly. No lesson was saved.');
+            }
+            $nameInput = array_values($nameInput);
+            $partNames = [];
+            for ($index = 0, $partCount = count($additionalUrls) + 1; $index < $partCount; $index++) {
+                $partNames[] = item_recording_part_name($nameInput[$index] ?? '', $index + 1);
+            }
+
+            $existingData = $existingResourceItem
+                ? mmh_course_resource_template_data($existingResourceItem['template_data'] ?? '')
+                : [];
+            $existingResourceKind = strtolower(trim((string) ($existingData['resource_type'] ?? ($existingData['resource']['type'] ?? ''))));
+            $existingResourceProvider = strtolower(trim((string) ($existingData['resource_provider'] ?? ($existingData['resource']['provider'] ?? ''))));
+            $preserveStructuredRecording = strtolower((string) ($existingResourceItem['template_type'] ?? '')) === 'resource'
+                && (in_array($existingResourceKind, ['recording', 'video'], true)
+                    || in_array($existingResourceProvider, ['sharepoint', 'microsoft_stream', 'teams'], true));
+            $existingTemplateType = (string) ($existingResourceItem['template_type'] ?? '');
+            $preserveLegacyVideoType = $existingResourceItem
+                && in_array(strtolower(trim($existingTemplateType)), ['', 'video'], true)
+                && strtolower(trim((string) ($existingResourceItem['item_type'] ?? ''))) === 'video';
+            $storedTemplateType = $preserveStructuredRecording ? 'resource' : ($preserveLegacyVideoType ? $existingTemplateType : 'recording');
+            $template_data = array_merge($existingData, ['template_type' => $storedTemplateType]);
+            // Keep the existing structured Resource URL field authoritative
+            // when that was the original representation; otherwise use the
+            // Recording `url` field. Remove stale aliases before writing.
+            unset($template_data['external_url']);
+            if ($preserveStructuredRecording) {
+                if (array_key_exists('resource_url', $existingData)) {
+                    $template_data['resource_url'] = $url;
                 }
-                $url = (string) mmh_course_resource_safe_url($url);
+                if (!array_key_exists('resource_url', $existingData) || is_array($existingData['resource'] ?? null)) {
+                    $resource = is_array($existingData['resource'] ?? null) ? $existingData['resource'] : [];
+                    $resource['url'] = $url;
+                    $template_data['resource'] = $resource;
+                }
+                unset($template_data['url']);
+            } else {
+                $template_data['url'] = $url;
             }
             $lesson_number = item_post('page_order');
-            $template_data = array_merge($template_data, [
-                'url' => $url,
-                'lesson_number' => is_numeric($lesson_number) ? (int) $lesson_number : '',
-            ]);
-            $html = item_recording_html($item_title, $url);
+            $template_data['lesson_number'] = is_numeric($lesson_number)
+                ? (int) $lesson_number
+                : ($existingData['lesson_number'] ?? '');
+            if ($additionalUrls) $template_data['additional_recording_urls'] = $additionalUrls;
+            else unset($template_data['additional_recording_urls']);
+            if (count(array_filter($partNames, static fn(string $name): bool => $name !== '')) > 0) {
+                $template_data['recording_part_names'] = $partNames;
+            } else {
+                unset($template_data['recording_part_names']);
+            }
+            // Keep legacy teacher-authored lesson content on edits. The saved
+            // structured URL is authoritative for playback; generated HTML
+            // remains the new-item default only.
+            $html = $existingResourceItem
+                ? (string) ($existingResourceItem['item_description'] ?? '')
+                : item_recording_html($item_title, $url);
             break;
 
         case 'classified_assignment':
@@ -1043,12 +1128,19 @@ function item_build_template(mysqli $conn, $template_type, $course_id, $item_tit
         $academic_metadata = item_collect_academic_metadata($conn, $course_id, false);
     }
 
-    $itemMetadata = $template_type === 'classified_assignment' ? item_existing_metadata() : $academic_metadata;
+    if ($template_type === 'recording' && $existingResourceItem) {
+        $storedMetadata = json_decode((string) ($existingResourceItem['metadata'] ?? ''), true);
+        $storedMetadata = is_array($storedMetadata) ? $storedMetadata : [];
+        $itemMetadata = array_replace($storedMetadata, $academic_metadata);
+    } else {
+        $itemMetadata = $template_type === 'classified_assignment' ? item_existing_metadata() : $academic_metadata;
+    }
     $itemMetadata = item_apply_section_metadata_overrides($conn, $course_id, $itemMetadata);
 
     return [
         'html' => $html,
         'data' => $template_data,
+        'template_type' => $template_type === 'recording' && !empty($preserveStructuredRecording) ? 'resource' : $template_type,
         // Classified Assignment metadata is canonical on assignments (linked
         // back through item_id), so it is not duplicated in course_items.
         'metadata' => $itemMetadata,
@@ -1082,10 +1174,10 @@ $allowed_item_types = ['video', 'file', 'quiz', 'timed_exam'];
 $posted_item_type = isset($_POST['item_type']) && in_array($_POST['item_type'], $allowed_item_types, true) ? $_POST['item_type'] : '';
 $item_type = (in_array($template_type, ['custom_html', 'resource'], true) && $posted_item_type !== '') ? $posted_item_type : item_type_for_template($template_type);
 $existing_resource_item = [];
-if ($template_type === 'resource' && $method === 'UPDATE' && item_post('item_id') !== '') {
-    $resource_stmt = $conn->prepare('SELECT item_description, template_data FROM course_items WHERE item_id = ? AND course_id = ? LIMIT 1');
+if (in_array($template_type, ['resource', 'recording'], true) && $method === 'UPDATE' && item_post('item_id') !== '') {
+    $resource_stmt = $conn->prepare('SELECT * FROM course_items WHERE item_id = ? AND course_id = ? LIMIT 1');
     if (!$resource_stmt) {
-        item_response(false, 'Unable to load the existing resource.');
+        item_response(false, 'Unable to load the existing lesson.');
     }
     $resource_item_id = item_post('item_id');
     $resource_stmt->bind_param('ss', $resource_item_id, $course_id);
@@ -1095,9 +1187,18 @@ if ($template_type === 'resource' && $method === 'UPDATE' && item_post('item_id'
     if (!$existing_resource_item) {
         item_response(false, 'Lesson not found.');
     }
+    if ($template_type === 'recording' && strtolower((string) ($existing_resource_item['template_type'] ?? '')) === 'resource') {
+        $existingData = mmh_course_resource_template_data($existing_resource_item['template_data'] ?? '');
+        $existingKind = strtolower(trim((string) ($existingData['resource_type'] ?? ($existingData['resource']['type'] ?? ''))));
+        $existingProvider = strtolower(trim((string) ($existingData['resource_provider'] ?? ($existingData['resource']['provider'] ?? ''))));
+        if (in_array($existingKind, ['recording', 'video'], true) || in_array($existingProvider, ['sharepoint', 'microsoft_stream', 'teams'], true)) {
+            $item_type = (string) ($existing_resource_item['item_type'] ?? $item_type);
+        }
+    }
 }
 $duration_minutes = item_optional_duration_minutes();
 $built = item_build_template($conn, $template_type, $course_id, $item_title, $existing_resource_item);
+$stored_template_type = (string) ($built['template_type'] ?? $template_type);
 $item_description = $built['html'];
 $template_data_json = item_json($built['data']);
 $item_metadata_json = item_json($built['metadata'] ?? []);
@@ -1233,7 +1334,7 @@ try {
         if ($has_template_type) {
             $sets[] = 'template_type = ?';
             $types .= 's';
-            $params[] = $template_type;
+            $params[] = $stored_template_type;
         }
         if ($has_template_data) {
             $sets[] = 'template_data = ?';
@@ -1307,7 +1408,7 @@ try {
         item_response(true, 'Lesson updated successfully.', [
             'course_id' => $course_id,
             'item_id' => $item_id,
-            'template_type' => $template_type,
+            'template_type' => $stored_template_type,
         ]);
     }
 

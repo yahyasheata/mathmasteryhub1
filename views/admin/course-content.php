@@ -32,7 +32,7 @@ if (!$course) {
 
 $item_archive_filter = '';
 $archive_column = $conn->prepare("SELECT 1 FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'course_items' AND COLUMN_NAME = 'archived_at' LIMIT 1");
-if ($archive_column) { $archive_column->execute(); if ($archive_column->get_result()->fetch_assoc()) $item_archive_filter = " AND (archived_at IS NULL OR archived_at = '')"; $archive_column->close(); }
+if ($archive_column) { $archive_column->execute(); if ($archive_column->get_result()->fetch_assoc()) $item_archive_filter = ' AND archived_at IS NULL'; $archive_column->close(); }
 $count_stmt = $conn->prepare('SELECT COUNT(*) AS total FROM course_items WHERE course_id = ?' . $item_archive_filter);
 $count_stmt->bind_param('s', $course_id);
 $count_stmt->execute();
@@ -657,6 +657,31 @@ $admin_base = rtrim((string) $baseUrl, '/') . '/admin/';
   $(document).on('show.bs.dropdown.courseManager', '#course-manager-list .dropdown', function() { $(this).closest('.course-manager-section').addClass('has-open-menu'); });
   $(document).on('hidden.bs.dropdown.courseManager', '#course-manager-list .dropdown', function() { $(this).closest('.course-manager-section').removeClass('has-open-menu'); });
   $(document).on('click.courseManager', '#course-manager-editor .template-card', function(event) { event.preventDefault(); activateTemplate($(this).closest('form'), $(this).data('template')); markEditorDirty(); });
+  function updateRecordingPartLabels($list) {
+    $list.children('[data-recording-part]').each(function(index) {
+      var label = 'Part ' + (index + 1);
+      $(this).find('[data-recording-part-label]').first().text(label);
+      $(this).find('[data-recording-part-name]').attr('placeholder', label);
+      $(this).find('[data-recording-remove]').attr('aria-label', 'Remove ' + label);
+    });
+  }
+  $(document).on('click.courseManager', '#course-manager-editor [data-recording-add-part]', function() {
+    var $list = $(this).siblings('[data-recording-parts-list]');
+    var inputId = 'recording-part-' + Date.now() + '-' + Math.floor(Math.random() * 1000000);
+    var nameId = inputId + '-name';
+    var $part = $('<div class="mb-2" data-recording-part data-recording-extra><label data-recording-part-label></label><div class="input-group"><input type="url" class="form-control" name="additional_recording_urls[]" data-template-required="recording" required placeholder="https://..."><button type="button" class="btn btn-outline-secondary" data-recording-remove>Remove</button></div><label class="form-label mt-2" for="' + nameId + '">Display name (optional)</label><input id="' + nameId + '" type="text" class="form-control" name="recording_part_names[]" maxlength="80" data-recording-part-name placeholder="Part 2"></div>');
+    $part.find('[data-recording-part-label]').attr('for', inputId);
+    $part.find('input[type="url"]').attr('id', inputId);
+    $list.append($part);
+    updateRecordingPartLabels($list);
+    markEditorDirty();
+  });
+  $(document).on('click.courseManager', '#course-manager-editor [data-recording-remove]', function() {
+    var $list = $(this).closest('[data-recording-parts-list]');
+    $(this).closest('[data-recording-extra]').remove();
+    updateRecordingPartLabels($list);
+    markEditorDirty();
+  });
   $(document).on('change.courseManager', '#course-manager-editor [data-custom-label-selector]', function() { updateCustomLabel($(this).closest('form')); markEditorDirty(); });
   $(document).on('change.courseManager', '#course-manager-editor .sectionTypeSelector, #course-manager-editor .sectionUnlockModeSelector, #course-manager-editor .sectionCompletionRuleSelector, #course-manager-editor .sectionReleaseModeSelector', function() { updateSectionFields($(this).closest('form')); markEditorDirty(); });
   $(document).on('submit.courseManager', '#course-manager-editor .courseBuilderItemForm, #course-manager-editor .courseBuilderSectionForm', function(event) { event.preventDefault(); saveEditorForm(this); });

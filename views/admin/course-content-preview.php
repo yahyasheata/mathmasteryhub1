@@ -129,7 +129,36 @@ $timedExamPreview = $action === 'timed_exam' ? mmh_timed_exam_load_for_item($con
             </header>
 
             <section class="course-content-preview-stage" aria-label="Lesson preview">
-                <?php if ($action === 'embed' && $embedUrl !== ''): ?>
+                <?php if ($action === 'recording_parts' && !empty($resource['recording_parts'])): $previewParts = $resource['recording_parts']; $previewPart = $previewParts[0]; ?>
+                    <nav class="course-resource-recording-parts" aria-label="Recording parts" data-preview-recording-parts>
+                        <?php foreach ($previewParts as $partIndex => $part): ?><button type="button" class="btn <?= $partIndex === 0 ? 'btn-primary' : 'btn-outline-secondary'; ?>" data-preview-recording-part data-mode="<?= admin_content_preview_escape($part['mode'] ?? ''); ?>" data-open="<?= admin_content_preview_escape($part['open_url'] ?? ''); ?>" data-embed="<?= admin_content_preview_escape($part['embed_url'] ?? ''); ?>" aria-pressed="<?= $partIndex === 0 ? 'true' : 'false'; ?>"><?= admin_content_preview_escape($part['label'] ?? ('Part ' . ($partIndex + 1))); ?></button><?php endforeach; ?>
+                    </nav>
+                    <div data-preview-recording-external<?= ($previewPart['mode'] ?? '') === 'external' ? '' : ' hidden'; ?>><h2>This recording opens externally</h2><p>The selected part opens in its provider in a new tab.</p><a class="btn btn-primary" data-preview-recording-open href="<?= admin_content_preview_escape($previewPart['open_url'] ?? ''); ?>" target="_blank" rel="noopener noreferrer">Open Recording</a></div>
+                    <iframe class="course-content-preview-embed" data-preview-recording-frame src="<?= admin_content_preview_escape($previewPart['embed_url'] ?? ''); ?>" title="<?= admin_content_preview_escape($title); ?> preview" loading="eager" referrerpolicy="no-referrer" allow="fullscreen; picture-in-picture" allowfullscreen<?= ($previewPart['mode'] ?? '') === 'external' ? ' hidden' : ''; ?>></iframe>
+                    <script>
+                    (function () {
+                        var nav = document.querySelector('[data-preview-recording-parts]');
+                        if (!nav) return;
+                        nav.addEventListener('click', function (event) {
+                            var button = event.target.closest('[data-preview-recording-part]');
+                            if (!button) return;
+                            nav.querySelectorAll('[data-preview-recording-part]').forEach(function (part) {
+                                var selected = part === button;
+                                part.setAttribute('aria-pressed', selected ? 'true' : 'false');
+                                part.classList.toggle('btn-primary', selected);
+                                part.classList.toggle('btn-outline-secondary', !selected);
+                            });
+                            var external = document.querySelector('[data-preview-recording-external]');
+                            var frame = document.querySelector('[data-preview-recording-frame]');
+                            var link = document.querySelector('[data-preview-recording-open]');
+                            var isExternal = button.dataset.mode === 'external';
+                            if (external) external.hidden = !isExternal;
+                            if (frame) { frame.hidden = isExternal; if (!isExternal) frame.src = button.dataset.embed || ''; }
+                            if (link) link.href = button.dataset.open || '';
+                        });
+                    }());
+                    </script>
+                <?php elseif ($action === 'embed' && $embedUrl !== ''): ?>
                     <iframe class="course-content-preview-embed" src="<?= admin_content_preview_escape($embedUrl); ?>" title="<?= admin_content_preview_escape($title); ?> preview" loading="eager" referrerpolicy="no-referrer" allow="fullscreen; picture-in-picture" allowfullscreen></iframe>
                 <?php elseif ($action === 'redirect' && $openUrl !== ''): ?>
                     <div class="course-content-preview-external">

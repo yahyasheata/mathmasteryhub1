@@ -2081,6 +2081,11 @@ body.theme-light .course-learning-page .student-course-section.is-locked .studen
 .course-resource-viewer[data-resource-viewer-kind='recording_external'] .course-resource-viewer-navigation { width: min(100%, 760px); margin: 18px auto 0; padding: 10px 14px; border: 1px solid var(--border); border-radius: var(--radius-md); background: color-mix(in srgb, var(--surface) 96%, var(--bg-primary)); box-shadow: var(--shadow-sm); }
 .course-resource-viewer[data-resource-viewer-kind='recording_external'] .course-resource-viewer-navigation > div { flex: 1 1 0; }
 .course-resource-viewer[data-resource-viewer-kind='recording_external'] .course-resource-viewer-navigation > div:last-child { text-align: right; }
+.course-resource-recording-parts { display: flex; flex-wrap: wrap; gap: 8px; width: min(100%, 760px); margin: 18px auto 0; }
+.course-resource-recording-parts .course-btn { min-height: 40px; }
+.course-resource-viewer [data-recording-external-panel][hidden],
+.course-resource-viewer [data-recording-embed-panel][hidden],
+.course-resource-viewer [data-resource-viewer-stage][hidden] { display: none !important; }
 @media (max-width: 600px) {
   .course-resource-viewer[data-resource-viewer-kind='recording_external'] .course-resource-recording-card { flex-direction: column; gap: 14px; width: 100%; margin-top: 14px; padding: 20px; }
   .course-resource-viewer[data-resource-viewer-kind='recording_external'] .course-resource-recording-open { width: 100%; justify-content: center; }

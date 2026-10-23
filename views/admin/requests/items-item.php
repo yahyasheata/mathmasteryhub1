@@ -594,7 +594,7 @@ if ($has_sections) {
     $section_stmt->close();
 }
 
-$item_archive_filter = items_item_column_exists($conn, 'archived_at') ? " AND (archived_at IS NULL OR archived_at = '')" : '';
+$item_archive_filter = items_item_column_exists($conn, 'archived_at') ? ' AND archived_at IS NULL' : '';
 $stmt = $conn->prepare('SELECT * FROM course_items WHERE course_id = ?' . $item_archive_filter . ' ORDER BY page_order ASC, id ASC');
 $stmt->bind_param('s', $course_id);
 $stmt->execute();

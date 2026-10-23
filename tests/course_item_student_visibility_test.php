@@ -5,7 +5,7 @@ if (PHP_SAPI !== 'cli') exit("CLI only\n");
 $root = dirname(__DIR__);
 require_once $root . '/inc/StudentCourseAccess.php';
 
-$expected = "(i.archived_at IS NULL OR i.archived_at = '') AND (i.status IS NULL OR i.status = '' OR i.status = 'published')";
+$expected = "i.archived_at IS NULL AND (i.status IS NULL OR i.status = '' OR i.status = 'published')";
 if (student_course_access_active_item_sql('i') !== $expected) {
     throw new RuntimeException('Canonical active-item predicate changed unexpectedly.');
 }

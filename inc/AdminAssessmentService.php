@@ -7,7 +7,7 @@ if (!function_exists('mmh_admin_assignment_item_map')) {
     {
         $map = [];
         $conflicts = [];
-        $itemArchiveFilter = mmh_assignment_identity_column_exists($conn, 'course_items', 'archived_at') ? " AND (i.archived_at IS NULL OR i.archived_at = '')" : '';
+        $itemArchiveFilter = mmh_assignment_identity_column_exists($conn, 'course_items', 'archived_at') ? ' AND i.archived_at IS NULL' : '';
         $result = $conn->query("SELECT i.id AS item_db_id, i.course_id, i.item_id, i.item_title, i.item_type, i.template_type, i.template_data, i.item_description, i.assignment_id, i.status AS item_status FROM course_items i WHERE i.template_type = 'classified_assignment'" . $itemArchiveFilter . " AND (i.status IS NULL OR i.status = '' OR i.status = 'published')");
         if (!$result) throw new RuntimeException('Unable to load Assignment Course Items: ' . $conn->error);
         while ($item = $result->fetch_assoc()) {

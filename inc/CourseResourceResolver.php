@@ -151,6 +151,50 @@ if (!function_exists('mmh_course_resource_template_data')) {
     }
 }
 
+if (!function_exists('mmh_course_resource_recording_parts')) {
+    /** Return the supported, ordered URLs for one Recording Course Item. */
+    function mmh_course_resource_recording_parts(array $item): array
+    {
+        $data = mmh_course_resource_template_data($item['template_data'] ?? '');
+        $type = strtolower(trim((string) ($item['template_type'] ?? '')));
+        $resourceType = strtolower(trim((string) ($data['resource_type'] ?? ($data['resource']['type'] ?? ''))));
+        $resourceProvider = strtolower(trim((string) ($data['resource_provider'] ?? ($data['resource']['provider'] ?? ''))));
+        $isStructuredRecording = $type === 'resource'
+            && (in_array($resourceType, ['recording', 'video'], true)
+                || in_array($resourceProvider, ['sharepoint', 'microsoft_stream', 'teams'], true));
+
+        $primary = $isStructuredRecording
+            ? trim((string) ($data['resource_url'] ?? ($data['resource']['url'] ?? '')))
+            : trim((string) ($data['url'] ?? ($data['external_url'] ?? '')));
+        if ($primary === '') {
+            // This is the same conservative legacy HTML resolver used by playback.
+            $primary = (string) (mmh_course_resource_simple_legacy_url($item['item_description'] ?? '', $item['item_title'] ?? '') ?? '');
+        }
+
+        $parts = [];
+        foreach (array_merge([$primary], is_array($data['additional_recording_urls'] ?? null) ? $data['additional_recording_urls'] : []) as $candidate) {
+            $candidate = trim((string) $candidate);
+            if ($candidate !== '') $parts[] = $candidate;
+        }
+        return array_values($parts);
+    }
+}
+
+if (!function_exists('mmh_course_resource_recording_part_names')) {
+    /** Return optional labels aligned with the ordered Recording URLs. */
+    function mmh_course_resource_recording_part_names(array $item, int $partCount): array
+    {
+        $data = mmh_course_resource_template_data($item['template_data'] ?? '');
+        $storedNames = is_array($data['recording_part_names'] ?? null) ? $data['recording_part_names'] : [];
+        $names = [];
+        for ($index = 0; $index < max(0, $partCount); $index++) {
+            $value = $storedNames[$index] ?? '';
+            $names[] = is_scalar($value) ? trim((string) $value) : '';
+        }
+        return $names;
+    }
+}
+
 if (!function_exists('mmh_course_assignment_canonical_id')) {
     /**
      * The authoritative Course Item -> Assignment link.
@@ -574,6 +618,43 @@ if (!function_exists('mmh_course_resource_resolve_core')) {
         $nativeResourceUrl = mmh_course_resource_safe_url($data['resource_url'] ?? $data['resource']['url'] ?? '');
         $nativeResourceType = strtolower(trim((string) ($data['resource_type'] ?? $data['resource']['type'] ?? '')));
         $nativeResourceProvider = strtolower(trim((string) ($data['resource_provider'] ?? $data['resource']['provider'] ?? '')));
+        $recordingParts = ($type === 'recording' || $type === 'video'
+            || ($type === 'resource' && (in_array($nativeResourceType, ['recording', 'video'], true)
+                || in_array($nativeResourceProvider, ['sharepoint', 'microsoft_stream', 'teams'], true))))
+            ? mmh_course_resource_recording_parts($item)
+            : [];
+        if (count($recordingParts) > 1
+            && ($type === 'recording' || $type === 'video'
+                || ($type === 'resource' && (in_array($nativeResourceType, ['recording', 'video'], true)
+                    || in_array($nativeResourceProvider, ['sharepoint', 'microsoft_stream', 'teams'], true))))) {
+            $resolvedParts = [];
+            $recordingPartNames = mmh_course_resource_recording_part_names($item, count($recordingParts));
+            foreach ($recordingParts as $partIndex => $partUrl) {
+                $partLabel = $recordingPartNames[$partIndex] ?? '';
+                $microsoft = mmh_course_resource_microsoft_recording_status($partUrl);
+                $embed = mmh_course_resource_embed_details($partUrl, 'recording');
+                if (($microsoft['state'] ?? '') === 'external') {
+                    $resolvedParts[] = ['mode' => 'external', 'url' => $partUrl, 'open_url' => $partUrl, 'label' => $partLabel !== '' ? $partLabel : 'Part ' . ($partIndex + 1)];
+                } elseif (($embed['kind'] ?? '') === 'google') {
+                    $resolvedParts[] = ['mode' => 'embed', 'url' => $partUrl, 'open_url' => $embed['open_url'], 'embed_url' => $embed['embed_url'], 'download_url' => $embed['download_url'], 'embed_kind' => $embed['kind'], 'label' => $partLabel !== '' ? $partLabel : 'Part ' . ($partIndex + 1)];
+                }
+            }
+            if (count($resolvedParts) > 1) {
+                return [
+                    'action' => 'recording_parts',
+                    'recording_parts' => $resolvedParts,
+                    'url' => $resolvedParts[0]['url'],
+                    'open_url' => $resolvedParts[0]['open_url'],
+                    'embed_url' => $resolvedParts[0]['embed_url'] ?? '',
+                    'download_url' => $resolvedParts[0]['download_url'] ?? '',
+                    'embed_kind' => $resolvedParts[0]['embed_kind'] ?? 'recording_external',
+                    'description' => (string) ($data['description'] ?? ''),
+                    'label' => 'Recording',
+                    'icon' => 'fas fa-play-circle',
+                    'event_type' => mmh_lesson_open_event('recording'),
+                ];
+            }
+        }
         if ($type === 'resource' && $nativeResourceUrl !== null) {
             $nativeResourceType = $nativeResourceType !== '' ? $nativeResourceType : 'external_link';
             [$label, $icon] = mmh_course_resource_display_meta($nativeResourceType, $nativeResourceProvider, $nativeResourceUrl);
