@@ -2131,6 +2131,81 @@ body.theme-light .course-learning-page .student-course-section.is-locked .studen
   .course-resource-viewer-page .course-resource-viewer-toolbar button { transition: none; }
 }
 
+/* Desktop recording polish: keep completion actions in the header column and
+   make multipart selection part of the viewer controls flow. */
+.course-resource-viewer-page .course-resource-viewer-heading { align-items: stretch; }
+.course-resource-viewer-page .course-resource-viewer-title-block { min-width: 0; }
+.course-resource-viewer-page .course-resource-viewer-header-actions {
+  display: flex;
+  flex: 0 0 auto;
+  flex-direction: column;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 12px;
+  margin-left: auto;
+}
+.course-resource-viewer-page .course-resource-viewer-header-actions .course-resource-viewer-return {
+  order: -1;
+  margin-left: 0;
+}
+.course-resource-viewer-page .course-resource-viewer-header-actions [data-resource-complete] {
+  min-height: 40px;
+  margin-top: auto;
+  white-space: nowrap;
+}
+.course-resource-viewer-page .course-resource-recording-controls { min-width: 0; }
+.course-resource-viewer-page .course-resource-recording-parts {
+  justify-content: flex-start;
+  width: 100%;
+  margin: 14px 0 8px;
+}
+.course-resource-viewer-page .course-resource-recording-parts .course-btn {
+  max-width: min(100%, 380px);
+  min-width: 0;
+  white-space: normal;
+  line-height: 1.25;
+  text-align: left;
+  box-shadow: none;
+  transform: none;
+  transition: none;
+}
+.course-resource-viewer-page .course-resource-recording-parts .course-btn-primary,
+.course-resource-viewer-page .course-resource-recording-parts .course-btn-primary:hover,
+.course-resource-viewer-page .course-resource-recording-parts .course-btn-primary:focus {
+  color: var(--primary-foreground) !important;
+  background: var(--primary-action) !important;
+  border-color: var(--primary-action) !important;
+  box-shadow: none;
+  transform: none;
+}
+.course-resource-viewer-page .course-resource-recording-parts .course-btn-secondary:hover,
+.course-resource-viewer-page .course-resource-recording-parts .course-btn-secondary:focus {
+  box-shadow: none;
+  transform: none;
+}
+.course-resource-viewer-page .course-resource-recording-parts .course-btn:focus-visible {
+  outline: 2px solid var(--primary);
+  outline-offset: 2px;
+  box-shadow: none;
+}
+@media (max-width: 720px) {
+  .course-resource-viewer-page .course-resource-viewer-header-actions { display: contents; }
+  .course-resource-viewer-page .course-resource-viewer-header-actions [data-resource-complete] {
+    grid-column: 2;
+    justify-self: start;
+    max-width: 100%;
+    min-height: 40px;
+    margin: 0;
+    white-space: normal;
+  }
+  .course-resource-viewer-page .course-resource-viewer-header-actions .course-resource-viewer-return {
+    grid-column: 2;
+    justify-self: start;
+    margin: 0;
+  }
+  .course-resource-viewer-page .course-resource-recording-parts { margin-top: 10px; }
+  .course-resource-viewer-page .course-resource-recording-parts .course-btn { max-width: 100%; }
+}
 
 /* Shared Homework surface — distinct assignment actions on the same LMS canvas. */
 .course-homework-page { min-height: 100vh; margin: 0; color: var(--text-primary); background: var(--bg-primary); }

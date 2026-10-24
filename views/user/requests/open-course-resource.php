@@ -176,9 +176,11 @@ function course_resource_render_viewer(mysqli $conn, $baseUrl, $userId, array $c
                 <p class="course-resource-viewer-meta"><?= course_resource_escape($resource['label'] ?? 'Resource'); ?><?php if ($lessonPosition > 0 && $lessonTotal > 0): ?> <span aria-hidden="true">•</span> Lesson <?= $lessonPosition; ?> of <?= $lessonTotal; ?><?php endif; ?><?php if ($durationLabel !== ''): ?> <span aria-hidden="true">•</span> <?= course_resource_escape($durationLabel); ?><?php endif; ?></p>
                 <h1><?= course_resource_escape($title); ?></h1>
                 <p class="course-resource-viewer-completion<?= $isCompleted ? ' is-complete' : ''; ?>"><span class="<?= $completionIcon; ?>" aria-hidden="true"></span> <?= course_resource_escape($completionLabel); ?></p>
-                <?php if ($manualCompletion): ?><button type="button" class="course-btn course-btn-secondary" data-resource-complete data-course-id="<?= course_resource_escape($course['course_id']); ?>" data-item-id="<?= course_resource_escape($itemId); ?>" data-section-id="<?= course_resource_escape((string) ($selection['section_id'] ?? '')); ?>" data-csrf="<?= course_resource_escape(student_course_csrf_token()); ?>"><span class="fas fa-check" aria-hidden="true"></span> Mark Lesson Complete</button><?php endif; ?>
             </div>
-            <a href="<?= course_resource_escape($returnUrl); ?>" class="course-resource-viewer-return"><span class="fas fa-arrow-left" aria-hidden="true"></span> Return to course</a>
+            <div class="course-resource-viewer-header-actions">
+                <?php if ($manualCompletion): ?><button type="button" class="course-btn course-btn-secondary" data-resource-complete data-course-id="<?= course_resource_escape($course['course_id']); ?>" data-item-id="<?= course_resource_escape($itemId); ?>" data-section-id="<?= course_resource_escape((string) ($selection['section_id'] ?? '')); ?>" data-csrf="<?= course_resource_escape(student_course_csrf_token()); ?>"><span class="fas fa-check" aria-hidden="true"></span> Mark Lesson Complete</button><?php endif; ?>
+                <a href="<?= course_resource_escape($returnUrl); ?>" class="course-resource-viewer-return"><span class="fas fa-arrow-left" aria-hidden="true"></span> Return to course</a>
+            </div>
         </div>
     </header>
 
@@ -187,6 +189,7 @@ function course_resource_render_viewer(mysqli $conn, $baseUrl, $userId, array $c
     <?php endif; ?>
 
 <?php if ($isMultipartRecording): ?>
+    <div class="course-resource-recording-controls">
     <nav class="course-resource-recording-parts" aria-label="Recording parts" data-recording-part-selector>
         <?php foreach ($recordingParts as $partIndex => $part): ?>
             <button type="button" class="course-btn <?= $partIndex === 0 ? 'course-btn-primary' : 'course-btn-secondary'; ?>" data-recording-part-button data-recording-part-mode="<?= course_resource_escape($part['mode'] ?? ''); ?>" data-recording-part-open="<?= course_resource_escape($part['open_url'] ?? ''); ?>" data-recording-part-embed="<?= course_resource_escape($part['embed_url'] ?? ''); ?>" data-recording-part-download="<?= course_resource_escape($part['download_url'] ?? ''); ?>" data-recording-part-kind="<?= course_resource_escape($part['embed_kind'] ?? 'recording_external'); ?>" aria-pressed="<?= $partIndex === 0 ? 'true' : 'false'; ?>"><?= course_resource_escape($part['label'] ?? ('Part ' . ($partIndex + 1))); ?></button>
@@ -204,6 +207,7 @@ function course_resource_render_viewer(mysqli $conn, $baseUrl, $userId, array $c
         <div class="course-resource-viewer-tool-divider" aria-hidden="true"></div>
         <div class="course-resource-viewer-tool-group course-resource-viewer-tool-group-actions"><span class="course-resource-viewer-tool-label">Actions</span><a href="<?= course_resource_escape($downloadUrl); ?>" target="_blank" rel="noopener noreferrer" data-resource-download<?= $downloadUrl === '' ? ' hidden' : ''; ?>><span class="fas fa-download" aria-hidden="true"></span><span>Download</span></a><button type="button" data-resource-copy><span class="fas fa-link" aria-hidden="true"></span><span>Copy link</span></button><button type="button" data-resource-reload><span class="fas fa-sync-alt" aria-hidden="true"></span><span>Reload</span></button><button type="button" data-resource-fullscreen aria-pressed="false"><span class="fas fa-expand" aria-hidden="true"></span><span>Fullscreen</span></button></div><span class="visually-hidden" data-resource-status role="status" aria-live="polite"></span>
     </section>
+    </div>
     <section id="resource-viewer-stage" class="course-resource-viewer-stage" data-resource-viewer-stage data-resource-kind="<?= course_resource_escape($stageKind); ?>" aria-label="<?= course_resource_escape($title); ?> viewer" tabindex="-1" aria-busy="true"<?= $isExternalRecording ? ' hidden' : ''; ?>><div class="course-resource-viewer-loading" data-resource-viewer-loading><span class="fas fa-circle-notch fa-spin" aria-hidden="true"></span><span>Preparing your resource…</span></div><iframe data-resource-viewer-frame data-resource-viewer-src="<?= course_resource_escape($embedUrl); ?>" title="<?= course_resource_escape($title); ?>" loading="eager" referrerpolicy="no-referrer" allow="fullscreen; picture-in-picture" allowfullscreen></iframe></section>
     <p class="course-resource-viewer-provider-notice" data-resource-viewer-notice role="status" aria-live="polite" hidden></p>
 <?php elseif ($isExternalRecording): ?>
